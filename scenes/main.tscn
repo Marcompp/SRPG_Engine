@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3 uid="uid://dydlc7h02vfc4"]
+
+[ext_resource type="Script" uid="uid://celkbc7d8ugph" path="res://scripts/battle.gd" id="1_battle"]
+[ext_resource type="Script" uid="uid://dhibolfsflu6r" path="res://scripts/battle_map.gd" id="2_map"]
+[ext_resource type="Script" uid="uid://blma2iny7sguk" path="res://scripts/cursor.gd" id="3_cursor"]
+[ext_resource type="Script" uid="uid://vc2b6fe3ln7p" path="res://scripts/ui.gd" id="4_ui"]
+
+[node name="Battle" type="Node2D"]
+script = ExtResource("1_battle")
+
+[node name="Map" type="Node2D" parent="."]
+script = ExtResource("2_map")
+
+[node name="Units" type="Node2D" parent="."]
+
+[node name="Cursor" type="Node2D" parent="."]
+script = ExtResource("3_cursor")
+
+[node name="UI" type="CanvasLayer" parent="."]
+script = ExtResource("4_ui")
