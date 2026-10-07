@@ -15,12 +15,21 @@ var _forecast: PanelContainer
 var _forecast_cells: Array = []
 var _spell_forecast: PanelContainer
 var _spell_label: Label
+var _trade: PanelContainer
+## One label per side of the trade window: [selected unit, partner].
+var _trade_labels: Array[Label] = []
 var _level_up: PanelContainer
 var _level_title: Label
 ## Rows of [name, value, gain] labels, one per stat in Experience.STATS.
 var _level_rows: Array = []
 var _banner: ColorRect
 var _banner_label: Label
+## Full-screen unit stats page.
+var _status: PanelContainer
+var _status_title: Label
+var _status_stats: GridContainer
+var _status_combat: GridContainer
+var _status_items: Label
 
 
 func _ready() -> void:
@@ -48,6 +57,8 @@ func _ready() -> void:
 	_spell_label = Label.new()
 	_spell_forecast = _make_panel(_spell_label)
 	_level_up = _make_level_up()
+	_trade = _make_trade()
+	_status = _make_status()
 
 	_banner = ColorRect.new()
 	_banner.position = Vector2(0, 56)
@@ -95,6 +106,21 @@ func _make_forecast() -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.visible = false
 	panel.add_child(grid)
+	_root.add_child(panel)
+	return panel
+
+
+func _make_trade() -> PanelContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	for i in 2:
+		var label := Label.new()
+		label.custom_minimum_size.x = 84
+		row.add_child(label)
+		_trade_labels.append(label)
+	var panel := PanelContainer.new()
+	panel.visible = false
+	panel.add_child(row)
 	_root.add_child(panel)
 	return panel
 
@@ -167,8 +193,14 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void
 		if unit.is_caster():
 			hp_line += "  MP %d/%d" % [unit.mp, unit.max_mp]
 		text = "%s  %s\n%s\n" % [unit.unit_name, lv, hp_line]
-		if not unit.items.is_empty() or not unit.is_caster():
+		if not unit.weapon.is_empty() or not unit.is_caster():
 			text += weapon + "\n"
+		var others: Array[String] = []
+		for i in unit.items.size():
+			if not Items.is_weapon(unit.items[i]):
+				others.append(item_label(unit, i))
+		if not others.is_empty():
+			text += "Items: %s\n" % ", ".join(others)
 		if not unit.spells.is_empty():
 			text += "Spells: %s\n" % ", ".join(unit.spells)
 		if unit.is_dancer:
@@ -267,9 +299,57 @@ func show_area_forecast(caster: Unit, spell_name: String, rows: Array, cursor_ce
 	_place(_spell_forecast, _away_right(cursor_cell), cursor_cell.y < 5)
 
 
+func show_shove_forecast(target: Unit, dest_terrain: String, cursor_cell: Vector2i) -> void:
+	_spell_label.text = "Shove\n%s -> %s" % [target.unit_name, dest_terrain]
+	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
 func show_dance_forecast(target: Unit, cursor_cell: Vector2i) -> void:
 	_spell_label.text = "Dance\n%s can act again" % target.unit_name
 	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
+static func item_label(unit: Unit, index: int) -> String:
+	var item := unit.items[index]
+	return "%s %d%s" % [item.name, item.uses, " E" if index == unit.equipped_index() else ""]
+
+
+## Partner's inventory while choosing who to trade with.
+func show_trade_preview(partner: Unit, cursor_cell: Vector2i) -> void:
+	var lines: Array[String] = ["Trade with %s" % partner.unit_name]
+	for i in partner.items.size():
+		lines.append("  " + item_label(partner, i))
+	if partner.items.is_empty():
+		lines.append("  (no items)")
+	_spell_label.text = "\n".join(lines)
+	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
+## Two inventories side by side. `cursor`/`held`: x = side (0 left, 1 right), y = slot;
+## held is (-1, -1) when nothing is picked up. ">" marks the cursor, "*" the held item.
+func show_trade(left: Unit, right: Unit, cursor: Vector2i, held: Vector2i) -> void:
+	hide_info()
+	var sides: Array[Unit] = [left, right]
+	for side in 2:
+		var u := sides[side]
+		var lines: Array[String] = [u.unit_name]
+		for slot in Unit.MAX_ITEMS:
+			var mark := "  "
+			if held == Vector2i(side, slot):
+				mark = "* "
+			if cursor == Vector2i(side, slot):
+				mark = "> "
+			lines.append(mark + (item_label(u, slot) if slot < u.items.size() else "---"))
+		_trade_labels[side].text = "\n".join(lines)
+	_trade.reset_size()
+	_trade.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 3)
+	_trade.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_trade.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_trade.visible = true
+
+
+func hide_trade() -> void:
+	_trade.visible = false
 
 
 func hide_forecast() -> void:
@@ -320,3 +400,120 @@ func show_end(text: String, color: Color) -> void:
 	_banner.color = Color(color, 0.85)
 	_banner.modulate.a = 1.0
 	_banner.visible = true
+
+
+# --- Stats screen ----------------------------------------------------------------
+
+func _make_status() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.visible = false
+	_root.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 4)
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 12)
+	panel.add_child(cols)
+
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 4)
+	cols.add_child(left)
+	_status_title = Label.new()
+	left.add_child(_status_title)
+	_status_stats = _make_pair_grid()
+	left.add_child(_status_stats)
+	var hint := Label.new()
+	hint.text = "Up/Down: next unit\nX: close"
+	hint.add_theme_color_override("font_color", DIM)
+	left.add_child(hint)
+
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 4)
+	cols.add_child(right)
+	_status_combat = _make_pair_grid()
+	right.add_child(_status_combat)
+	_status_items = Label.new()
+	right.add_child(_status_items)
+	return panel
+
+
+## Grid of label/value pairs, two pairs per row.
+func _make_pair_grid() -> GridContainer:
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 5)
+	grid.add_theme_constant_override("v_separation", 0)
+	return grid
+
+
+func _fill_pair_grid(grid: GridContainer, pairs: Array) -> void:
+	for child in grid.get_children():
+		grid.remove_child(child)
+		child.queue_free()
+	for pair in pairs:
+		var key := Label.new()
+		key.text = pair[0]
+		key.add_theme_color_override("font_color", DIM)
+		grid.add_child(key)
+		var value := Label.new()
+		value.text = str(pair[1])
+		value.custom_minimum_size.x = 16
+		grid.add_child(value)
+
+
+func show_status(unit: Unit) -> void:
+	var title := "%s  Lv %d" % [unit.unit_name, unit.level]
+	if unit.team == Unit.Team.PLAYER:
+		title += "  EXP %d" % unit.exp_points
+	title += "\nHP %d/%d" % [unit.hp, unit.max_hp]
+	if unit.is_caster():
+		title += "   MP %d/%d" % [unit.mp, unit.max_mp]
+	_status_title.text = title
+
+	var stats := [["STR", unit.strength]]
+	if unit.is_caster():
+		stats.append(["MAG", unit.magic])
+	stats.append_array([["SKL", unit.skill], ["SPD", unit.speed], ["LCK", unit.luck],
+		["DEF", unit.defense], ["RES", unit.resistance], ["MOV", unit.mov]])
+	_fill_pair_grid(_status_stats, stats)
+
+	# Combat numbers for the equipped weapon (before terrain and the weapon triangle).
+	var armed := not unit.weapon.is_empty()
+	var rng := "--"
+	if armed:
+		rng = str(unit.min_range) if unit.min_range == unit.max_range \
+			else "%d-%d" % [unit.min_range, unit.max_range]
+	_fill_pair_grid(_status_combat, [
+		["Atk", Combat.base_attack(unit) if armed else "--"],
+		["Hit", Combat.base_hit(unit) if armed else "--"],
+		["Avo", Combat.base_avoid(unit)],
+		["Crit", Combat.base_crit(unit) if armed else "--"],
+		["AS", Combat.attack_speed(unit)],
+		["Rng", rng],
+	])
+
+	var lines: Array[String] = ["Items"]
+	if unit.items.is_empty():
+		lines.append("  (none)")
+	var equipped := unit.equipped_index()
+	for i in unit.items.size():
+		var item := unit.items[i]
+		var mark := "E " if i == equipped else "   "
+		if Items.is_weapon(item):
+			var wr := str(item.min_rng) if item.min_rng == item.max_rng \
+				else "%d-%d" % [item.min_rng, item.max_rng]
+			lines.append("%s%s  %d  %s %s" % [mark, item.name, item.uses, item.type, wr])
+		else:
+			lines.append("%s%s  %d" % [mark, item.name, item.uses])
+	if not unit.spells.is_empty():
+		lines.append("Spells")
+		for s in unit.spells:
+			var spell := Spells.get_spell(s)
+			lines.append("   %s  %dMP  %s" % [s, spell.mp, str(spell.max_rng)
+				if spell.min_rng == spell.max_rng else "%d-%d" % [spell.min_rng, spell.max_rng]])
+	if unit.is_dancer:
+		lines.append("Skill: Dance")
+	_status_items.text = "\n".join(lines)
+	_status.visible = true
+
+
+func hide_status() -> void:
+	_status.visible = false

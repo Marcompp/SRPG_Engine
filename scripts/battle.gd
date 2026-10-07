@@ -1,20 +1,20 @@
 extends Node2D
 ## Battle controller: spawns units, runs the turn loop and routes input.
 
-enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, BUSY, GAME_OVER }
+enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, BUSY, GAME_OVER }
 
 const PLAYER_UNITS := [
-	{"name": "Lord", "cell": Vector2i(1, 4), "lord": true, "weapons": ["Iron Sword", "Knife"], "lv": 1,
+	{"name": "Lord", "cell": Vector2i(1, 4), "lord": true, "items": ["Iron Sword", "Knife", "Potion"], "lv": 1,
 		"spells": ["Earth Spike"],
 		"hp": 18, "str": 5, "mag": 2, "skl": 8, "spd": 9, "lck": 7, "def": 4, "res": 1, "mov": 5, "mp": 8,
 		"growths": {"hp": 80, "str": 45, "mag": 20, "skl": 50, "spd": 40, "lck": 45, "def": 30, "res": 30, "mp": 30}},
-	{"name": "Fighter", "cell": Vector2i(2, 2), "weapons": ["Iron Axe", "Hatchet"], "lv": 2,
+	{"name": "Fighter", "cell": Vector2i(2, 2), "items": ["Iron Axe", "Hatchet"], "lv": 2,
 		"hp": 24, "str": 7, "skl": 4, "spd": 5, "lck": 3, "def": 3, "res": 0, "mov": 5,
 		"growths": {"hp": 80, "str": 60, "skl": 40, "spd": 20, "lck": 45, "def": 25, "res": 15}},
-	{"name": "Knight", "cell": Vector2i(2, 6), "weapons": ["Iron Lance", "Javelin"], "lv": 1,
+	{"name": "Knight", "cell": Vector2i(2, 6), "items": ["Iron Lance", "Javelin", "Potion"], "lv": 1,
 		"hp": 22, "str": 7, "skl": 4, "spd": 2, "lck": 2, "def": 9, "res": 1, "mov": 4,
 		"growths": {"hp": 90, "str": 40, "skl": 30, "spd": 30, "lck": 35, "def": 55, "res": 15}},
-	{"name": "Archer", "cell": Vector2i(1, 6), "weapons": ["Iron Bow"], "lv": 1,
+	{"name": "Archer", "cell": Vector2i(1, 6), "items": ["Iron Bow"], "lv": 1,
 		"hp": 18, "str": 5, "skl": 7, "spd": 6, "lck": 4, "def": 3, "res": 1, "mov": 5,
 		"growths": {"hp": 60, "str": 40, "skl": 50, "spd": 60, "lck": 50, "def": 15, "res": 25}},
 	{"name": "Cleric", "cell": Vector2i(0, 5), "spells": ["Heal"], "lv": 1,
@@ -23,26 +23,26 @@ const PLAYER_UNITS := [
 	{"name": "Mage", "cell": Vector2i(0, 3), "spells": ["Fire", "Firestorm"], "lv": 1,
 		"hp": 16, "str": 1, "mag": 6, "skl": 5, "spd": 6, "lck": 3, "def": 2, "res": 4, "mov": 5, "mp": 14,
 		"growths": {"hp": 55, "str": 5, "mag": 60, "skl": 45, "spd": 45, "lck": 30, "def": 15, "res": 40, "mp": 50}},
-	{"name": "Dancer", "cell": Vector2i(0, 7), "dancer": true, "lv": 1,
+	{"name": "Dancer", "cell": Vector2i(0, 7), "dancer": true, "items": ["Potion"], "lv": 1,
 		"hp": 15, "str": 1, "skl": 3, "spd": 10, "lck": 8, "def": 1, "res": 3, "mov": 5,
 		"growths": {"hp": 60, "str": 10, "skl": 30, "spd": 65, "lck": 60, "def": 15, "res": 35}},
 ]
 const ENEMY_UNITS := [
-	{"name": "Thief", "cell": Vector2i(14, 1), "weapons": ["Knife"], "lv": 1,
+	{"name": "Thief", "cell": Vector2i(14, 1), "items": ["Knife"], "lv": 1,
 		"hp": 16, "str": 3, "skl": 5, "spd": 9, "lck": 2, "def": 1, "res": 1, "mov": 6},
-	{"name": "Brigand", "cell": Vector2i(12, 2), "weapons": ["Iron Axe", "Hatchet"], "lv": 2,
+	{"name": "Brigand", "cell": Vector2i(12, 2), "items": ["Iron Axe", "Hatchet"], "lv": 2,
 		"hp": 20, "str": 5, "skl": 1, "spd": 4, "lck": 0, "def": 3, "res": 0, "mov": 5},
-	{"name": "Soldier", "cell": Vector2i(13, 4), "weapons": ["Iron Lance", "Javelin"], "lv": 1,
+	{"name": "Soldier", "cell": Vector2i(13, 4), "items": ["Iron Lance", "Javelin"], "lv": 1,
 		"hp": 18, "str": 5, "skl": 3, "spd": 4, "lck": 1, "def": 4, "res": 1, "mov": 5},
-	{"name": "Archer", "cell": Vector2i(14, 5), "weapons": ["Iron Bow"], "lv": 2,
+	{"name": "Archer", "cell": Vector2i(14, 5), "items": ["Iron Bow"], "lv": 2,
 		"hp": 17, "str": 5, "skl": 4, "spd": 5, "lck": 1, "def": 2, "res": 1, "mov": 5},
-	{"name": "Brigand", "cell": Vector2i(12, 6), "weapons": ["Steel Axe"], "lv": 3,
+	{"name": "Brigand", "cell": Vector2i(12, 6), "items": ["Steel Axe"], "lv": 3,
 		"hp": 21, "str": 6, "skl": 2, "spd": 3, "lck": 0, "def": 2, "res": 0, "mov": 5},
 	{"name": "Cleric", "cell": Vector2i(14, 7), "spells": ["Heal"], "lv": 2,
 		"hp": 15, "str": 1, "mag": 4, "skl": 4, "spd": 6, "lck": 4, "def": 1, "res": 5, "mov": 5, "mp": 10},
 	{"name": "Mage", "cell": Vector2i(13, 6), "spells": ["Fire", "Firestorm"], "lv": 2,
 		"hp": 15, "str": 1, "mag": 5, "skl": 4, "spd": 5, "lck": 1, "def": 1, "res": 4, "mov": 5, "mp": 12},
-	{"name": "Mercenary", "cell": Vector2i(13, 8), "weapons": ["Killing Edge", "Iron Sword"], "lv": 3,
+	{"name": "Mercenary", "cell": Vector2i(13, 8), "items": ["Killing Edge", "Iron Sword"], "lv": 3,
 		"hp": 19, "str": 4, "skl": 6, "spd": 8, "lck": 2, "def": 3, "res": 1, "mov": 5},
 ]
 
@@ -64,10 +64,28 @@ var weapon_choices: Array[int] = []
 var spell_choices: Array[String] = []
 ## Spell being targeted, or "" when targeting an attack.
 var active_spell := ""
-## True while TARGETING picks an ally to Dance for.
-var dancing := false
+## What TARGETING is picking a unit for: "attack", "spell", "dance" or "trade".
+var target_mode := "attack"
+## Set once the selected unit trades; its move can no longer be undone.
+var has_traded := false
+## Trade screen state: the partner, cursor (x = side: 0 selected / 1 partner,
+## y = slot), and the picked-up item's (side, slot), or (-1, -1) when none.
+var trade_partner: Unit
+var trade_cursor := Vector2i.ZERO
+var trade_held := Vector2i(-1, -1)
 ## Cells an area spell may be centered on while in AREA_TARGET.
 var area_centers: Array[Vector2i] = []
+## Whether the enemy danger zone overlay is shown (toggled with danger_zone).
+var danger_on := false
+## Unit (either side) under the cursor while browsing, whose ranges are shown, or null.
+var hovered: Unit
+## Enemies the player marked (Z); their threat is drawn as a red overlay.
+var marked: Array[Unit] = []
+## Planned path for the selected unit; follows the cursor's trail when it can.
+var arrow: Array[Vector2i] = []
+## Unit shown on the stats screen, and the state to return to when it closes.
+var status_unit: Unit
+var status_return_state := State.IDLE
 
 
 func _ready() -> void:
@@ -112,9 +130,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	var dir := _dir_from(event)
 	var accept := event.is_action_pressed("confirm")
 	var cancel := event.is_action_pressed("cancel")
-	if dir == Vector2i.ZERO and not accept and not cancel:
+	var danger := event.is_action_pressed("danger_zone")
+	var info := event.is_action_pressed("unit_info")
+	if dir == Vector2i.ZERO and not accept and not cancel and not danger and not info:
 		return
 	get_viewport().set_input_as_handled()
+
+	# Map-view shortcuts, available while browsing or choosing where to move.
+	if state == State.IDLE or state == State.SELECTED:
+		if danger:
+			danger_on = not danger_on
+			refresh_threat()
+			return
+		if info:
+			var u := unit_at(cursor.cell)
+			if u:
+				open_status(u)
+			return
 
 	match state:
 		State.IDLE:
@@ -124,6 +156,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				var u := unit_at(cursor.cell)
 				if u and u.team == Unit.Team.PLAYER and not u.has_acted:
 					select(u)
+				elif u and u.team != Unit.Team.PLAYER:
+					toggle_mark(u)
 				elif u == null:
 					ui.hide_info()
 					var options: Array[String] = ["End Turn"]
@@ -131,6 +165,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		State.SELECTED:
 			if dir != Vector2i.ZERO:
 				move_cursor(dir)
+				update_arrow(cursor.cell)
 			elif accept and reach.cells.has(cursor.cell):
 				move_selected(cursor.cell)
 			elif cancel:
@@ -139,6 +174,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				selected = null
 				state = State.IDLE
 				refresh_info()
+		State.STATUS:
+			if dir.y != 0:
+				cycle_status(dir.y)
+			elif cancel or info:
+				close_status()
 		State.MENU:
 			if dir.y != 0:
 				ui.menu_move(dir.y)
@@ -155,9 +195,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				show_target()
 			elif accept:
 				ui.hide_forecast()
+				if target_mode == "trade":
+					open_trade(targets[target_index])
+					return
 				state = State.BUSY
-				if dancing:
+				if target_mode == "dance":
 					await do_dance(selected, targets[target_index])
+				elif target_mode == "shove":
+					await do_shove(selected, targets[target_index])
 				elif active_spell and Spells.is_support(active_spell):
 					await cast_heal(selected, targets[target_index], active_spell)
 				elif active_spell:
@@ -167,8 +212,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				finish_action()
 			elif cancel:
 				ui.hide_forecast()
+				map.clear_ranges()
 				cursor.cell = selected.cell
-				if dancing:
+				if target_mode in ["dance", "trade", "shove"]:
 					open_unit_menu()
 				elif active_spell:
 					open_magic_menu()
@@ -190,6 +236,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				map.clear_ranges()
 				cursor.cell = selected.cell
 				open_magic_menu()
+		State.TRADE:
+			if dir != Vector2i.ZERO:
+				trade_move(dir)
+			elif accept:
+				trade_accept()
+			elif cancel:
+				trade_cancel()
 		State.GAME_OVER:
 			if accept:
 				get_tree().reload_current_scene()
@@ -214,30 +267,145 @@ func move_cursor(dir: Vector2i) -> void:
 
 func refresh_info() -> void:
 	ui.update_info(unit_at(cursor.cell), map.terrain_at(cursor.cell), cursor.cell)
+	update_hover()
 
 
 # --- Player actions ----------------------------------------------------------
 
-func select(u: Unit) -> void:
-	selected = u
-	origin_cell = u.cell
-	reach = map.get_reachable(u, units())
+## Weapon ranges plus offensive spell reach. Spells the unit can't afford are
+## skipped when `affordable_only` (used for enemy threat, which must be accurate).
+func offense_ranges(u: Unit, affordable_only := false) -> Array[Vector2i]:
 	var offense := u.weapon_ranges()
-	for r in u.spell_ranges(false):
+	for s in u.spells:
+		if Spells.is_support(s) or (affordable_only and not Spells.can_afford(u, s)):
+			continue
+		var r := Spells.reach_ranges(s)
 		if not offense.has(r):
 			offense.append(r)
-	map.show_ranges(reach.cells.keys(), map.get_attack_cells(reach.cells, offense),
-		map.get_attack_cells(reach.cells, u.spell_ranges(true)))
+	return offense
+
+
+## Shows a unit's move (blue), attack (red) and support (green) ranges.
+func show_unit_ranges(u: Unit, unit_reach: Dictionary) -> void:
+	map.show_ranges(unit_reach.cells.keys(), map.get_attack_cells(unit_reach.cells, offense_ranges(u)),
+		map.get_attack_cells(unit_reach.cells, u.spell_ranges(true)))
+
+
+func select(u: Unit) -> void:
+	selected = u
+	has_traded = false
+	origin_cell = u.cell
+	reach = map.get_reachable(u, units())
+	show_unit_ranges(u, reach)
+	arrow = [u.cell]
+	map.arrow_path = arrow.duplicate()
 	state = State.SELECTED
 	refresh_info()
+
+
+## Extends the arrow along the cursor's trail if that stays a legal path within
+## MOV; otherwise falls back to the shortest path. Hidden while out of range.
+func update_arrow(target: Vector2i) -> void:
+	if target != selected.cell and not reach.parents.has(target):
+		arrow = []
+	elif arrow.has(target):
+		arrow = arrow.slice(0, arrow.find(target) + 1)
+	elif not arrow.is_empty() and BattleMap.distance(arrow[-1], target) == 1 \
+			and path_cost(arrow) + map.move_cost(target) <= selected.mov:
+		arrow.append(target)
+	else:
+		arrow = map.build_path(reach.parents, selected.cell, target)
+	map.arrow_path = arrow.duplicate()
+
+
+func path_cost(path: Array[Vector2i]) -> int:
+	var total := 0
+	for c in path.slice(1):
+		total += map.move_cost(c)
+	return total
 
 
 func move_selected(dest: Vector2i) -> void:
 	state = State.BUSY
 	map.clear_ranges()
 	ui.hide_info()
-	await selected.move_along(map.build_path(reach.parents, selected.cell, dest))
+	var path := arrow if not arrow.is_empty() and arrow[-1] == dest \
+		else map.build_path(reach.parents, selected.cell, dest)
+	await selected.move_along(path)
 	open_unit_menu()
+
+
+# --- Map info: enemy ranges, danger zone, stats screen -----------------------
+
+## While browsing, shows the move/attack ranges of whichever unit is under the cursor.
+func update_hover() -> void:
+	if state != State.IDLE:
+		return
+	hovered = unit_at(cursor.cell)
+	if hovered:
+		show_unit_ranges(hovered, map.get_reachable(hovered, units()))
+	else:
+		map.clear_ranges()
+
+
+## Z on an enemy adds/removes its threat from the red overlay.
+func toggle_mark(u: Unit) -> void:
+	if marked.has(u):
+		marked.erase(u)
+	else:
+		marked.append(u)
+	refresh_threat()
+
+
+## Every cell an enemy could attack next phase: where it can move, plus what its
+## weapons and affordable damage spells reach from there.
+func enemy_threat(e: Unit) -> Dictionary:
+	var cells := {}
+	var ranges := offense_ranges(e, true)
+	if ranges.is_empty():
+		return cells
+	var e_reach := map.get_reachable(e, units())
+	for c in e_reach.cells:
+		cells[c] = true
+	for c in map.get_attack_cells(e_reach.cells, ranges):
+		cells[c] = true
+	return cells
+
+
+func threat_of(enemies: Array[Unit]) -> Dictionary:
+	var cells := {}
+	for e in enemies:
+		cells.merge(enemy_threat(e))
+	return cells
+
+
+## Recomputes the purple (all enemies) and red (marked enemies) overlays. Called
+## whenever positions may have changed, and drops marks on enemies that died.
+func refresh_threat() -> void:
+	marked = marked.filter(func(e: Unit) -> bool: return is_instance_valid(e) and e.hp > 0)
+	map.danger_cells = threat_of(units_of(Unit.Team.ENEMY)) if danger_on else {}
+	map.marked_cells = threat_of(marked)
+
+
+func open_status(u: Unit) -> void:
+	status_return_state = state
+	status_unit = u
+	state = State.STATUS
+	ui.hide_info()
+	ui.show_status(u)
+
+
+## Up/Down flips through the shown unit's side, in roster order.
+func cycle_status(step: int) -> void:
+	var side := units_of(status_unit.team)
+	status_unit = side[wrapi(side.find(status_unit) + step, 0, side.size())]
+	ui.show_status(status_unit)
+
+
+func close_status() -> void:
+	ui.hide_status()
+	state = status_return_state
+	refresh_info()
 
 
 func enemies_in_range(u: Unit, w: Dictionary) -> Array[Unit]:
@@ -249,7 +417,7 @@ func enemies_in_range(u: Unit, w: Dictionary) -> Array[Unit]:
 
 
 func can_attack_any(u: Unit) -> bool:
-	for w in u.items:
+	for w in u.weapons():
 		if not enemies_in_range(u, w).is_empty():
 			return true
 	return false
@@ -268,6 +436,16 @@ func weapon_label(w: Dictionary) -> String:
 	return "%s  %d" % [w.name, w.uses]
 
 
+## Adjacent units on the same team; trading is allowed even if they already acted.
+func trade_partners(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	for ally in units_of(u.team):
+		if ally != u and BattleMap.distance(u.cell, ally.cell) == 1 \
+				and not (u.items.is_empty() and ally.items.is_empty()):
+			result.append(ally)
+	return result
+
+
 func open_unit_menu() -> void:
 	var options: Array[String] = []
 	if can_attack_any(selected):
@@ -276,6 +454,10 @@ func open_unit_menu() -> void:
 		options.append("Magic")
 	if not dance_targets(selected).is_empty():
 		options.append("Dance")
+	if not trade_partners(selected).is_empty():
+		options.append("Trade")
+	if not shove_targets(selected).is_empty():
+		options.append("Shove")
 	if not selected.items.is_empty():
 		options.append("Items")
 	options.append("Wait")
@@ -287,7 +469,7 @@ func open_attack_menu() -> void:
 	var options: Array[String] = []
 	weapon_choices = []
 	for i in selected.items.size():
-		if not enemies_in_range(selected, selected.items[i]).is_empty():
+		if Items.is_weapon(selected.items[i]) and not enemies_in_range(selected, selected.items[i]).is_empty():
 			options.append(weapon_label(selected.items[i]))
 			weapon_choices.append(i)
 	_open_menu("attack", options)
@@ -301,11 +483,13 @@ func open_magic_menu() -> void:
 	_open_menu("magic", options)
 
 
-## Inventory view; picking a weapon equips it (does not end the unit's turn).
+## Inventory view. Picking a weapon equips it (does not end the unit's turn);
+## picking a usable consumable uses it (ends the turn).
 func open_items_menu() -> void:
 	var options: Array[String] = []
+	var equipped := selected.equipped_index()
 	for i in selected.items.size():
-		options.append(weapon_label(selected.items[i]) + ("  (E)" if i == 0 else ""))
+		options.append(weapon_label(selected.items[i]) + ("  (E)" if i == equipped else ""))
 	_open_menu("items", options)
 
 
@@ -327,6 +511,10 @@ func menu_accept() -> void:
 					open_magic_menu()
 				"Dance":
 					start_dance_targeting()
+				"Trade":
+					start_trade_targeting()
+				"Shove":
+					start_shove_targeting()
 				"Items":
 					open_items_menu()
 				"Wait":
@@ -337,8 +525,18 @@ func menu_accept() -> void:
 		"magic":
 			start_spell_targeting(spell_choices[ui.menu_index])
 		"items":
-			selected.equip(ui.menu_index)
-			open_items_menu()
+			var item := selected.items[ui.menu_index]
+			if Items.is_weapon(item):
+				selected.equip(ui.menu_index)
+				open_items_menu()
+			elif Items.can_use(selected, item):
+				state = State.BUSY
+				selected.use_item(ui.menu_index)
+				await get_tree().create_timer(0.5).timeout
+				finish_action()
+			else:
+				selected.popup("Can't use", Color.LIGHT_GRAY)
+				open_items_menu()
 
 
 func menu_cancel() -> void:
@@ -347,6 +545,10 @@ func menu_cancel() -> void:
 			state = State.IDLE
 			refresh_info()
 		"unit":
+			if has_traded:
+				# Trading commits the move, as in GBA FE.
+				open_unit_menu()
+				return
 			selected.set_cell(origin_cell)
 			cursor.cell = origin_cell
 			select(selected)
@@ -356,7 +558,7 @@ func menu_cancel() -> void:
 
 func start_targeting() -> void:
 	active_spell = ""
-	dancing = false
+	target_mode = "attack"
 	targets = enemies_in_range(selected, selected.weapon)
 	target_index = 0
 	state = State.TARGETING
@@ -365,7 +567,7 @@ func start_targeting() -> void:
 
 func start_spell_targeting(spell_name: String) -> void:
 	active_spell = spell_name
-	dancing = false
+	target_mode = "spell"
 	if Spells.get_spell(spell_name).target == "area":
 		start_area_targeting()
 		return
@@ -378,8 +580,14 @@ func start_spell_targeting(spell_name: String) -> void:
 func show_target() -> void:
 	var target := targets[target_index]
 	cursor.cell = target.cell
-	if dancing:
+	if target_mode == "dance":
 		ui.show_dance_forecast(target, cursor.cell)
+	elif target_mode == "shove":
+		var dest := shove_destination(selected, target)
+		map.show_area([], [dest])
+		ui.show_shove_forecast(target, map.terrain_at(dest).name, cursor.cell)
+	elif target_mode == "trade":
+		ui.show_trade_preview(target, cursor.cell)
 	elif active_spell and Spells.is_support(active_spell):
 		var spell := Spells.get_spell(active_spell)
 		ui.show_heal_forecast(selected, target, active_spell, Spells.heal_amount(selected, spell, target), cursor.cell)
@@ -435,11 +643,141 @@ func dance_targets(u: Unit) -> Array[Unit]:
 
 func start_dance_targeting() -> void:
 	active_spell = ""
-	dancing = true
+	target_mode = "dance"
 	targets = dance_targets(selected)
 	target_index = 0
 	state = State.TARGETING
 	show_target()
+
+
+func start_trade_targeting() -> void:
+	active_spell = ""
+	target_mode = "trade"
+	targets = trade_partners(selected)
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+# --- Trade screen ---------------------------------------------------------------
+# Pick an item on either side, then a slot on the other side: an occupied slot
+# swaps the two items, an empty slot hands the item over. Trading never uses up
+# the unit's action, so it can trade repeatedly and with several partners.
+
+func open_trade(partner: Unit) -> void:
+	trade_partner = partner
+	trade_held = Vector2i(-1, -1)
+	trade_cursor = Vector2i(0 if not selected.items.is_empty() else 1, 0)
+	cursor.cell = selected.cell
+	state = State.TRADE
+	_refresh_trade()
+
+
+func _trade_side(side: int) -> Unit:
+	return selected if side == 0 else trade_partner
+
+
+## Highest slot the cursor may sit on for a side: only filled slots, plus the
+## first empty one when it is the drop target for a held item.
+func _trade_max_slot(side: int) -> int:
+	var count := _trade_side(side).items.size()
+	if trade_held.x >= 0 and side != trade_held.x:
+		return mini(count, Unit.MAX_ITEMS - 1)
+	return count - 1
+
+
+func trade_move(dir: Vector2i) -> void:
+	if dir.y != 0:
+		var top := _trade_max_slot(trade_cursor.x)
+		trade_cursor.y = wrapi(trade_cursor.y + dir.y, 0, top + 1)
+	elif trade_held.x < 0:
+		var other := 1 - trade_cursor.x
+		if _trade_max_slot(other) >= 0:
+			trade_cursor = Vector2i(other, mini(trade_cursor.y, _trade_max_slot(other)))
+	_refresh_trade()
+
+
+func trade_accept() -> void:
+	if trade_held.x < 0:
+		# Pick up the item under the cursor and jump to the other side.
+		trade_held = trade_cursor
+		var other := 1 - trade_cursor.x
+		trade_cursor = Vector2i(other, mini(trade_cursor.y, _trade_max_slot(other)))
+	else:
+		var from := _trade_side(trade_held.x).items
+		var to := _trade_side(trade_cursor.x).items
+		var item := from[trade_held.y]
+		if trade_cursor.y < to.size():
+			from[trade_held.y] = to[trade_cursor.y]
+			to[trade_cursor.y] = item
+		else:
+			from.remove_at(trade_held.y)
+			to.append(item)
+		has_traded = true
+		trade_held = Vector2i(-1, -1)
+		# Stay on this side if it still has items, otherwise hop back.
+		if _trade_max_slot(trade_cursor.x) < 0:
+			trade_cursor.x = 1 - trade_cursor.x
+		trade_cursor.y = mini(trade_cursor.y, _trade_max_slot(trade_cursor.x))
+	_refresh_trade()
+
+
+func trade_cancel() -> void:
+	if trade_held.x >= 0:
+		trade_cursor = trade_held
+		trade_held = Vector2i(-1, -1)
+		_refresh_trade()
+		return
+	ui.hide_trade()
+	selected.queue_redraw()
+	trade_partner.queue_redraw()
+	open_unit_menu()
+
+
+func _refresh_trade() -> void:
+	ui.show_trade(selected, trade_partner, trade_cursor, trade_held)
+
+
+## Shove (FE9): push an adjacent ally one cell straight away from the shover.
+## Every unit can Shove; it ends the shover's turn and leaves the target's
+## action state alone.
+func shove_destination(shover: Unit, target: Unit) -> Vector2i:
+	return target.cell + (target.cell - shover.cell)
+
+
+## The landing cell must be on the map, walkable for the target and empty.
+func can_shove(shover: Unit, target: Unit) -> bool:
+	if target.team != shover.team or BattleMap.distance(shover.cell, target.cell) != 1:
+		return false
+	var dest := shove_destination(shover, target)
+	return map.move_cost(dest) >= 0 and unit_at(dest) == null
+
+
+func shove_targets(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	for ally in units_of(u.team):
+		if ally != u and can_shove(u, ally):
+			result.append(ally)
+	return result
+
+
+func start_shove_targeting() -> void:
+	active_spell = ""
+	target_mode = "shove"
+	targets = shove_targets(selected)
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+func do_shove(shover: Unit, target: Unit) -> void:
+	var dest := shove_destination(shover, target)
+	map.clear_ranges()
+	shover.popup("Shove", Color.WHITE)
+	await shover.lunge(target.cell)
+	var path: Array[Vector2i] = [target.cell, dest]
+	await target.move_along(path)
+	await get_tree().create_timer(0.2).timeout
 
 
 ## Refreshes the target so it can move and act again this phase.
@@ -593,6 +931,7 @@ func finish_action() -> void:
 		cursor.cell = selected.cell
 	selected = null
 	map.clear_ranges()
+	refresh_threat()
 	if check_game_over():
 		return
 	for u in units_of(Unit.Team.PLAYER):
@@ -616,6 +955,7 @@ func start_player_phase() -> void:
 	var players := units_of(Unit.Team.PLAYER)
 	if not players.is_empty():
 		cursor.cell = players[0].cell
+	refresh_threat()
 	state = State.IDLE
 	refresh_info()
 

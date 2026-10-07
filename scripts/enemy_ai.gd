@@ -53,7 +53,7 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 	var best_score := -INF
 	var home := enemy.cell
 	var original: Dictionary = enemy.weapon
-	for w in enemy.items.duplicate():
+	for w in enemy.weapons():
 		enemy.equip(enemy.items.find(w))
 		for p in players:
 			for cell in cells:
@@ -69,7 +69,7 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 					best_cell = cell
 					best_weapon = w
 					best_spell = ""
-	if not enemy.items.is_empty():
+	if not original.is_empty():
 		enemy.equip(enemy.items.find(original))
 
 	for s in enemy.spells:
@@ -130,7 +130,7 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 		# can't attack follow their nearest ally instead of walking into the enemy.
 		var goals: Array[Unit] = players
 		var offensive_spells := enemy.spells.filter(func(s: String) -> bool: return not Spells.is_support(s))
-		if enemy.items.is_empty() and offensive_spells.is_empty():
+		if enemy.weapon.is_empty() and offensive_spells.is_empty():
 			goals = []
 			goals.assign(battle.units_of(enemy.team).filter(func(u: Unit) -> bool: return u != enemy))
 		if goals.is_empty():

@@ -30,7 +30,19 @@ func _run_all() -> void:
 		"test_firestorm_targets_and_cast",
 		"test_earth_spike_raises_mountain",
 		"test_dance_refreshes_ally",
+		"test_potion_heals_and_ends_turn",
+		"test_equipped_weapon_skips_items",
+		"test_trade_swap_and_give",
+		"test_trade_repeatable_and_keeps_action",
 		"test_enemy_mage_uses_firestorm_on_cluster",
+		"test_danger_zone_toggle_and_coverage",
+		"test_hover_and_mark_enemy",
+		"test_hover_own_units",
+		"test_shove_pushes_ally",
+		"test_shove_blocked_cases",
+		"test_arrow_follows_cursor_trail",
+		"test_status_screen",
+		"test_mp_bar_grays_when_no_spell_affordable",
 		"test_enemy_phases_run_without_errors",
 	]
 	for t in tests:
@@ -167,7 +179,7 @@ func test_weapon_break_ends_strikes() -> void:
 	await b.do_combat(lord, brig)
 	check_eq(lord.weapon.get("name", ""), "Knife", "next weapon equipped after break")
 	check_eq(lord.weapon.get("uses", 0), 30, "no follow-up strike with the new weapon")
-	check_eq(lord.items.size(), 1, "broken weapon removed")
+	check(lord.items.all(func(i): return i.name != "Iron Sword"), "broken weapon removed")
 
 
 func test_exp_formula_and_level_up() -> void:
@@ -287,6 +299,115 @@ func test_dance_refreshes_ally() -> void:
 	check_eq(dancer.exp_points, Experience.DANCE_EXP, "Dance EXP")
 
 
+func test_potion_heals_and_ends_turn() -> void:
+	var lord := unit_named("Lord")
+	clear_board([lord])
+	lord.set_cell(Vector2i(4, 2))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Items")
+	await pick("Potion  3")
+	check(not lord.has_acted, "Potion at full HP is refused")
+	check_eq(b.state, b.State.MENU, "still in the items menu")
+	await press(KEY_X)
+	await press(KEY_X)
+	await press(KEY_X)
+	lord.hp = 2
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Items")
+	await pick("Potion  3")
+	check_eq(lord.hp, 17, "Potion heals 15")
+	check(lord.has_acted, "using an item ends the turn")
+	var potion: Dictionary = lord.items.filter(func(i): return i.name == "Potion")[0]
+	check_eq(potion.uses, 2, "one use spent")
+	potion.uses = 1
+	lord.hp = 2
+	lord.use_item(lord.items.find(potion))
+	check(lord.items.all(func(i): return i.name != "Potion"), "empty Potion removed")
+
+
+func test_equipped_weapon_skips_items() -> void:
+	var lord := unit_named("Lord")
+	var potion := Items.make("Potion")
+	lord.items.push_front(potion)
+	check_eq(lord.weapon.name, "Iron Sword", "equipped = first weapon, not first item")
+	lord.equip(0)
+	check(lord.items[0] == potion, "equip() ignores consumables")
+	check_eq(lord.weapon_ranges().size(), 2, "ranges come from weapons only")
+
+
+func test_trade_swap_and_give() -> void:
+	var lord := unit_named("Lord")
+	var dancer := unit_named("Dancer")
+	clear_board([lord, dancer])
+	lord.set_cell(Vector2i(4, 2))
+	dancer.set_cell(Vector2i(5, 2))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Trade")
+	check_eq(b.state, b.State.TARGETING, "choosing a trade partner")
+	await press(KEY_Z)
+	check_eq(b.state, b.State.TRADE, "trade screen open")
+	# Lord: Iron Sword, Knife, Potion. Dancer: Potion.
+	# Give the Knife (slot 1) to the Dancer's empty slot 1.
+	await press(KEY_DOWN)
+	await press(KEY_Z)
+	check_eq(b.trade_cursor, Vector2i(1, 1), "cursor jumps to the same row on the partner's side")
+	await press(KEY_Z)
+	check_eq(dancer.items.map(func(i): return i.name), ["Potion", "Knife"], "Knife handed over")
+	check_eq(lord.items.map(func(i): return i.name), ["Iron Sword", "Potion"], "Lord lost the Knife")
+	# Swap the Dancer's Potion (right slot 0) with the Lord's Iron Sword (left slot 0).
+	await press(KEY_UP)
+	await press(KEY_Z)
+	check_eq(b.trade_cursor, Vector2i(0, 0), "cursor jumps back to the Lord's row 0")
+	await press(KEY_Z)
+	check_eq(lord.items.map(func(i): return i.name), ["Potion", "Potion"], "swap: Lord")
+	check_eq(dancer.items.map(func(i): return i.name), ["Iron Sword", "Knife"], "swap: Dancer")
+	check(lord.weapon.is_empty(), "Lord is now unarmed")
+	await press(KEY_X)
+	check_eq(b.state, b.State.MENU, "leaving the trade screen returns to the unit menu")
+	check(not b.ui.menu_options.has("Attack"), "unarmed Lord has no Attack")
+
+
+func test_trade_repeatable_and_keeps_action() -> void:
+	var lord := unit_named("Lord")
+	var knight := unit_named("Knight")
+	var dancer := unit_named("Dancer")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	clear_board([lord, knight, dancer, brig])
+	lord.set_cell(Vector2i(4, 2))
+	knight.set_cell(Vector2i(4, 3))
+	dancer.set_cell(Vector2i(4, 1))
+	brig.set_cell(Vector2i(5, 2))
+	knight.has_acted = true
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_RIGHT)
+	await press(KEY_LEFT)
+	await press(KEY_Z)
+	for partner in [knight, dancer, knight]:
+		await pick("Trade")
+		while b.targets[b.target_index] != partner:
+			await press(KEY_RIGHT)
+		await press(KEY_Z)
+		# Give the Lord's last item to the partner (or swap if full).
+		await press(KEY_Z)
+		await press(KEY_Z)
+		await press(KEY_X)
+		check_eq(b.state, b.State.MENU, "back in the unit menu after trading with " + partner.unit_name)
+		check(not lord.has_acted, "trading doesn't use the action")
+	check(knight.has_acted, "trading doesn't refresh an ally that already acted")
+	var cell := lord.cell
+	await press(KEY_X)
+	check_eq(lord.cell, cell, "after a trade, cancel no longer undoes the move")
+	check_eq(b.state, b.State.MENU, "cancel keeps the unit menu open")
+	await pick("Attack")
+	check_eq(b.state, b.State.MENU, "can still attack after trading")
+
+
 func test_enemy_mage_uses_firestorm_on_cluster() -> void:
 	var e_mage := unit_named("Mage", Unit.Team.ENEMY)
 	var knight := unit_named("Knight")
@@ -309,3 +430,188 @@ func test_enemy_phases_run_without_errors() -> void:
 		while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
 			await process_frame
 	check(b.state == b.State.IDLE or b.state == b.State.GAME_OVER, "battle loop settles")
+
+
+func test_danger_zone_toggle_and_coverage() -> void:
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	var e_mage := unit_named("Mage", Unit.Team.ENEMY)
+	clear_board([brig])
+	brig.set_cell(Vector2i(10, 2))
+	check(b.map.danger_cells.is_empty(), "danger zone starts hidden")
+	await press(KEY_C)
+	check(b.danger_on, "C toggles the danger zone on")
+	# Brigand: MOV 5 plus a Hatchet (range 1-2) reaches 7 tiles out along row 2.
+	check(b.map.danger_cells.has(Vector2i(3, 2)), "cell 7 tiles from the Brigand is threatened")
+	check(not b.map.danger_cells.has(Vector2i(0, 0)), "far corner is safe")
+	# Enemy spells only count while the caster can afford them.
+	e_mage.mp = 0
+	check(b.offense_ranges(e_mage, true).is_empty(), "Mage with 0 MP threatens nothing")
+	await press(KEY_C)
+	check(b.map.danger_cells.is_empty(), "C again hides it")
+
+
+func test_hover_and_mark_enemy() -> void:
+	var sold := unit_named("Soldier", Unit.Team.ENEMY)
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	clear_board([sold, brig])
+	sold.set_cell(Vector2i(10, 4))
+	brig.set_cell(Vector2i(10, 8))
+	b.cursor.cell = Vector2i(9, 4)
+	await press(KEY_RIGHT)
+	check(b.hovered == sold, "hovering an enemy tracks it")
+	check(not b.map.move_cells.is_empty() and not b.map.attack_cells.is_empty(), "hover shows its ranges")
+	await press(KEY_LEFT)
+	check(b.hovered == null and b.map.move_cells.is_empty(), "moving off clears the ranges")
+	await press(KEY_RIGHT)
+	await press(KEY_Z)
+	check(b.marked.has(sold), "Z marks the enemy")
+	check_eq(b.map.marked_cells, b.enemy_threat(sold), "red overlay is the enemy's threat")
+	check_eq(b.state, b.State.IDLE, "marking keeps browsing")
+	await press(KEY_LEFT)
+	check(not b.map.marked_cells.is_empty(), "red overlay stays after moving away")
+	# A second mark adds to the overlay.
+	b.cursor.cell = Vector2i(9, 8)
+	await press(KEY_RIGHT)
+	await press(KEY_Z)
+	var both: Dictionary = b.enemy_threat(sold)
+	both.merge(b.enemy_threat(brig))
+	check_eq(b.map.marked_cells, both, "overlay covers every marked enemy")
+	# Z again unmarks; a dead enemy's mark is dropped.
+	await press(KEY_Z)
+	check(not b.marked.has(brig), "Z again unmarks")
+	sold.hp = 0
+	b.refresh_threat()
+	check(b.marked.is_empty() and b.map.marked_cells.is_empty(), "dead enemy's mark is removed")
+
+
+func test_arrow_follows_cursor_trail() -> void:
+	var lord := unit_named("Lord")
+	clear_board([lord])
+	lord.set_cell(Vector2i(4, 2))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	for k in [KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_UP]:
+		await press(k)
+	var trail: Array[Vector2i] = [Vector2i(4, 2), Vector2i(5, 2), Vector2i(5, 3), Vector2i(6, 3), Vector2i(6, 2)]
+	check_eq(b.map.arrow_path, trail, "arrow follows the cursor's detour")
+	await press(KEY_DOWN)
+	check_eq(b.map.arrow_path, trail.slice(0, 4), "backtracking shortens the arrow")
+	await press(KEY_UP)
+	# (9, 2) is exactly MOV 5 away; (10, 2) is out of range.
+	for i in 4:
+		await press(KEY_RIGHT)
+	check(b.map.arrow_path.is_empty(), "arrow hides when the cursor leaves the move range")
+	await press(KEY_LEFT)
+	check_eq(b.map.arrow_path.size(), 6, "back in range: shortest path to (9, 2)")
+	await press(KEY_Z)
+	check_eq(lord.cell, Vector2i(9, 2), "unit moves to the arrow's end")
+	check_eq(b.state, b.State.MENU, "then the action menu opens")
+
+
+func test_status_screen() -> void:
+	var lord := unit_named("Lord")
+	b.cursor.cell = lord.cell
+	await press(KEY_R)
+	check_eq(b.state, b.State.STATUS, "R opens the stats screen")
+	check(b.ui._status.visible, "stats screen visible")
+	check(b.ui._status_title.text.begins_with("Lord"), "shows the unit under the cursor")
+	check(b.ui._status_items.text.contains("E Iron Sword"), "equipped weapon is marked")
+	check(b.ui._status_items.text.contains("Earth Spike"), "spells are listed")
+	var atk_value: Label = b.ui._status_combat.get_child(1)
+	check_eq(atk_value.text, str(Combat.base_attack(lord)), "Atk matches the combat formula")
+	await press(KEY_DOWN)
+	check(b.status_unit != lord and b.status_unit.team == Unit.Team.PLAYER, "Down shows the next ally")
+	await press(KEY_X)
+	check_eq(b.state, b.State.IDLE, "X closes it")
+	check(not b.ui._status.visible, "stats screen hidden")
+
+
+func test_mp_bar_grays_when_no_spell_affordable() -> void:
+	var lord := unit_named("Lord")
+	var mage := unit_named("Mage")
+	check(lord.can_cast_any(), "Lord with 8 MP can cast Earth Spike (5)")
+	lord.mp = 4
+	check(not lord.can_cast_any(), "Lord with 4 MP can't cast anything: bar goes gray")
+	mage.mp = 3
+	check(mage.can_cast_any(), "Mage with 3 MP can still cast Fire (3)")
+	mage.mp = 2
+	check(not mage.can_cast_any(), "Mage with 2 MP can't cast anything")
+
+
+func test_hover_own_units() -> void:
+	var lord := unit_named("Lord")
+	var cleric := unit_named("Cleric")
+	b.cursor.cell = lord.cell + Vector2i.UP
+	await press(KEY_DOWN)
+	check(b.hovered == lord, "hovering your own unit tracks it")
+	var lord_reach: Dictionary = b.map.get_reachable(lord, b.units())
+	check_eq(b.map.move_cells.size(), lord_reach.cells.size(), "hover shows its move range")
+	check(not b.map.attack_cells.is_empty(), "and its attack range")
+	# Units that already acted still show their ranges.
+	lord.has_acted = true
+	await press(KEY_UP)
+	await press(KEY_DOWN)
+	check(not b.map.move_cells.is_empty(), "acted units show ranges too")
+	lord.has_acted = false
+	# Healers show their support range (green).
+	b.cursor.cell = cleric.cell + Vector2i.UP
+	await press(KEY_DOWN)
+	check(not b.map.support_cells.is_empty(), "Cleric hover shows heal range")
+	# Z on your own unit still selects it rather than marking.
+	await press(KEY_Z)
+	check_eq(b.state, b.State.SELECTED, "Z selects your unit")
+	check(b.marked.is_empty(), "own units are never marked")
+
+
+func test_shove_pushes_ally() -> void:
+	var knight := unit_named("Knight")
+	var fighter := unit_named("Fighter")
+	clear_board([knight, fighter])
+	knight.set_cell(Vector2i(4, 6))
+	fighter.set_cell(Vector2i(5, 6))
+	b.cursor.cell = knight.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Shove")
+	check_eq(b.state, b.State.TARGETING, "Shove asks for a target")
+	check_eq(b.map.area_cells, [Vector2i(6, 6)], "landing cell is previewed")
+	check(b.ui._spell_label.text.contains("Fighter"), "preview names the target")
+	await press(KEY_Z)
+	check_eq(fighter.cell, Vector2i(6, 6), "ally pushed one cell away")
+	check_eq(knight.cell, Vector2i(4, 6), "shover stays put")
+	check(knight.has_acted, "shoving ends the shover's turn")
+	check(not fighter.has_acted, "the shoved ally can still act")
+	check_eq(b.state, b.State.IDLE, "back to browsing")
+
+
+func test_shove_blocked_cases() -> void:
+	var lord := unit_named("Lord")
+	var knight := unit_named("Knight")
+	var archer := unit_named("Archer")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	clear_board([lord, knight, archer, brig])
+	# Into a mountain: Knight at (3, 4) pushed toward (2, 4).
+	lord.set_cell(Vector2i(4, 4))
+	knight.set_cell(Vector2i(3, 4))
+	check(not b.can_shove(lord, knight), "can't shove into a mountain")
+	# Into a river: (7, 5) is water.
+	lord.set_cell(Vector2i(5, 5))
+	knight.set_cell(Vector2i(6, 5))
+	check(not b.can_shove(lord, knight), "can't shove into a river")
+	# Into another unit.
+	lord.set_cell(Vector2i(4, 2))
+	knight.set_cell(Vector2i(5, 2))
+	archer.set_cell(Vector2i(6, 2))
+	check(not b.can_shove(lord, knight), "can't shove into an occupied cell")
+	# Enemies can't be shoved; neither can non-adjacent allies.
+	brig.set_cell(Vector2i(4, 3))
+	check(not b.can_shove(lord, brig), "enemies can't be shoved")
+	archer.set_cell(Vector2i(4, 0))
+	check(not b.can_shove(lord, archer), "ally must be adjacent")
+	# Off a raised mountain is fine.
+	b.map.set_terrain(Vector2i(4, 3), "M")
+	brig.set_cell(Vector2i(10, 9))
+	knight.set_cell(Vector2i(4, 3))
+	lord.set_cell(Vector2i(4, 4))
+	check(b.can_shove(lord, knight), "a unit standing on a mountain can be shoved off it")
+	check_eq(b.shove_targets(lord), [knight], "shove_targets lists only valid allies")

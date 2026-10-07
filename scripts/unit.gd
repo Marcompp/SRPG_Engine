@@ -9,6 +9,8 @@ const ENEMY_COLOR := Color("d84a3a")
 const ACTED_COLOR := Color("6a6a6a")
 const HP_COLOR := Color("5ee05e")
 const MP_COLOR := Color("5aa0ff")
+## MP bar color when there isn't enough MP for any of the unit's spells.
+const MP_EMPTY_COLOR := Color("8a8a8a")
 
 var unit_name := ""
 var team: Team = Team.PLAYER
@@ -31,15 +33,20 @@ var magic := 0
 var mov := 5
 ## Casters only (max_mp > 0); everyone else has no MP bar.
 var max_mp := 0
-var mp := 0
+var mp := 0:
+	set(value):
+		mp = value
+		queue_redraw()
 var spells: Array[String] = []
 const MAX_ITEMS := 5
 
-## Inventory of weapon dictionaries; items[0] is the equipped weapon.
+## Inventory of weapons and consumables (see Items). The first weapon in the
+## list is the equipped one.
 var items: Array[Dictionary] = []
 var weapon: Dictionary:
 	get:
-		return items[0] if not items.is_empty() else {}
+		var i := equipped_index()
+		return items[i] if i >= 0 else {}
 ## Equipped weapon's range; 0 when unarmed.
 var min_range: int:
 	get:
@@ -76,8 +83,8 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.max_mp = stats.get("mp", 0)
 	u.mp = u.max_mp
 	u.spells.assign(stats.get("spells", []))
-	for weapon_name in stats.get("weapons", []).slice(0, MAX_ITEMS):
-		u.items.append(Weapons.make(weapon_name))
+	for item_name in stats.get("items", []).slice(0, MAX_ITEMS):
+		u.items.append(Items.make(item_name))
 	u.set_cell(p_cell)
 	return u
 
@@ -124,17 +131,48 @@ func can_attack_at(dist: int) -> bool:
 	return weapon_reaches(weapon, dist)
 
 
+## Index of the equipped weapon in `items`, or -1 when unarmed.
+func equipped_index() -> int:
+	for i in items.size():
+		if Items.is_weapon(items[i]):
+			return i
+	return -1
+
+
+func weapons() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for item in items:
+		if Items.is_weapon(item):
+			result.append(item)
+	return result
+
+
 ## Moves items[index] to the front, making it the equipped weapon.
 func equip(index: int) -> void:
+	if index < 0 or not Items.is_weapon(items[index]):
+		return
 	var w := items[index]
 	items.remove_at(index)
 	items.push_front(w)
 
 
-## Distinct (min, max) ranges across the whole inventory.
+## Spends one use of a consumable and applies it. Removes it when used up.
+func use_item(index: int) -> void:
+	var item := items[index]
+	match item.kind:
+		"heal":
+			var amount := mini(item.heal, max_hp - hp)
+			heal(amount)
+			popup("+%d" % amount, Color.PALE_GREEN)
+	item.uses -= 1
+	if item.uses <= 0:
+		items.remove_at(index)
+
+
+## Distinct (min, max) ranges across all carried weapons.
 func weapon_ranges() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
-	for w in items:
+	for w in weapons():
 		var r := Vector2i(w.min_rng, w.max_rng)
 		if not result.has(r):
 			result.append(r)
@@ -176,9 +214,10 @@ func take_damage(amount: int) -> void:
 ## Spends one use of the equipped weapon. Returns true if it broke
 ## (it is removed, and the next item becomes equipped).
 func use_weapon() -> bool:
-	items[0].uses -= 1
-	if items[0].uses <= 0:
-		items.remove_at(0)
+	var i := equipped_index()
+	items[i].uses -= 1
+	if items[i].uses <= 0:
+		items.remove_at(i)
 		return true
 	return false
 
@@ -220,9 +259,19 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_CENTER, 12, 9, Color.WHITE)
 	_draw_bar(13, 2, float(hp) / max_hp, HP_COLOR)
 	if is_caster():
-		_draw_bar(15, 1, float(mp) / max_mp, MP_COLOR)
+		# No dark backing for MP, so spent MP doesn't read like missing HP.
+		_draw_bar(15, 1, float(mp) / max_mp, MP_COLOR if can_cast_any() else MP_EMPTY_COLOR, false)
 
 
-func _draw_bar(y: float, height: float, fraction: float, color: Color) -> void:
-	draw_rect(Rect2(2, y, 12, height), Color.BLACK)
+## Whether the unit has enough MP for at least one of its spells.
+func can_cast_any() -> bool:
+	for s in spells:
+		if Spells.can_afford(self, s):
+			return true
+	return false
+
+
+func _draw_bar(y: float, height: float, fraction: float, color: Color, backing := true) -> void:
+	if backing:
+		draw_rect(Rect2(2, y, 12, height), Color.BLACK)
 	draw_rect(Rect2(2, y, 12.0 * fraction, height), color)

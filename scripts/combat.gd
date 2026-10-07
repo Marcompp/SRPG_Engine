@@ -31,26 +31,44 @@ static func attack_speed(u: Unit) -> int:
 	return u.speed - maxi(0, u.weapon.get("wt", 0) - u.strength)
 
 
+# Unit-only parts of the formulas (equipped weapon, no target or terrain). These are
+# what the stats screen shows; the matchup functions below build on them.
+
+static func base_attack(u: Unit) -> int:
+	return u.strength + u.weapon.mt
+
+
+static func base_hit(u: Unit) -> int:
+	return u.weapon.hit + u.skill * 2 + int(u.luck * 0.5)
+
+
+static func base_avoid(u: Unit) -> int:
+	return attack_speed(u) * 2 + u.luck
+
+
+static func base_crit(u: Unit) -> int:
+	return u.weapon.crit + int(u.skill * 0.5)
+
+
 static func damage(attacker: Unit, defender: Unit, map: BattleMap) -> int:
 	if attacker.weapon.is_empty():
 		return 0
-	var atk: int = attacker.strength + attacker.weapon.mt + triangle(attacker, defender) * TRIANGLE_DMG
+	var atk: int = base_attack(attacker) + triangle(attacker, defender) * TRIANGLE_DMG
 	return maxi(0, atk - (defender.defense + map.terrain_def(defender.cell)))
 
 
 static func hit_chance(attacker: Unit, defender: Unit, map: BattleMap) -> int:
 	if attacker.weapon.is_empty():
 		return 0
-	var hit: int = attacker.weapon.hit + attacker.skill * 2 + int(attacker.luck * 0.5) \
-		+ triangle(attacker, defender) * TRIANGLE_HIT
-	var avoid: int = attack_speed(defender) * 2 + defender.luck + map.terrain_avoid(defender.cell)
+	var hit: int = base_hit(attacker) + triangle(attacker, defender) * TRIANGLE_HIT
+	var avoid: int = base_avoid(defender) + map.terrain_avoid(defender.cell)
 	return clampi(hit - avoid, 0, 100)
 
 
 static func crit_chance(attacker: Unit, defender: Unit) -> int:
 	if attacker.weapon.is_empty():
 		return 0
-	return clampi(attacker.weapon.crit + int(attacker.skill * 0.5) - defender.luck, 0, 100)
+	return clampi(base_crit(attacker) - defender.luck, 0, 100)
 
 
 static func doubles(a: Unit, b: Unit) -> bool:
