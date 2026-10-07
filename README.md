@@ -6,6 +6,16 @@ A tactical RPG prototype in the style of the GBA Fire Emblem games, built with G
 
 Open the folder in Godot 4.4 and press F5.
 
+## Tests
+
+Headless test suite (combat math, ranges, inventory, EXP, spells, Dance, enemy AI, full enemy phases):
+
+```
+godot --headless --path . --script res://tests/run_tests.gd
+```
+
+Exits with code 0 when every test passes, 1 otherwise.
+
 ## Controls
 
 | Key | Action |
