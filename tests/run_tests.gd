@@ -31,6 +31,7 @@ func _run_all() -> void:
 		"test_earth_spike_raises_mountain",
 		"test_dance_refreshes_ally",
 		"test_potion_heals_and_ends_turn",
+		"test_ether_restores_mp",
 		"test_equipped_weapon_skips_items",
 		"test_trade_swap_and_give",
 		"test_trade_repeatable_and_keeps_action",
@@ -54,10 +55,37 @@ func _run_all() -> void:
 		"test_level_select_loads_coastal_raid",
 		"test_move_type_costs",
 		"test_flying_gets_no_terrain_bonus",
+		"test_mounted_units_cannot_shove",
+		"test_rescue_rules",
+		"test_rescue_and_drop_ferry",
+		"test_fallen_carrier_drops_passenger",
+		"test_class_data_is_consistent",
+		"test_class_weapon_restrictions",
+		"test_swim_and_climb_costs",
+		"test_inspire_buffs_adjacent_allies",
+		"test_ship_board_and_unload",
+		"test_sunk_ship_sets_passengers_ashore",
 		"test_arrow_follows_cursor_trail",
 		"test_status_screen",
+		"test_status_screen_detail_mode",
+		"test_stat_caps",
 		"test_mp_bar_grays_when_no_spell_affordable",
+		"test_jump_to_next_unit",
+		"test_fast_forward_enemy_phase",
+		"test_level_up_waits_for_confirm",
+		"test_end_turn_warning",
+		"test_effectiveness_triples_might",
+		"test_spirits_resist_non_silver_weapons",
+		"test_forecast_shows_effectiveness",
+		"test_ai_prefers_effective_weapon",
+		"test_race_class_bans",
+		"test_race_movement_and_tags",
+		"test_race_weaknesses_and_resistances",
+		"test_race_spell_elements",
+		"test_race_carry_and_shove",
+		"test_race_regen_and_exp",
 		"test_enemy_phases_run_without_errors",
+		"test_coastal_raid_phases_run_without_errors",
 	]
 	for t in tests:
 		current_test = t
@@ -82,6 +110,8 @@ func _run_all() -> void:
 
 func _fresh_battle() -> void:
 	b = load(MAIN_SCENE).instantiate()
+	# Nobody presses Z in tests: level-ups time out instead (see test_level_up_waits_for_confirm).
+	b.get_node("UI").level_up_waits = false
 	root.add_child(b)
 	while b.state != b.State.IDLE:
 		await process_frame
@@ -204,8 +234,8 @@ func test_exp_formula_and_level_up() -> void:
 	check_eq(Experience.combat_exp(lord, brig, false, false), 1, "no-damage EXP")
 	lord.exp_points = 95
 	await b.gain_exp(lord, 33)
-	check_eq(lord.level, 2, "level after 128 EXP")
-	check_eq(lord.exp_points, 28, "leftover EXP")
+	check_eq(lord.level, 2, "level after 95 + 36 EXP (33 x1.1 for Humans)")
+	check_eq(lord.exp_points, 31, "leftover EXP")
 
 
 func test_cancel_move_restores_unit() -> void:
@@ -239,7 +269,7 @@ func test_heal_spell() -> void:
 	await press(KEY_Z)
 	check_eq(lord.hp, 18, "healed INT 5 + 10, capped at max HP")
 	check_eq(cleric.mp, 8, "Heal costs 4 MP")
-	check_eq(cleric.exp_points, 11, "Heal gives 11 EXP")
+	check_eq(cleric.exp_points, 12, "Heal gives 11 EXP, 12 for a Human")
 	check(cleric.has_acted, "casting ends the turn")
 
 
@@ -255,7 +285,7 @@ func test_fire_forecast_and_counter() -> void:
 	sold.mp = 0
 	check_eq(Combat.spell_damage(mage, sold, fire, b.map), 11, "current MP is magic defense")
 	sold.mp = 1
-	check(not f.can_counter, "Iron Lance can't counter at range 2")
+	check(not f.can_counter, "Iron Spear can't counter at range 2")
 	sold.equip(1)
 	f = Combat.spell_forecast(mage, sold, fire, b.map)
 	check(f.can_counter, "Javelin counters at range 2")
@@ -315,7 +345,7 @@ func test_dance_refreshes_ally() -> void:
 	await press(KEY_Z)
 	check(not knight.has_acted, "danced ally can act again")
 	check(dancer.has_acted, "dancer's turn ends")
-	check_eq(dancer.exp_points, Experience.DANCE_EXP, "Dance EXP")
+	check_eq(dancer.exp_points, roundi(Experience.DANCE_EXP * 1.1), "Dance EXP (Human x1.1)")
 
 
 func test_potion_heals_and_ends_turn() -> void:
@@ -345,6 +375,30 @@ func test_potion_heals_and_ends_turn() -> void:
 	lord.hp = 2
 	lord.use_item(lord.items.find(potion))
 	check(lord.items.all(func(i): return i.name != "Potion"), "empty Potion removed")
+
+
+func test_ether_restores_mp() -> void:
+	var mage := unit_named("Mage")
+	clear_board([mage])
+	mage.set_cell(Vector2i(4, 2))
+	b.cursor.cell = mage.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Items")
+	await pick("Ether  3")
+	check(not mage.has_acted, "Ether at full MP is refused")
+	await press(KEY_X)
+	await press(KEY_X)
+	await press(KEY_X)
+	mage.mp = 1
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Items")
+	await pick("Ether  3")
+	check_eq(mage.mp, mini(16, mage.max_mp), "Ether restores 15 MP, capped at max")
+	check(mage.has_acted, "using an Ether ends the turn")
+	var ether: Dictionary = mage.items.filter(func(i): return i.name == "Ether")[0]
+	check_eq(ether.uses, 2, "one use spent")
 
 
 func test_equipped_weapon_skips_items() -> void:
@@ -453,6 +507,15 @@ func test_enemy_phases_run_without_errors() -> void:
 	check(b.state == b.State.IDLE or b.state == b.State.GAME_OVER, "battle loop settles")
 
 
+func test_coastal_raid_phases_run_without_errors() -> void:
+	Levels.selected = "coastal_raid"
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	Levels.selected = "river_crossing"
+	await test_enemy_phases_run_without_errors()
+
+
 func test_danger_zone_toggle_and_coverage() -> void:
 	var brig := unit_named("Brigand", Unit.Team.ENEMY)
 	var e_mage := unit_named("Mage", Unit.Team.ENEMY)
@@ -466,7 +529,8 @@ func test_danger_zone_toggle_and_coverage() -> void:
 	check(not b.map.danger_cells.has(Vector2i(0, 0)), "far corner is safe")
 	# Enemy spells only count while the caster can afford them.
 	e_mage.mp = 0
-	check(b.offense_ranges(e_mage, true).is_empty(), "Mage with 0 MP threatens nothing")
+	var ranges: Array[Vector2i] = b.offense_ranges(e_mage, true)
+	check(ranges.size() == 1 and ranges[0] == Vector2i(1, 1), "Mage with 0 MP only threatens with its staff")
 	await press(KEY_C)
 	check(b.map.danger_cells.is_empty(), "C again hides it")
 
@@ -531,20 +595,101 @@ func test_arrow_follows_cursor_trail() -> void:
 
 func test_status_screen() -> void:
 	var lord := unit_named("Lord")
+	var screen: StatusScreen = b.ui.status_screen
 	b.cursor.cell = lord.cell
-	await press(KEY_R)
-	check_eq(b.state, b.State.STATUS, "R opens the stats screen")
-	check(b.ui._status.visible, "stats screen visible")
-	check(b.ui._status_title.text.begins_with("Lord"), "shows the unit under the cursor")
-	check(b.ui._status_items.text.contains("E Iron Sword"), "equipped weapon is marked")
-	check(b.ui._status_items.text.contains("Earth Spike"), "spells are listed")
-	var atk_value: Label = b.ui._status_combat.get_child(1)
-	check_eq(atk_value.text, str(Combat.base_attack(lord)), "Atk matches the combat formula")
+	await press(KEY_D)
+	check_eq(b.state, b.State.STATUS, "D opens the status screen")
+	check(screen.visible and screen.unit == lord, "shows the unit under the cursor")
+	check_eq(screen.page, 0, "starts on the Stats page")
+	var texts := _texts(screen)
+	for expected in ["Lord", "Swordsman", "Human", "Lv 1", "Exp 0", "HP 18/18", "MP 8/8"]:
+		check(texts.has(expected), "left column shows '%s'" % expected)
+	# Pages: Right flips, Left flips back; the Items page lists weapons, numbers, spells.
+	await press(KEY_RIGHT)
+	check_eq(screen.page, 1, "Right: Items page")
+	texts = _texts(screen)
+	check(texts.has("E") and texts.has("Iron Sword"), "equipped weapon marked")
+	check(texts.has(str(Combat.base_attack(lord))), "Atk from the combat formula")
+	check(texts.has("Earth Spike"), "spells listed")
+	await press(KEY_RIGHT)
+	await press(KEY_RIGHT)
+	check_eq(screen.page, 3, "players have a 4th page (Bio)")
+	check(_texts(screen).any(func(t): return t.contains("river crossing")), "biography events shown")
+	await press(KEY_RIGHT)
+	check_eq(screen.page, 0, "pages wrap around")
+	# Up/Down changes unit and keeps the page.
+	await press(KEY_RIGHT)
 	await press(KEY_DOWN)
-	check(b.status_unit != lord and b.status_unit.team == Unit.Team.PLAYER, "Down shows the next ally")
+	check(screen.unit != lord and screen.unit.team == Unit.Team.PLAYER, "Down shows the next ally")
+	check_eq(screen.page, 1, "and stays on the same page")
 	await press(KEY_X)
 	check_eq(b.state, b.State.IDLE, "X closes it")
-	check(not b.ui._status.visible, "stats screen hidden")
+	check(not screen.visible, "screen hidden")
+
+
+func test_status_screen_detail_mode() -> void:
+	var lord := unit_named("Lord")
+	var screen: StatusScreen = b.ui.status_screen
+	b.cursor.cell = lord.cell
+	await press(KEY_D)
+	await press(KEY_D)
+	check(screen.detail, "D again enters detail mode")
+	check_eq(screen.highlighted_text(), Glossary.stat("str", lord), "starts on the page's first entry (STR)")
+	check(screen.highlighted_text().contains("Cap: 20"), "stat help mentions the cap")
+	await press(KEY_DOWN)
+	check_eq(screen.highlighted_text(), Glossary.stat("int", lord), "Down moves to the next entry")
+	await press(KEY_LEFT)
+	check_eq(screen.highlighted_text(), Glossary.unit_class(lord), "Left jumps to the left column (class)")
+	await press(KEY_DOWN)
+	check(screen.highlighted_text().begins_with("Human"), "then race")
+	await press(KEY_D)
+	check(not screen.detail and b.state == b.State.STATUS, "D leaves detail mode, screen stays open")
+	await press(KEY_RIGHT)
+	await press(KEY_D)
+	check(screen.highlighted_text().begins_with("Iron Sword (Sword)"), "Items page: weapon details")
+	await press(KEY_X)
+	check(not screen.detail and b.state == b.State.STATUS, "X also leaves detail mode first")
+	await press(KEY_X)
+	check_eq(b.state, b.State.IDLE, "a second X closes the screen")
+	# Enemies have no Bio page.
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	b.cursor.cell = brig.cell
+	await press(KEY_D)
+	check_eq(screen.page_count(), 3, "enemies: Stats, Items, Skills only")
+	await press(KEY_X)
+
+
+func test_stat_caps() -> void:
+	var lord := unit_named("Lord")
+	check_eq(lord.stat_cap("str"), 20, "default cap 20")
+	check_eq(lord.stat_cap("hp"), 80, "HP cap 80")
+	check_eq(lord.stat_cap("mp"), 40, "MP cap 40")
+	lord.strength = 20
+	check(lord.is_capped("str"), "STR 20 is capped")
+	# A capped stat never grows, even at a 100% growth.
+	lord.growths = {"str": 100, "dex": 100}
+	for i in 20:
+		var gains := Experience.roll_level_up(lord)
+		check(not gains.has("str"), "capped STR doesn't roll")
+	Experience.apply_level_up(lord, {"str": 1})
+	check_eq(lord.strength, 20, "applying a gain never passes the cap")
+	# The status screen draws capped stats in the glowing color.
+	b.cursor.cell = lord.cell
+	await press(KEY_D)
+	var screen: StatusScreen = b.ui.status_screen
+	check(not screen._glow.is_empty(), "capped stat glows")
+	await press(KEY_X)
+
+
+func _texts(screen: StatusScreen) -> Array:
+	var result := []
+	var stack: Array[Node] = [screen]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is Label and node.is_visible_in_tree():
+			result.append(node.text)
+		stack.append_array(node.get_children())
+	return result
 
 
 func test_mp_bar_grays_when_no_spell_affordable() -> void:
@@ -574,7 +719,9 @@ func test_hover_own_units() -> void:
 	await press(KEY_DOWN)
 	check(not b.map.move_cells.is_empty(), "acted units show ranges too")
 	lord.has_acted = false
-	# Healers show their support range (green).
+	# Healers show their support range (green) where it reaches past their weapon
+	# (red wins where both reach, and a staff covers Heal's range 1).
+	cleric.items.clear()
 	b.cursor.cell = cleric.cell + Vector2i.UP
 	await press(KEY_DOWN)
 	check(not b.map.support_cells.is_empty(), "Cleric hover shows heal range")
@@ -861,9 +1008,22 @@ func test_all_levels_are_valid() -> void:
 		var taken := {}
 		for data in level.players + level.enemies:
 			var cell: Vector2i = data.cell
-			var move_type: String = data.get("move", "foot")
+			check(Classes.DATA.has(data.get("class", "")), "%s: %s has a known class" % [id, data.name])
+			if not Classes.DATA.has(data.get("class", "")):
+				continue
+			var cls := Classes.get_data(data["class"])
+			for item_name in data.get("items", []):
+				if Weapons.DATA.has(item_name):
+					check(cls.weapons.has(Weapons.DATA[item_name].type),
+						"%s: %s (%s) can wield its %s" % [id, data.name, data["class"], item_name])
+			var race: String = data.get("race", "Human")
+			check(Races.DATA.has(race), "%s: %s has a known race" % [id, data.name])
+			if not Races.DATA.has(race):
+				continue
+			check(Races.allows(race, data["class"]), "%s: %s can be a %s" % [id, race, data["class"]])
+			var move_type := Races.move_type(race, data["class"])
 			var key: String = layout[cell.y][cell.x]
-			check(BattleMap.MOVE_COSTS[move_type][key] >= 0,
+			check(BattleMap.cost_for(key, move_type) >= 0,
 				"%s: %s (%s) can stand on its start tile '%s'" % [id, data.name, move_type, key])
 			check(not taken.has(cell), "%s: %s shares a start tile" % [id, data.name])
 			taken[cell] = true
@@ -880,8 +1040,11 @@ func test_level_select_loads_coastal_raid() -> void:
 	var siren := unit_named("Siren")
 	var lord := unit_named("Lord")
 	check(pegasus != null and pegasus.move_type == "flying", "roster loaded with move types")
-	# The island is out of reach on foot, but not for fliers and mermaids.
-	check(not b.map.cost_field(Vector2i(13, 4), "foot").has(lord.cell), "foot units can't reach the island")
+	check(pegasus.is_mounted() and pegasus.unit_class == "Flier", "and classes")
+	var galley: Unit = unit_named("Galley")
+	check(galley != null and galley.is_ship(), "player Galley is a ship")
+	# The island is out of reach on foot (sea costs 6 > MOV 5), but not for fliers and mermaids.
+	check(b.map.move_cost(Vector2i(11, 4), "foot") > lord.mov, "foot units can never step into the sea")
 	check(b.map.cost_field(Vector2i(13, 4), "flying").has(pegasus.cell), "fliers can")
 	check(b.map.cost_field(Vector2i(12, 5), "mermaid").has(siren.cell), "mermaids can (via the river mouth)")
 
@@ -890,15 +1053,41 @@ func test_move_type_costs() -> void:
 	var fighter := unit_named("Fighter")
 	isolate([fighter])
 	var m: BattleMap = b.map
-	check_eq(m.move_cost(Vector2i(4, 0), "foot"), 2, "foot: forest 2")
-	check_eq(m.move_cost(Vector2i(4, 0), "horse"), 3, "horse: forest 3")
-	check_eq(m.move_cost(Vector2i(4, 0), "rogue"), 1, "rogue: forest 1")
-	check_eq(m.move_cost(Vector2i(7, 0), "flying"), 1, "flying: river 1")
-	check_eq(m.move_cost(Vector2i(2, 3), "flying"), 1, "flying: mountain 1")
-	check_eq(m.move_cost(Vector2i(0, 0), "ship"), -1, "ship: no land")
-	check_eq(m.move_cost(Vector2i(7, 0), "ship"), 1, "ship: river 1")
-	check_eq(m.move_cost(Vector2i(0, 0), "mermaid"), 2, "mermaid: plain 2")
-	check_eq(m.move_cost(Vector2i(7, 0), "mermaid"), 1, "mermaid: river 1")
+	# The full terrain spec: MOV cost per move type, in this column order.
+	var types := ["foot", "heavy", "horse", "rogue", "climb", "swim", "mermaid", "ship", "flying", "spirit"]
+	var x := -1.0
+	var spec := {
+		".": [1, 1, 1, 1, 1, 1, 3, 6, 1, 1],
+		"=": [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 1.5, 5, 1, 1],
+		"H": [1, 1, 1.2, 1, 1, 1, 1, 10, 1, 1],
+		"T": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1, 1],
+		"S": [1, 1, 1.5, 1, 1, 1, 2, 5, 1, 1],
+		"D": [1.5, 1.5, 3, 1.5, 1.5, 1.5, 2, 4, 1, 1],
+		"F": [2, 2, 4, 1.5, 2, 2, 3, 10, 1, 1],
+		"#": [10, 10, 20, 6, 10, 10, 10, 20, 1, 1],
+		"h": [4, 10, 10, 4, 2, 4, 10, 20, 1, 1],
+		"M": [7, 15, 15, 7, 4, 7, 15, 20, 1, 1],
+		"~": [6, 8, 8, 6, 6, 2, 1, 1, 1, 1],
+		"L": [6, 8, 8, 6, 6, 2, 1, 1, 1, 1],
+		"W": [6, 8, 8, 6, 6, 2, 1, 1, 1, 1],
+		"v": [20, 20, 20, 20, 20, 6, 6, 8, 1, 1],
+		"*": [1, 1, 1.5, 1, 1, 1, 2, 5, 1, 1],
+		"i": [1.5, 1, 2, 1.5, 1.5, 1.5, 1, 4, 1, 1],
+		"_": [1, 1, 1.5, 1, 1, 1, 3, 10, 1.5, 1],
+		"c": [1, 1, 1.5, 1, 1, 1, 3, 10, 1.5, 1],
+		"X": [x, x, x, x, x, x, x, x, x, 1],
+		"I": [2, 2, 2, 2, 2, 2, 2, 20, 1, 1],
+		"O": [x, x, x, x, x, x, x, x, 1, 1],
+		"|": [x, x, x, x, x, x, x, x, 1, 1],
+	}
+	check_eq(spec.size(), BattleMap.TERRAIN.size(), "every terrain is covered by the spec")
+	for key in spec:
+		for i in types.size():
+			var got := BattleMap.cost_for(key, types[i])
+			check(is_equal_approx(got, float(spec[key][i])),
+				"%s (%s) for %s: expected %s, got %s" % [BattleMap.TERRAIN[key].name, key, types[i], spec[key][i], got])
+	# Only fliers and spirits ignore terrain bonuses.
+	check_eq(BattleMap.NO_TERRAIN_BONUS, ["flying", "spirit"], "fliers and spirits get no terrain bonuses")
 	# Reachability follows the unit's type: (8, 4) is across the river from (6, 4).
 	fighter.set_cell(Vector2i(6, 4))
 	fighter.mov = 2
@@ -922,3 +1111,636 @@ func test_flying_gets_no_terrain_bonus() -> void:
 	brig.move_type = "flying"
 	check_eq(Combat.damage(fighter, brig, b.map), grounded + 1, "flier loses the forest's DEF +1")
 	check(Combat.hit_chance(fighter, brig, b.map) > grounded_hit, "and its avoid bonus")
+
+
+# --- Mounted units: no Shove, Rescue/Drop ------------------------------------------------
+
+func test_mounted_units_cannot_shove() -> void:
+	var fighter := unit_named("Fighter")
+	var knight := unit_named("Knight")
+	isolate([fighter, knight])
+	fighter.set_cell(Vector2i(4, 6))
+	knight.set_cell(Vector2i(5, 6))
+	check(b.can_shove(fighter, knight), "two foot units can shove")
+	fighter.set_class("Cavalry")
+	check(not b.can_shove(fighter, knight), "a mounted unit can't shove")
+	check(not b.can_shove(knight, fighter), "a mounted unit can't be shoved")
+	knight.set_class("Flier")
+	fighter.set_class("Axeman")
+	check(not b.can_shove(fighter, knight), "Fliers are mounted")
+	knight.set_race("Harpy")
+	knight.set_class("Archer")
+	check(knight.move_type == "flying" and b.can_shove(fighter, knight),
+		"Harpies fly but aren't mounted, so they can be shoved")
+
+
+func test_rescue_rules() -> void:
+	var fighter := unit_named("Fighter")
+	var knight := unit_named("Knight")
+	var archer := unit_named("Archer")
+	isolate([fighter, knight, archer])
+	fighter.set_cell(Vector2i(4, 6))
+	knight.set_cell(Vector2i(5, 6))
+	archer.set_cell(Vector2i(3, 6))
+	check(b.rescue_targets(fighter).is_empty(), "foot units can't rescue")
+	fighter.set_class("Cavalry")
+	check_eq(b.rescue_targets(fighter).size(), 2, "a mounted unit can rescue adjacent foot allies")
+	archer.set_class("Flier")
+	check_eq(b.rescue_targets(fighter), [knight], "mounted allies can't be rescued")
+	archer.set_race("Harpy")
+	archer.set_class("Archer")
+	check(b.rescue_targets(fighter).has(archer), "unmounted fliers (Harpy) can be rescued")
+	archer.set_class("Galley")
+	check(not b.rescue_targets(fighter).has(archer), "ships can't be rescued")
+
+
+func test_rescue_and_drop_ferry() -> void:
+	var fighter := unit_named("Fighter")
+	var lord := unit_named("Lord")
+	var archer := unit_named("Archer")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	# An idle Archer keeps the player phase open; the Brigand avoids an instant Victory.
+	isolate([fighter, lord, archer, brig])
+	archer.set_cell(Vector2i(0, 0))
+	brig.set_cell(Vector2i(14, 9))
+	fighter.set_class("Cavalry")
+	fighter.mov = 7
+	fighter.set_cell(Vector2i(4, 6))
+	lord.set_cell(Vector2i(5, 6))
+	var as_before := Combat.attack_speed(fighter)
+	# Rescue: select the Fighter, stay in place, Rescue the Lord.
+	b.cursor.cell = fighter.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Rescue")
+	check_eq(b.map.area_cells, [lord.cell], "rescue target previewed")
+	await press(KEY_Z)
+	check(fighter.carrying == lord and lord.carried_by == fighter, "Lord is being carried")
+	check(not b.units().has(lord), "carried units are off the map")
+	check(not lord.visible, "and hidden")
+	check(fighter.has_acted, "rescuing ends the rescuer's turn")
+	check_eq(b.state, b.State.IDLE, "a carried Lord isn't a defeat")
+	check(Combat.attack_speed(fighter) < as_before, "carrying halves AGI (attack speed drops)")
+	# Next turn: ride east and drop the Lord, who can still act.
+	fighter.has_acted = false
+	b.cursor.cell = fighter.cell
+	await press(KEY_Z)
+	for i in 4:
+		await press(KEY_RIGHT)
+	await press(KEY_Z)
+	check_eq(fighter.cell, Vector2i(8, 6), "carrier moved (across the river ford)")
+	await pick("Drop")
+	var drop_cell: Vector2i = b.drop_cells[0]
+	await press(KEY_Z)
+	check(fighter.carrying == null and lord.carried_by == null, "dropped")
+	check_eq(lord.cell, drop_cell, "Lord set down on the chosen cell")
+	check(b.units().has(lord) and lord.visible, "back on the map")
+	check(fighter.has_acted, "dropping ends the carrier's turn")
+	check(not lord.has_acted, "the dropped Lord can still act")
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	check_eq(b.state, b.State.SELECTED, "and can be selected to move on")
+
+
+func test_fallen_carrier_drops_passenger() -> void:
+	var fighter := unit_named("Fighter")
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([fighter, lord, brig])
+	fighter.set_class("Cavalry")
+	fighter.set_cell(Vector2i(4, 6))
+	lord.set_cell(Vector2i(5, 6))
+	await b.do_rescue(fighter, lord)
+	brig.set_cell(Vector2i(4, 5))
+	fighter.hp = 1
+	brig.dexterity = 60  # guaranteed hit
+	await b.do_combat(brig, fighter)
+	check(not is_instance_valid(fighter) or fighter.hp <= 0, "carrier fell")
+	check_eq(lord.cell, Vector2i(4, 6), "passenger set down where the carrier fell")
+	check(b.units().has(lord) and lord.visible and lord.carried_by == null, "passenger back on the map")
+
+
+# --- Classes ----------------------------------------------------------------------------
+
+func test_class_data_is_consistent() -> void:
+	for id in Classes.DATA:
+		var c: Dictionary = Classes.DATA[id]
+		check(BattleMap.MOVE_TYPES.has(c.move), "%s: known move type %s" % [id, c.move])
+		check(not c.weapons.is_empty(), "%s: wields something" % id)
+		for t in c.weapons:
+			check(Weapons.DATA.values().any(func(w): return w.type == t), "%s: weapon type %s exists" % [id, t])
+		for p in Classes.promotions(id):
+			check(Classes.DATA.has(p) and Classes.DATA[p].get("promoted", false),
+				"%s: promotes into a promoted class (%s)" % [id, p])
+	check_eq(Classes.promotions("Guard"), ["Juggernaut"], "Guard -> Juggernaut")
+	check_eq(Classes.promotions("Turret"), ["Juggernaut"], "Turret -> Juggernaut")
+	var lord := unit_named("Lord")
+	lord.level = 7
+	lord.set_class("Swordsmaster")
+	check_eq(lord.level, 7, "changing class keeps the level")
+
+
+func test_class_weapon_restrictions() -> void:
+	var lord := unit_named("Lord")
+	var mage := unit_named("Mage")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	lord.items.push_front(Items.make("Iron Axe"))
+	check_eq(lord.weapon.name, "Iron Sword", "a Swordsman skips the axe it can't wield")
+	lord.equip(0)
+	check_eq(lord.items[0].name, "Iron Axe", "equip() refuses weapons the class can't wield")
+	check(lord.weapons().all(func(w): return w.type == "sword"), "weapons() lists only wieldable ones")
+	check_eq(mage.weapon.name, "Quarterstaff", "Mages wield staves")
+	clear_board([mage, brig])
+	mage.set_cell(Vector2i(5, 2))
+	brig.set_cell(Vector2i(6, 2))
+	check_eq(Combat.triangle(mage, brig), 0, "staves sit outside the triangle")
+	check(Combat.can_counter(brig, mage), "a staff counters in melee")
+	# The items menu marks the axe as unusable.
+	lord.set_cell(Vector2i(4, 4))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Items")
+	check(b.ui.menu_options[0].ends_with("(x)"), "unusable weapon is marked (x)")
+
+
+func test_swim_and_climb_costs() -> void:
+	# Exact costs are in test_move_type_costs; this checks what they mean on a map.
+	var m: BattleMap = b.map
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	check_eq(brig.move_type, "climb", "Brigands climb")
+	isolate([brig])
+	brig.set_cell(Vector2i(1, 3))  # next to the (2, 3) mountain
+	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(2, 3)), "a MOV 5 climber can scale a mountain (4)")
+	brig.move_type = "foot"
+	check(not m.get_reachable(brig, b.units()).cells.has(Vector2i(2, 3)), "a MOV 5 foot unit can't (7)")
+	brig.set_cell(Vector2i(6, 0))  # next to the river at (7, 0)
+	brig.move_type = "swim"
+	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(7, 0)), "a swimmer wades into the river (2)")
+	# Berserkers keep the best of both on every terrain.
+	check_eq(Classes.get_data("Berserker").move, "swim_climb", "Berserkers swim and climb")
+	for key in BattleMap.TERRAIN:
+		var swim := BattleMap.cost_for(key, "swim")
+		var climb := BattleMap.cost_for(key, "climb")
+		var best := minf(swim, climb) if swim >= 0 and climb >= 0 else maxf(swim, climb)
+		check(is_equal_approx(BattleMap.cost_for(key, "swim_climb"), best),
+			"swim_climb on '%s': expected %s, got %s" % [key, best, BattleMap.cost_for(key, "swim_climb")])
+	check_eq(BattleMap.cost_for("M", "swim_climb"), 4.0, "climbs mountains like a climber")
+	check_eq(BattleMap.cost_for("~", "swim_climb"), 2.0, "swims rivers like a swimmer")
+	brig.move_type = "swim_climb"
+	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(7, 0)), "a Berserker wades into the river")
+	brig.set_cell(Vector2i(1, 3))
+	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(2, 3)), "and scales the mountain")
+
+
+func test_inspire_buffs_adjacent_allies() -> void:
+	var banner := unit_named("Bannerman")
+	var knight := unit_named("Knight")
+	var fighter := unit_named("Fighter")
+	var archer := unit_named("Archer")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	clear_board([banner, knight, fighter, archer, brig])
+	banner.set_cell(Vector2i(4, 6))
+	knight.set_cell(Vector2i(5, 6))
+	fighter.set_cell(Vector2i(4, 7))
+	archer.set_cell(Vector2i(6, 6))
+	brig.set_cell(Vector2i(5, 5))
+	var dmg_before := Combat.damage(knight, brig, b.map)
+	var taken_before := Combat.damage(brig, knight, b.map)
+	b.cursor.cell = banner.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Inspire")
+	check_eq(b.map.area_cells.size(), 2, "both adjacent allies are previewed")
+	await press(KEY_Z)
+	check_eq(knight.inspire_bonus, 1, "Lv 1 Inspire: +1")
+	check_eq(fighter.inspire_bonus, 1, "every adjacent ally is inspired")
+	check_eq(archer.inspire_bonus, 0, "allies 2 tiles away are not")
+	check_eq(Combat.damage(knight, brig, b.map), dmg_before + 1, "+1 STR")
+	check_eq(Combat.damage(brig, knight, b.map), maxi(0, taken_before - 1), "+1 DEF")
+	check(banner.has_acted, "Inspire ends the Bannerman's turn")
+	check_eq(banner.exp_points, roundi(Experience.INSPIRE_EXP * 1.1), "Inspire EXP (Human x1.1)")
+	check_eq(Classes.inspire_bonus(5), 2, "Lv 5: +2")
+	check_eq(Classes.inspire_bonus(20), 5, "Lv 20: +5")
+	b.clear_inspire(Unit.Team.ENEMY)
+	check_eq(knight.inspire_bonus, 1, "lasts through the enemy phase")
+	b.clear_inspire(Unit.Team.PLAYER)
+	check_eq(knight.inspire_bonus, 0, "gone at the next player phase")
+
+
+func test_ship_board_and_unload() -> void:
+	var ship := unit_named("Archer")
+	var lord := unit_named("Lord")
+	var knight := unit_named("Knight")
+	var fighter := unit_named("Fighter")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	# An idle Fighter keeps the player phase open; the Brigand avoids an instant Victory.
+	isolate([ship, lord, knight, fighter, brig])
+	ship.set_class("Galley")
+	ship.set_cell(Vector2i(7, 4))
+	lord.set_cell(Vector2i(6, 4))
+	knight.set_cell(Vector2i(6, 5))
+	fighter.set_cell(Vector2i(0, 0))
+	brig.set_cell(Vector2i(14, 9))
+	check(not b.can_shove(lord, ship), "ships can't be shoved")
+	# The Lord boards without moving.
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Board")
+	check_eq(b.map.area_cells, [ship.cell], "ship previewed")
+	await press(KEY_Z)
+	check(lord.carried_by == ship and ship.passengers == [lord], "Lord is aboard")
+	check(not b.units().has(lord) and not lord.visible, "passengers are off the map")
+	check(lord.has_acted, "boarding ends the boarder's turn")
+	check_eq(b.state, b.State.IDLE, "a Lord aboard isn't a defeat")
+	# The Knight walks up to the ship and boards: now it's full.
+	b.cursor.cell = knight.cell
+	await press(KEY_Z)
+	await press(KEY_UP)
+	await press(KEY_Z)
+	await pick("Board")
+	await press(KEY_Z)
+	check_eq(ship.passengers.size(), 2, "two aboard")
+	fighter.set_cell(Vector2i(8, 4))
+	check(b.board_targets(fighter).is_empty(), "a full ship takes nobody else")
+	fighter.set_cell(Vector2i(0, 0))
+	# New phase: passengers are refreshed even while aboard.
+	await b.start_player_phase()
+	check(not lord.has_acted and not knight.has_acted, "passengers get their action back")
+	# The ship sails one tile and unloads the Lord, then the Knight, without ending its turn.
+	b.cursor.cell = ship.cell
+	await press(KEY_Z)
+	await press(KEY_DOWN)
+	await press(KEY_Z)
+	check_eq(ship.cell, Vector2i(7, 5), "ship moved")
+	await pick("Unload")
+	check_eq(b.state, b.State.MENU, "two passengers: pick who to unload")
+	await pick("Lord")
+	var lord_cell: Vector2i = b.drop_cells[0]
+	await press(KEY_Z)
+	check(lord.carried_by == null and lord.visible and b.units().has(lord), "Lord unloaded")
+	check_eq(lord.cell, lord_cell, "onto the chosen cell")
+	check(not ship.has_acted, "unloading doesn't end the ship's turn")
+	check_eq(b.state, b.State.MENU, "the ship's menu reopens")
+	await press(KEY_X)
+	check_eq(ship.cell, Vector2i(7, 5), "after unloading, cancel no longer undoes the move")
+	await pick("Unload")
+	await press(KEY_Z)
+	check(ship.passengers.is_empty() and b.units().has(knight), "Knight unloaded too")
+	check(not b.ui.menu_options.has("Unload"), "nothing left to unload")
+	await pick("Wait")
+	check(ship.has_acted, "Wait ends the ship's turn")
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	check_eq(b.state, b.State.SELECTED, "the unloaded Lord can act")
+
+
+func test_sunk_ship_sets_passengers_ashore() -> void:
+	var ship := unit_named("Archer")
+	var knight := unit_named("Knight")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([ship, knight, brig])
+	ship.set_class("Galley")
+	ship.set_cell(Vector2i(7, 4))
+	knight.set_cell(Vector2i(6, 4))
+	await b.do_board(knight, ship)
+	brig.set_cell(Vector2i(8, 4))
+	ship.hp = 1
+	brig.dexterity = 60  # guaranteed hit
+	await b.do_combat(brig, ship)
+	check(not is_instance_valid(ship) or ship.hp <= 0, "ship sank")
+	check(b.units().has(knight) and knight.visible and knight.carried_by == null, "passenger back on the map")
+	check_eq(b.map.move_cost(knight.cell, knight.move_type) >= 0, true, "on a cell it can stand on")
+	check_eq(BattleMap.distance(knight.cell, Vector2i(7, 4)), 1, "next to where the ship sank")
+
+
+# --- Quality of life ----------------------------------------------------------------------
+
+func test_jump_to_next_unit() -> void:
+	var waiting: Array = b.units_of(Unit.Team.PLAYER)
+	b.cursor.cell = Vector2i(5, 5)  # empty tile
+	await press(KEY_A)
+	check_eq(b.cursor.cell, waiting[0].cell, "from an empty tile: first unit that hasn't acted")
+	await press(KEY_A)
+	check_eq(b.cursor.cell, waiting[1].cell, "then the next one")
+	waiting[2].has_acted = true
+	await press(KEY_A)
+	check_eq(b.cursor.cell, waiting[3].cell, "units that already acted are skipped")
+	b.cursor.cell = waiting[-1].cell
+	await press(KEY_A)
+	check_eq(b.cursor.cell, waiting[0].cell, "wraps around to the first")
+
+
+func test_fast_forward_enemy_phase() -> void:
+	Input.action_press("cancel")
+	await process_frame
+	check_eq(Engine.time_scale, 1.0, "holding X on the player phase does nothing")
+	b.enemy_phase = true
+	await process_frame
+	check_eq(Engine.time_scale, b.FAST_FORWARD_SPEED, "holding X on the enemy phase speeds up the game")
+	check(b.ui._fast_forward.visible, "with an on-screen indicator")
+	Input.action_release("cancel")
+	await process_frame
+	check_eq(Engine.time_scale, 1.0, "back to normal when released")
+	check(not b.ui._fast_forward.visible, "indicator hidden")
+	b.enemy_phase = false
+
+
+func test_level_up_waits_for_confirm() -> void:
+	var lord := unit_named("Lord")
+	b.ui.level_up_waits = true
+	lord.exp_points = 95
+	var done := [false]
+	var run := func():
+		await b.gain_exp(lord, 33)
+		done[0] = true
+	run.call()
+	await create_timer(2.6).timeout
+	check(b.ui._level_up.visible, "level-up window still up after the old 2 s timeout")
+	check(not done[0], "and the game waits")
+	var e := InputEventKey.new()
+	e.physical_keycode = KEY_Z
+	e.keycode = KEY_Z
+	e.pressed = true
+	b.ui._unhandled_input(e)
+	await process_frame
+	await process_frame
+	check(not b.ui._level_up.visible, "Z closes it")
+	check(done[0], "and the game carries on")
+
+
+func test_end_turn_warning() -> void:
+	var waiting: int = b.units_of(Unit.Team.PLAYER).size()
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("End Turn")
+	check_eq(b.menu_context, "end_turn", "End Turn with units waiting asks first")
+	check_eq(b.ui.menu_options, ["Cancel", "End Turn"], "Cancel is listed (and selected) first")
+	check(b.ui._menu_label.text.contains("%d units haven't acted" % waiting), "the prompt says how many")
+	await press(KEY_Z)
+	check_eq(b.state, b.State.IDLE, "Z right away cancels")
+	check(not b.enemy_phase, "turn not ended")
+	await press(KEY_Z)
+	await pick("End Turn")
+	await pick("End Turn")
+	check(b.enemy_phase or b.turn == 2, "confirming ends the turn")
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+
+
+# --- Weapon effectiveness --------------------------------------------------------------
+
+## Puts a fresh copy of `weapon_name` first in `u`'s inventory (equipped).
+func give_weapon(u: Unit, weapon_name: String) -> void:
+	u.items.push_front(Items.make(weapon_name))
+
+
+func test_effectiveness_triples_might() -> void:
+	# Each weapon goes to a class that can wield it (classes restrict weapon types).
+	var archer := unit_named("Archer")
+	var knight := unit_named("Knight")
+	var fighter := unit_named("Fighter")
+	var target := unit_named("Cleric")
+	isolate([archer, knight, fighter, target])
+	target.set_cell(Vector2i(6, 2))  # plain: no terrain DEF
+	var cases := [
+		["Iron Bow", "flying", archer], ["Pike", "horse", knight],
+		["Hammer", "heavy", fighter], ["Woodcutter", "ship", fighter],
+	]
+	for c in cases:
+		var attacker: Unit = c[2]
+		attacker.set_cell(Vector2i(4, 2) if c[0] == "Iron Bow" else Vector2i(5, 2))
+		give_weapon(attacker, c[0])
+		check_eq(attacker.weapon.name, c[0], "%s equipped" % c[0])
+		var mt: int = Weapons.DATA[c[0]].mt
+		var tri := Combat.triangle(attacker, target)
+		target.tags.assign(["foot"])
+		var normal := Combat.damage(attacker, target, b.map)
+		check_eq(normal, maxi(0, attacker.strength + mt + tri - target.defense), "%s vs foot: normal damage" % c[0])
+		target.tags.assign([c[1]])
+		check(Combat.is_effective(attacker.weapon, target), "%s is effective vs %s" % [c[0], c[1]])
+		check_eq(Combat.damage(attacker, target, b.map), attacker.strength + mt * 3 + tri - target.defense,
+			"%s vs %s: might x3" % [c[0], c[1]])
+		attacker.items.remove_at(0)
+		attacker.set_cell(Vector2i(0, 9 - cases.find(c)))
+	# Effectiveness counts on counters too: an archer's bow shoots down a flier at range 2.
+	target.tags.assign(["flying"])
+	archer.set_cell(Vector2i(8, 2))
+	check_eq(Combat.forecast(target, archer, b.map).def.multiplier, 3, "counter forecast flags effectiveness")
+
+
+func test_spirits_resist_non_silver_weapons() -> void:
+	var blade := unit_named("Fighter")
+	var wraith := unit_named("Archer")
+	var mage := unit_named("Mage")
+	isolate([blade, wraith, mage])
+	blade.set_cell(Vector2i(5, 2))
+	wraith.set_cell(Vector2i(6, 2))
+	blade.strength = 15  # enough to hurt through DEF either way
+	give_weapon(blade, "Iron Axe")
+	var full := Combat.damage(blade, wraith, b.map)
+	wraith.tags.assign(["spirit"])
+	check_eq(Combat.damage(blade, wraith, b.map), floori(full / 2.0), "non-silver weapon: half damage")
+	check(Combat.side_stats(blade, wraith, b.map).resisted, "forecast flags the resistance")
+	# Silver: not resisted, and effective (x3 might).
+	blade.items.remove_at(0)
+	give_weapon(blade, "Silver Axe")
+	var mt: int = Weapons.DATA["Silver Axe"].mt
+	check_eq(Combat.damage(blade, wraith, b.map), blade.strength + mt * 3 - wraith.defense,
+		"silver weapon: full damage, might x3")
+	check(not Combat.side_stats(blade, wraith, b.map).resisted, "silver isn't resisted")
+	# Magic isn't a physical weapon: spirits take it normally.
+	var fire := Spells.get_spell("Fire")
+	mage.set_cell(Vector2i(4, 2))
+	var vs_spirit := Combat.spell_damage(mage, wraith, fire, b.map)
+	wraith.tags.assign(["foot"])
+	check_eq(vs_spirit, Combat.spell_damage(mage, wraith, fire, b.map), "spells ignore spirit resistance")
+
+
+func test_forecast_shows_effectiveness() -> void:
+	var archer := unit_named("Archer")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([archer, brig])
+	archer.set_cell(Vector2i(5, 2))
+	brig.set_cell(Vector2i(7, 2))
+	brig.tags.assign(["flying"])
+	b.ui.show_forecast(archer, brig, Combat.forecast(archer, brig, b.map), archer.cell)
+	var weapon_label: Label = b.ui._forecast_cells[1][1]
+	check(weapon_label.text.ends_with("x3"), "attacker's weapon tagged x3 (got '%s')" % weapon_label.text)
+
+
+func test_ai_prefers_effective_weapon() -> void:
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	var knight := unit_named("Knight")
+	isolate([brig, knight])
+	check_eq(knight.move_type, "heavy", "the Knight (Guard) wears heavy armor")
+	brig.items.assign([Items.make("Iron Axe"), Items.make("Hammer")])
+	brig.set_cell(Vector2i(5, 2))
+	knight.set_cell(Vector2i(6, 2))
+	var plan: Dictionary = EnemyAI._best_attack(brig, b, {brig.cell: 0})
+	check_eq(plan.get("weapon", {}).get("name", ""), "Hammer", "AI picks the Hammer vs armor")
+
+
+# --- Races -------------------------------------------------------------------------
+
+func test_race_class_bans() -> void:
+	for c in [
+		["Naga", "Cavalry", false], ["Naga", "Flier", false], ["Naga", "Footman", true],
+		["Centaur", "Flier", false], ["Centaur", "Guard", true], ["Minotaur", "Nomad", false],
+		["Harpy", "Guard", false], ["Harpy", "Cavalry", true], ["Ent", "Equestrian", false],
+		["Stoneborn", "Rogue", false], ["Stoneborn", "Cavalry", false], ["Stoneborn", "Guard", true],
+		["Stoneborn", "Axeman", true], ["Human", "Flier", true],
+	]:
+		check_eq(Races.allows(c[0], c[1]), c[2], "%s %s allowed" % [c[0], c[1]])
+	for r in Races.DATA:
+		check(Races.DATA[r].has("description"), "%s has a description" % r)
+
+
+func test_race_movement_and_tags() -> void:
+	var fighter := unit_named("Fighter")  # Axeman
+	var knight := unit_named("Knight")  # Guard
+	var thief := unit_named("Thief", Unit.Team.ENEMY)  # Rogue
+	var galley := unit_named("Archer")
+	check_eq(fighter.tags, ["foot"] as Array[String], "a Human's tags are its class's")
+	fighter.set_race("Naga")
+	check_eq(fighter.move_type, "mermaid", "Nagas always move as aquatic")
+	check(fighter.tags.has("foot") and fighter.tags.has("aquatic") and fighter.tags.has("reptile"),
+		"and keep the class tag next to their own")
+	knight.set_race("Centaur")
+	check_eq(knight.move_type, "horse", "Centaur Guard moves as a horse")
+	check(knight.tags.has("heavy") and knight.tags.has("horse"), "but is still a heavy target")
+	check_eq(knight.mov_bonus, 0, "no MOV bonus outside foot and scout classes")
+	var base := knight.mov
+	knight.set_class("Footman")
+	check_eq(knight.mov, base + 1, "+1 MOV in a foot class")
+	knight.set_race("Lizal")
+	check_eq(knight.move_type, "swim_climb", "Lizal on foot swims and climbs")
+	check_eq(knight.mov, base, "bonus gone with the race")
+	thief.set_race("Lizal")
+	check_eq(thief.move_type, "rogue_swim_climb", "a Lizal scout keeps scout movement too")
+	check(is_equal_approx(BattleMap.cost_for("#", "rogue_swim_climb"), 6.0)
+		and is_equal_approx(BattleMap.cost_for("W", "rogue_swim_climb"), 2.0)
+		and is_equal_approx(BattleMap.cost_for("M", "rogue_swim_climb"), 4.0), "cheapest of the three")
+	knight.set_class("Cavalry")
+	check_eq(knight.move_type, "horse", "a Lizal rider just rides")
+	fighter.set_race("Harpy")
+	check_eq(fighter.move_type, "flying", "Harpies fly")
+	fighter.set_class("Cavalry")
+	check_eq(fighter.move_type, "horse", "unless mounted")
+	check(fighter.tags.has("flying"), "but still count as fliers")
+	fighter.set_race("Ghost")
+	check_eq(fighter.move_type, "spirit", "Ghosts always move as spirits")
+	fighter.set_class("Axeman")
+	fighter.set_race("Stoneborn")
+	check(fighter.move_type == "heavy" and fighter.tags.has("heavy"), "Stoneborn move and count as heavy")
+	fighter.set_race("Ent")
+	check(fighter.move_type == "heavy" and not fighter.tags.has("heavy"), "Ents only move as heavy")
+	galley.set_class("Galley")
+	galley.set_race("Ghost")
+	check_eq(galley.move_type, "ship", "ships keep sailing whatever the crew")
+
+
+func test_race_weaknesses_and_resistances() -> void:
+	var fighter := unit_named("Fighter")  # Axeman
+	var soldier := unit_named("Knight")  # Guard (spears)
+	var target := unit_named("Cleric")
+	isolate([fighter, soldier, target])
+	target.set_cell(Vector2i(6, 2))  # plain: no terrain DEF
+	soldier.set_cell(Vector2i(5, 2))
+	fighter.set_cell(Vector2i(7, 2))
+	fighter.strength = 15
+	soldier.strength = 15
+	var spear := Items.make("Iron Spear")
+	var axe := Items.make("Iron Axe")
+	# Weak (x2): spears vs aquatic, axes vs wooden.
+	var human_dmg := Combat.damage(soldier, target, b.map)
+	target.set_race("Naga")
+	check_eq(Combat.multiplier(spear, target), 2, "spears are x2 vs aquatic")
+	check_eq(Combat.damage(soldier, target, b.map), human_dmg + spear.mt, "spear might doubled vs Naga")
+	target.set_race("Ent")
+	check_eq(Combat.multiplier(axe, target), 2, "axes are x2 vs wooden")
+	check_eq(Combat.multiplier(Items.make("Hammer"), target), 2, "the Hammer is just an axe vs Ents")
+	# Effective (x3) beats Weak and isn't stacked with it.
+	soldier.set_race("Centaur")
+	check_eq(Combat.multiplier(Items.make("Hammer"), soldier), 3, "Hammer effective vs a Centaur Guard")
+	check_eq(Combat.multiplier(Items.make("Pike"), soldier), 3, "and so is the Pike")
+	# Undead: silver is x2; a Ghost's spirit tag makes it x3 instead (no stacking).
+	var silver := Items.make("Silver Axe")
+	target.set_race("Skeleton")
+	check_eq(Combat.multiplier(silver, target), 2, "silver x2 vs Skeletons")
+	check(not Combat.resists(target, axe), "Skeletons don't resist iron")
+	target.set_race("Ghost")
+	check_eq(Combat.multiplier(silver, target), 3, "silver x3 vs Ghosts (spirit), not x6")
+	check(Combat.resists(target, axe), "Ghosts resist iron like any spirit")
+	check(not Combat.resists(target, silver), "but not silver")
+
+
+func test_race_spell_elements() -> void:
+	var mage := unit_named("Mage")
+	var target := unit_named("Cleric")
+	isolate([mage, target])
+	target.set_cell(Vector2i(6, 2))
+	mage.set_cell(Vector2i(5, 2))
+	mage.intelligence = 20
+	target.mp = 0
+	var fire := Spells.get_spell("Fire")
+	var spike := Spells.get_spell("Earth Spike")
+	var full := Combat.spell_damage(mage, target, fire, b.map)
+	target.set_race("Naga")
+	check_eq(Combat.spell_damage(mage, target, fire, b.map), floori(full / 2.0),
+		"Nagas resist Fire once, though both Aquatic and Reptile resist it")
+	check(Combat.spell_forecast(mage, target, fire, b.map).atk.resisted, "forecast flags it")
+	target.set_race("Ent")
+	check_eq(Combat.spell_damage(mage, target, fire, b.map), full + fire.power, "Ents take x2 Fire power")
+	check_eq(Combat.spell_forecast(mage, target, fire, b.map).atk.multiplier, 2, "forecast shows x2")
+	var spike_full: int = mage.intelligence + spike.power
+	check_eq(Combat.spell_damage(mage, target, spike, b.map), floori(spike_full / 2.0), "and resist Earth")
+	target.set_race("Ghost")
+	check_eq(Combat.spell_damage(mage, target, fire, b.map), full + fire.power, "the undead burn too")
+
+
+func test_race_carry_and_shove() -> void:
+	var fighter := unit_named("Fighter")
+	var knight := unit_named("Knight")
+	var archer := unit_named("Archer")
+	isolate([fighter, knight, archer])
+	fighter.set_cell(Vector2i(4, 6))
+	knight.set_cell(Vector2i(5, 6))
+	archer.set_cell(Vector2i(3, 6))
+	fighter.set_race("Centaur")
+	check(b.can_shove(fighter, knight), "Centaurs can shove")
+	check(not b.can_shove(knight, fighter), "but can't be shoved")
+	check_eq(b.rescue_targets(fighter).size(), 2, "and can carry allies on foot")
+	archer.set_class("Cavalry")
+	check(not b.rescue_targets(archer).has(fighter), "but can't be carried")
+	fighter.set_race("Human")
+	fighter.set_class("Cavalry")
+	knight.set_race("Ent")
+	check(not b.rescue_targets(fighter).has(knight), "Ents can't be carried")
+	fighter.set_class("Axeman")
+	check(not b.can_shove(fighter, knight), "or shoved")
+	knight.set_race("Stoneborn")
+	check(not b.can_shove(fighter, knight), "nor can the Stoneborn")
+	archer.set_cell(Vector2i(0, 0))  # clear the landing cell
+	check(b.can_shove(knight, fighter), "though they can shove others")
+
+
+func test_race_regen_and_exp() -> void:
+	var lord := unit_named("Lord")
+	var mage := unit_named("Mage")
+	isolate([lord, mage])
+	lord.set_cell(Vector2i(6, 2))  # plain: no tile healing
+	lord.set_race("Troll")
+	lord.hp = 5
+	await b.heal_on_tiles(Unit.Team.PLAYER)
+	check_eq(lord.hp, 5 + ceili(lord.max_hp * 0.1), "Trolls regenerate 10% HP")
+	check_eq(mage.mp_regen(), Spells.MP_REGEN, "normal MP regen")
+	mage.set_race("Fairy")
+	check_eq(mage.mp_regen(), Spells.MP_REGEN + 1, "Fairies recover 1 more")
+	lord.exp_points = 0
+	await b.gain_exp(lord, 10)
+	check_eq(lord.exp_points, 10, "Trolls earn plain EXP")
+	lord.set_race("Human")
+	await b.gain_exp(lord, 10)
+	check_eq(lord.exp_points, 21, "Humans earn 10% more")

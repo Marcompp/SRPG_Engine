@@ -21,10 +21,11 @@ var weapon_choices: Array[int] = []
 var spell_choices: Array[String] = []
 ## Spell being targeted, or "" when targeting an attack.
 var active_spell := ""
-## What TARGETING is picking a unit for: "attack", "spell", "dance" or "trade".
+## What TARGETING is picking for: "attack", "spell", "dance", "trade", "shove",
+## "rescue", "drop", "board", "unload" or "inspire".
 var target_mode := "attack"
-## Set once the selected unit trades; its move can no longer be undone.
-var has_traded := false
+## Set once the selected unit trades or unloads; its move can no longer be undone.
+var move_committed := false
 ## Trade screen state: the partner, cursor (x = side: 0 selected / 1 partner,
 ## y = slot), and the picked-up item's (side, slot), or (-1, -1) when none.
 var trade_partner: Unit
@@ -32,6 +33,11 @@ var trade_cursor := Vector2i.ZERO
 var trade_held := Vector2i(-1, -1)
 ## Cells an area spell may be centered on while in AREA_TARGET.
 var area_centers: Array[Vector2i] = []
+## Cells the carried unit can be dropped on, while target_mode is "drop" or "unload".
+var drop_cells: Array[Vector2i] = []
+## Passenger a ship is unloading, and the passengers behind the Unload menu's entries.
+var unload_passenger: Unit
+var passenger_choices: Array[Unit] = []
 ## Whether the enemy danger zone overlay is shown (toggled with danger_zone).
 var danger_on := false
 ## Unit (either side) under the cursor while browsing, whose ranges are shown, or null.
@@ -45,6 +51,10 @@ var status_unit: Unit
 var status_return_state := State.IDLE
 ## Current turn number (a turn is one player phase plus one enemy phase).
 var turn := 0
+## True during the enemy phase, when holding cancel fast-forwards.
+var enemy_phase := false
+## Game speed while fast-forwarding the enemy phase.
+const FAST_FORWARD_SPEED := 4.0
 
 
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
@@ -63,10 +73,11 @@ func _ready() -> void:
 
 # --- Queries -----------------------------------------------------------------
 
+## Units on the map (carried units are off the map and excluded).
 func units() -> Array[Unit]:
 	var result: Array[Unit] = []
 	for child in units_root.get_children():
-		if child is Unit and child.hp > 0:
+		if child is Unit and child.hp > 0 and child.carried_by == null:
 			result.append(child)
 	return result
 
@@ -96,7 +107,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var cancel := event.is_action_pressed("cancel")
 	var danger := event.is_action_pressed("danger_zone")
 	var info := event.is_action_pressed("unit_info")
-	if dir == Vector2i.ZERO and not accept and not cancel and not danger and not info:
+	var next := event.is_action_pressed("next_unit")
+	if dir == Vector2i.ZERO and not accept and not cancel and not danger and not info and not next:
 		return
 	get_viewport().set_input_as_handled()
 
@@ -114,7 +126,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	match state:
 		State.IDLE:
-			if dir != Vector2i.ZERO:
+			if next:
+				jump_to_next_unit()
+			elif dir != Vector2i.ZERO:
 				move_cursor(dir)
 			elif accept:
 				var u := unit_at(cursor.cell)
@@ -139,9 +153,21 @@ func _unhandled_input(event: InputEvent) -> void:
 				state = State.IDLE
 				refresh_info()
 		State.STATUS:
-			if dir.y != 0:
+			# Browsing: Up/Down = unit, Left/Right = page, D = detail mode, X = close.
+			# Detail mode: arrows move the highlight, D or X go back to browsing.
+			var screen := ui.status_screen
+			if screen.detail:
+				if dir != Vector2i.ZERO:
+					screen.move_detail(dir)
+				elif info or cancel:
+					screen.exit_detail()
+			elif dir.y != 0:
 				cycle_status(dir.y)
-			elif cancel or info:
+			elif dir.x != 0:
+				screen.change_page(dir.x)
+			elif info:
+				screen.enter_detail()
+			elif cancel:
 				close_status()
 		State.MENU:
 			if dir.y != 0:
@@ -155,7 +181,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		State.TARGETING:
 			if dir != Vector2i.ZERO:
 				var step := 1 if dir.x + dir.y > 0 else -1
-				target_index = wrapi(target_index + step, 0, targets.size())
+				var count := drop_cells.size() if target_mode in ["drop", "unload"] else targets.size()
+				target_index = wrapi(target_index + step, 0, count)
 				show_target()
 			elif accept:
 				ui.hide_forecast()
@@ -163,8 +190,22 @@ func _unhandled_input(event: InputEvent) -> void:
 					open_trade(targets[target_index])
 					return
 				state = State.BUSY
-				if target_mode == "dance":
+				if target_mode == "unload":
+					# Unloading doesn't end the ship's turn, but commits its move.
+					await do_unload(selected, unload_passenger, drop_cells[target_index])
+					move_committed = true
+					open_unit_menu()
+					return
+				if target_mode == "drop":
+					await do_drop(selected, drop_cells[target_index])
+				elif target_mode == "rescue":
+					await do_rescue(selected, targets[target_index])
+				elif target_mode == "dance":
 					await do_dance(selected, targets[target_index])
+				elif target_mode == "board":
+					await do_board(selected, targets[target_index])
+				elif target_mode == "inspire":
+					await do_inspire(selected)
 				elif target_mode == "shove":
 					await do_shove(selected, targets[target_index])
 				elif active_spell and Spells.is_support(active_spell):
@@ -178,7 +219,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				ui.hide_forecast()
 				map.clear_ranges()
 				cursor.cell = selected.cell
-				if target_mode in ["dance", "trade", "shove"]:
+				if target_mode in ["dance", "trade", "shove", "rescue", "drop", "board", "unload", "inspire"]:
 					open_unit_menu()
 				elif active_spell:
 					open_magic_menu()
@@ -231,6 +272,47 @@ func move_cursor(dir: Vector2i) -> void:
 	refresh_info()
 
 
+## Holding cancel during the enemy phase runs the game at FAST_FORWARD_SPEED.
+func _process(_delta: float) -> void:
+	var speed := FAST_FORWARD_SPEED if enemy_phase and Input.is_action_pressed("cancel") else 1.0
+	if Engine.time_scale != speed:
+		Engine.time_scale = speed
+		ui.show_fast_forward(speed)
+
+
+func _exit_tree() -> void:
+	# Leaving mid-fast-forward (restart, level select) must not keep the game sped up.
+	Engine.time_scale = 1.0
+
+
+## Moves the cursor to the next player unit that hasn't acted, in roster order,
+## wrapping around (FE's L button).
+func jump_to_next_unit() -> void:
+	var waiting: Array[Unit] = []
+	for u in units_of(Unit.Team.PLAYER):
+		if not u.has_acted:
+			waiting.append(u)
+	if waiting.is_empty():
+		return
+	var i := waiting.find(unit_at(cursor.cell))
+	cursor.cell = waiting[(i + 1) % waiting.size()].cell
+	refresh_info()
+
+
+## End Turn with units still waiting asks first; Cancel is selected by default.
+func confirm_end_turn() -> void:
+	var waiting := 0
+	for u in units_of(Unit.Team.PLAYER):
+		if not u.has_acted:
+			waiting += 1
+	if waiting == 0:
+		end_player_phase()
+		return
+	var options: Array[String] = ["Cancel", "End Turn"]
+	_open_menu("end_turn", options, "End turn? %d unit%s %s acted" % [
+		waiting, "" if waiting == 1 else "s", "hasn't" if waiting == 1 else "haven't"])
+
+
 func refresh_info() -> void:
 	ui.update_info(unit_at(cursor.cell), map.terrain_at(cursor.cell), cursor.cell)
 	update_hover()
@@ -259,7 +341,7 @@ func show_unit_ranges(u: Unit, unit_reach: Dictionary) -> void:
 
 func select(u: Unit) -> void:
 	selected = u
-	has_traded = false
+	move_committed = false
 	origin_cell = u.cell
 	reach = map.get_reachable(u, units())
 	show_unit_ranges(u, reach)
@@ -284,8 +366,8 @@ func update_arrow(target: Vector2i) -> void:
 	map.arrow_path = arrow.duplicate()
 
 
-func path_cost(path: Array[Vector2i]) -> int:
-	var total := 0
+func path_cost(path: Array[Vector2i]) -> float:
+	var total := 0.0
 	for c in path.slice(1):
 		total += map.move_cost(c, selected.move_type)
 	return total
@@ -415,10 +497,20 @@ func open_unit_menu() -> void:
 		options.append("Magic")
 	if not dance_targets(selected).is_empty():
 		options.append("Dance")
+	if not inspire_targets(selected).is_empty():
+		options.append("Inspire")
 	if not trade_partners(selected).is_empty():
 		options.append("Trade")
 	if not shove_targets(selected).is_empty():
 		options.append("Shove")
+	if not rescue_targets(selected).is_empty():
+		options.append("Rescue")
+	if not drop_cells_for(selected).is_empty():
+		options.append("Drop")
+	if not board_targets(selected).is_empty():
+		options.append("Board")
+	if not unloadable(selected).is_empty():
+		options.append("Unload")
 	if not selected.items.is_empty():
 		options.append("Items")
 	options.append("Wait")
@@ -430,7 +522,7 @@ func open_attack_menu() -> void:
 	var options: Array[String] = []
 	weapon_choices = []
 	for i in selected.items.size():
-		if Items.is_weapon(selected.items[i]) and not enemies_in_range(selected, selected.items[i]).is_empty():
+		if selected.can_wield(selected.items[i]) and not enemies_in_range(selected, selected.items[i]).is_empty():
 			options.append(weapon_label(selected.items[i]))
 			weapon_choices.append(i)
 	_open_menu("attack", options)
@@ -445,27 +537,40 @@ func open_magic_menu() -> void:
 
 
 ## Inventory view. Picking a weapon equips it (does not end the unit's turn);
-## picking a usable consumable uses it (ends the turn).
+## picking a usable consumable uses it (ends the turn). Weapons the unit's class
+## can't wield are marked (x).
 func open_items_menu() -> void:
 	var options: Array[String] = []
 	var equipped := selected.equipped_index()
 	for i in selected.items.size():
-		options.append(weapon_label(selected.items[i]) + ("  (E)" if i == equipped else ""))
+		var item := selected.items[i]
+		var mark := ""
+		if i == equipped:
+			mark = "  (E)"
+		elif Items.is_weapon(item) and not selected.can_wield(item):
+			mark = "  (x)"
+		options.append(weapon_label(item) + mark)
 	_open_menu("items", options)
 
 
-func _open_menu(context: String, options: Array[String]) -> void:
+func _open_menu(context: String, options: Array[String], title := "") -> void:
 	menu_context = context
-	ui.show_menu(options, selected.cell if selected else cursor.cell)
+	ui.show_menu(options, selected.cell if selected else cursor.cell, title)
 	state = State.MENU
 
 
 func menu_accept() -> void:
 	match menu_context:
+		"end_turn":
+			if ui.menu_choice() == "End Turn":
+				end_player_phase()
+			else:
+				state = State.IDLE
+				refresh_info()
 		"map":
 			match ui.menu_choice():
 				"End Turn":
-					end_player_phase()
+					confirm_end_turn()
 				"Level Select":
 					get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
 		"unit":
@@ -476,10 +581,20 @@ func menu_accept() -> void:
 					open_magic_menu()
 				"Dance":
 					start_dance_targeting()
+				"Inspire":
+					start_inspire_targeting()
+				"Board":
+					start_board_targeting()
+				"Unload":
+					open_unload_menu()
 				"Trade":
 					start_trade_targeting()
 				"Shove":
 					start_shove_targeting()
+				"Rescue":
+					start_rescue_targeting()
+				"Drop":
+					start_drop_targeting()
 				"Items":
 					open_items_menu()
 				"Wait":
@@ -489,9 +604,11 @@ func menu_accept() -> void:
 			start_targeting()
 		"magic":
 			start_spell_targeting(spell_choices[ui.menu_index])
+		"unload":
+			start_unload_targeting(passenger_choices[ui.menu_index])
 		"items":
 			var item := selected.items[ui.menu_index]
-			if Items.is_weapon(item):
+			if selected.can_wield(item):
 				selected.equip(ui.menu_index)
 				open_items_menu()
 			elif Items.can_use(selected, item):
@@ -506,18 +623,18 @@ func menu_accept() -> void:
 
 func menu_cancel() -> void:
 	match menu_context:
-		"map":
+		"map", "end_turn":
 			state = State.IDLE
 			refresh_info()
 		"unit":
-			if has_traded:
-				# Trading commits the move, as in GBA FE.
+			if move_committed:
+				# Trading commits the move, as in GBA FE (and so does unloading a ship).
 				open_unit_menu()
 				return
 			selected.set_cell(origin_cell)
 			cursor.cell = origin_cell
 			select(selected)
-		"attack", "magic", "items":
+		"attack", "magic", "items", "unload":
 			open_unit_menu()
 
 
@@ -543,10 +660,30 @@ func start_spell_targeting(spell_name: String) -> void:
 
 
 func show_target() -> void:
+	if target_mode in ["drop", "unload"]:
+		var cell := drop_cells[target_index]
+		cursor.cell = cell
+		map.show_area([], [cell])
+		var passenger := selected.carrying if target_mode == "drop" else unload_passenger
+		ui.show_drop_forecast(passenger, map.terrain_at(cell).name, cursor.cell,
+			"Drop" if target_mode == "drop" else "Unload")
+		return
+	if target_mode == "inspire":
+		var allies := inspire_targets(selected)
+		cursor.cell = selected.cell
+		map.show_area([], allies.map(func(a: Unit) -> Vector2i: return a.cell))
+		ui.show_inspire_forecast(allies, Classes.inspire_bonus(selected.level), cursor.cell)
+		return
 	var target := targets[target_index]
 	cursor.cell = target.cell
-	if target_mode == "dance":
+	if target_mode == "rescue":
+		map.show_area([], [target.cell])
+		ui.show_rescue_forecast(target, cursor.cell)
+	elif target_mode == "dance":
 		ui.show_dance_forecast(target, cursor.cell)
+	elif target_mode == "board":
+		map.show_area([], [target.cell])
+		ui.show_board_forecast(target, cursor.cell)
 	elif target_mode == "shove":
 		var dest := shove_destination(selected, target)
 		map.show_area([], [dest])
@@ -599,7 +736,7 @@ func show_area_preview() -> void:
 ## Adjacent allies who have already acted this phase.
 func dance_targets(u: Unit) -> Array[Unit]:
 	var result: Array[Unit] = []
-	if not u.is_dancer:
+	if not u.has_ability("dance"):
 		return result
 	for ally in units_of(u.team):
 		if ally != u and ally.has_acted and BattleMap.distance(u.cell, ally.cell) == 1:
@@ -679,7 +816,7 @@ func trade_accept() -> void:
 		else:
 			from.remove_at(trade_held.y)
 			to.append(item)
-		has_traded = true
+		move_committed = true
 		trade_held = Vector2i(-1, -1)
 		# Stay on this side if it still has items, otherwise hop back.
 		if _trade_max_slot(trade_cursor.x) < 0:
@@ -711,12 +848,16 @@ func shove_destination(shover: Unit, target: Unit) -> Vector2i:
 	return target.cell + (target.cell - shover.cell)
 
 
-## The landing cell must be on the map, walkable for the target and empty.
+## The landing cell must be on the map, enterable by the target in one move, and empty.
+## Mounted units can neither shove nor be shoved (they Rescue instead); neither can
+## ships. Some races change this (see Unit.can_shove and can_be_shoved).
 func can_shove(shover: Unit, target: Unit) -> bool:
 	if target.team != shover.team or BattleMap.distance(shover.cell, target.cell) != 1:
 		return false
+	if not shover.can_shove() or not target.can_be_shoved():
+		return false
 	var dest := shove_destination(shover, target)
-	return map.move_cost(dest, target.move_type) >= 0 and unit_at(dest) == null
+	return can_stand_on(target, dest) and unit_at(dest) == null
 
 
 func shove_targets(u: Unit) -> Array[Unit]:
@@ -744,6 +885,223 @@ func do_shove(shover: Unit, target: Unit) -> void:
 	var path: Array[Vector2i] = [target.cell, dest]
 	await target.move_along(path)
 	await get_tree().create_timer(0.2).timeout
+
+
+## Rescue (Thracia 776 style): a mounted unit (or a Centaur) picks up an adjacent
+## ally that can be carried (see Unit.can_be_carried) and carries it off the map. Carrying halves the rescuer's DEX and AGI
+## (Unit.combat_dex/agi). Rescuing and dropping each end the rescuer's turn; the
+## carried unit keeps its own action, so a dropped ally that hasn't acted yet can
+## still move. That's what lets mounted units ferry others.
+func rescue_targets(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	if not u.can_carry() or u.carrying:
+		return result
+	for ally in units_of(u.team):
+		if ally != u and ally.can_be_carried() and not ally.carrying \
+				and BattleMap.distance(u.cell, ally.cell) == 1:
+			result.append(ally)
+	return result
+
+
+## Adjacent cells where the carried unit could be set down.
+func drop_cells_for(u: Unit) -> Array[Vector2i]:
+	if not u.carrying:
+		return []
+	return landing_cells(u, u.carrying)
+
+
+## Empty cells next to `carrier` that `passenger` can stand on.
+func landing_cells(carrier: Unit, passenger: Unit) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for d in BattleMap.DIRS:
+		var c := carrier.cell + d
+		if can_stand_on(passenger, c) and unit_at(c) == null:
+			result.append(c)
+	return result
+
+
+func start_rescue_targeting() -> void:
+	active_spell = ""
+	target_mode = "rescue"
+	targets = rescue_targets(selected)
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+func start_drop_targeting() -> void:
+	active_spell = ""
+	target_mode = "drop"
+	drop_cells = drop_cells_for(selected)
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+func do_rescue(rescuer: Unit, ally: Unit) -> void:
+	map.clear_ranges()
+	rescuer.popup("Rescue", Color.WHITE)
+	var path: Array[Vector2i] = [ally.cell, rescuer.cell]
+	await ally.move_along(path)
+	ally.visible = false
+	ally.carried_by = rescuer
+	rescuer.carrying = ally
+	rescuer.queue_redraw()
+	await get_tree().create_timer(0.2).timeout
+
+
+func do_drop(carrier: Unit, cell: Vector2i) -> void:
+	map.clear_ranges()
+	var ally := carrier.carrying
+	release(carrier, carrier.cell)
+	var path: Array[Vector2i] = [carrier.cell, cell]
+	await ally.move_along(path)
+	await get_tree().create_timer(0.2).timeout
+
+
+## Puts the carried unit back on the map at `cell` (no animation).
+func release(carrier: Unit, cell: Vector2i) -> void:
+	var ally := carrier.carrying
+	carrier.carrying = null
+	carrier.queue_redraw()
+	ally.carried_by = null
+	ally.set_cell(cell)
+	ally.visible = true
+
+
+## Ships: an adjacent ally Boards a ship with room (ending the boarder's turn, like
+## being rescued, but initiated by the passenger). The ship can then Unload
+## passengers onto adjacent cells they can stand on without ending its own turn,
+## and a passenger that hasn't acted can still move. Ships can't board ships, and a
+## rescuer that is carrying someone can't board.
+func board_targets(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	if u.is_ship() or u.carrying:
+		return result
+	for ally in units_of(u.team):
+		if ally.is_ship() and ally.cargo_space() > 0 and BattleMap.distance(u.cell, ally.cell) == 1:
+			result.append(ally)
+	return result
+
+
+## Passengers that have somewhere to be unloaded.
+func unloadable(ship: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	for p in ship.passengers:
+		if not landing_cells(ship, p).is_empty():
+			result.append(p)
+	return result
+
+
+func start_board_targeting() -> void:
+	active_spell = ""
+	target_mode = "board"
+	targets = board_targets(selected)
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+## Picks which passenger to unload (skipped when there's only one).
+func open_unload_menu() -> void:
+	passenger_choices = unloadable(selected)
+	if passenger_choices.size() == 1:
+		start_unload_targeting(passenger_choices[0])
+		return
+	var options: Array[String] = []
+	for p in passenger_choices:
+		options.append(p.unit_name)
+	_open_menu("unload", options)
+
+
+func start_unload_targeting(passenger: Unit) -> void:
+	active_spell = ""
+	target_mode = "unload"
+	unload_passenger = passenger
+	drop_cells = landing_cells(selected, passenger)
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+func do_board(u: Unit, ship: Unit) -> void:
+	map.clear_ranges()
+	u.popup("Board", Color.WHITE)
+	var path: Array[Vector2i] = [u.cell, ship.cell]
+	await u.move_along(path)
+	u.visible = false
+	u.carried_by = ship
+	ship.passengers.append(u)
+	ship.queue_redraw()
+	await get_tree().create_timer(0.2).timeout
+
+
+func do_unload(ship: Unit, passenger: Unit, cell: Vector2i) -> void:
+	map.clear_ranges()
+	ship.passengers.erase(passenger)
+	ship.queue_redraw()
+	passenger.carried_by = null
+	passenger.set_cell(ship.cell)
+	passenger.visible = true
+	var path: Array[Vector2i] = [ship.cell, cell]
+	await passenger.move_along(path)
+	await get_tree().create_timer(0.2).timeout
+
+
+## Whether `u` may be placed on `cell` (shoved, dropped, unloaded): the cell must be
+## enterable within one move, i.e. cost no more than its MOV. Rivers cost foot units
+## 6, so a MOV 5 foot soldier can't be dropped into one.
+func can_stand_on(u: Unit, cell: Vector2i) -> bool:
+	var cost := map.move_cost(cell, u.move_type)
+	return cost >= 0 and cost <= u.mov
+
+
+## Nearest empty cell to `from` that `u` can stand on, or (-1, -1) if there's none.
+func nearest_free_cell(u: Unit, from: Vector2i) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	for y in map.rows:
+		for x in map.cols:
+			var c := Vector2i(x, y)
+			if not can_stand_on(u, c) or unit_at(c) != null:
+				continue
+			if best == Vector2i(-1, -1) or BattleMap.distance(from, c) < BattleMap.distance(from, best):
+				best = c
+	return best
+
+
+## Inspire: every adjacent ally gets +STR/DEF (Classes.inspire_bonus, growing with
+## the user's level) until the start of its side's next phase. Ends the user's turn.
+func inspire_targets(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	if not u.has_ability("inspire"):
+		return result
+	for ally in units_of(u.team):
+		if ally != u and BattleMap.distance(u.cell, ally.cell) == 1:
+			result.append(ally)
+	return result
+
+
+func start_inspire_targeting() -> void:
+	active_spell = ""
+	target_mode = "inspire"
+	targets = [selected]
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+func do_inspire(u: Unit) -> void:
+	var bonus := Classes.inspire_bonus(u.level)
+	var allies := inspire_targets(u)
+	map.clear_ranges()
+	u.popup("Inspire", Color.GOLD)
+	await get_tree().create_timer(0.3).timeout
+	for ally in allies:
+		ally.inspire_bonus = maxi(ally.inspire_bonus, bonus)
+		ally.popup("STR/DEF +%d" % bonus, Color.GOLD)
+	await get_tree().create_timer(0.5).timeout
+	if u.team == Unit.Team.PLAYER and u.level < Experience.LEVEL_CAP:
+		await gain_exp(u, Experience.INSPIRE_EXP)
 
 
 ## Refreshes the target so it can move and act again this phase.
@@ -874,12 +1232,31 @@ func _finish_exchange(attacker: Unit, defender: Unit, dealt: Array[Unit]) -> voi
 func _remove_dead_and_award(involved: Array[Unit], awards: Array) -> void:
 	for u in involved:
 		if u.hp <= 0:
+			var cell := u.cell
+			var carried := u.carrying
+			var aboard := u.passengers.duplicate()
 			await u.die()
+			# A fallen carrier's passenger is set down where it fell.
+			if carried:
+				carried.carried_by = null
+				carried.set_cell(cell)
+				carried.visible = true
+			# A sunk ship's passengers make for the nearest free cell they can stand on.
+			for p: Unit in aboard:
+				p.carried_by = null
+				var land := nearest_free_cell(p, cell)
+				if land == Vector2i(-1, -1):
+					p.hp = 0
+					p.queue_free()
+					continue
+				p.set_cell(land)
+				p.visible = true
 	for award in awards:
 		await gain_exp(award[0], award[1])
 
 
 func gain_exp(u: Unit, amount: int) -> void:
+	amount = roundi(amount * u.race_data().get("exp_mult", 1.0))
 	u.popup("+%d EXP" % amount, Color.AQUAMARINE)
 	await get_tree().create_timer(0.5).timeout
 	u.exp_points += amount
@@ -916,11 +1293,15 @@ func finish_action() -> void:
 
 func start_player_phase() -> void:
 	state = State.BUSY
+	enemy_phase = false
 	ui.hide_info()
-	for u in units():
-		u.has_acted = false
+	# Every unit, including carried ones, so passengers can act once set down.
+	for u in units_root.get_children():
+		if u is Unit:
+			u.has_acted = false
+	clear_inspire(Unit.Team.PLAYER)
 	for u in units_of(Unit.Team.PLAYER):
-		u.regen_mp(Spells.MP_REGEN)
+		u.regen_mp(u.mp_regen())
 	turn += 1
 	await ui.show_banner("Player Phase\nTurn %d" % turn, Color("2850b0"))
 	await heal_on_tiles(Unit.Team.PLAYER)
@@ -932,12 +1313,19 @@ func start_player_phase() -> void:
 	refresh_info()
 
 
-## Healing tiles (e.g. Forts) restore a share of max HP to `team`'s units at the
-## start of that team's phase.
+## Inspire lasts until the start of the inspired side's next phase.
+func clear_inspire(team: Unit.Team) -> void:
+	for u in units_root.get_children():
+		if u is Unit and u.team == team:
+			u.inspire_bonus = 0
+
+
+## Healing tiles (e.g. Forts) and regenerating races (Trolls) restore a share of
+## max HP to `team`'s units at the start of that team's phase.
 func heal_on_tiles(team: Unit.Team) -> void:
 	var healed := false
 	for u in units_of(team):
-		var rate := map.terrain_heal(u.cell)
+		var rate: float = map.terrain_heal(u.cell) + u.race_data().get("hp_regen", 0.0)
 		if rate > 0.0 and u.hp < u.max_hp:
 			var amount := mini(ceili(u.max_hp * rate), u.max_hp - u.hp)
 			u.heal(amount)
@@ -949,10 +1337,12 @@ func heal_on_tiles(team: Unit.Team) -> void:
 
 func end_player_phase() -> void:
 	state = State.BUSY
+	enemy_phase = true
 	ui.hide_info()
 	await ui.show_banner("Enemy Phase", Color("b02828"))
+	clear_inspire(Unit.Team.ENEMY)
 	for e in units_of(Unit.Team.ENEMY):
-		e.regen_mp(Spells.MP_REGEN)
+		e.regen_mp(e.mp_regen())
 	await heal_on_tiles(Unit.Team.ENEMY)
 	EnemyAI.update_all_wake(self)
 	for e in units_of(Unit.Team.ENEMY):
@@ -965,15 +1355,20 @@ func end_player_phase() -> void:
 
 
 func check_game_over() -> bool:
+	if state == State.GAME_OVER:
+		return true
 	if units_of(Unit.Team.ENEMY).is_empty():
+		enemy_phase = false
 		state = State.GAME_OVER
 		ui.show_end("Victory!", Color("2850b0"))
 		return true
+	# A carried Lord is still alive, so look past units() here.
 	var lord_alive := false
-	for u in units_of(Unit.Team.PLAYER):
-		if u.is_lord:
+	for u in units_root.get_children():
+		if u is Unit and u.hp > 0 and u.team == Unit.Team.PLAYER and u.is_lord:
 			lord_alive = true
 	if not lord_alive:
+		enemy_phase = false
 		state = State.GAME_OVER
 		ui.show_end("Defeat...", Color("602020"))
 		return true

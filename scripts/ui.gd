@@ -4,6 +4,12 @@ extends CanvasLayer
 
 var menu_options: Array[String] = []
 var menu_index := 0
+## Optional prompt shown above the menu options (e.g. the end-turn warning).
+var _menu_title := ""
+## Level-up windows wait for confirm; the test suite turns this off (2 s timeout instead).
+var level_up_waits := true
+signal level_up_confirmed
+var _fast_forward: Label
 
 var _root: Control
 var _info: PanelContainer
@@ -24,12 +30,8 @@ var _level_title: Label
 var _level_rows: Array = []
 var _banner: ColorRect
 var _banner_label: Label
-## Full-screen unit stats page.
-var _status: PanelContainer
-var _status_title: Label
-var _status_stats: GridContainer
-var _status_combat: GridContainer
-var _status_items: Label
+## GBA-style unit info screen.
+var status_screen: StatusScreen
 
 
 func _ready() -> void:
@@ -58,7 +60,15 @@ func _ready() -> void:
 	_spell_forecast = _make_panel(_spell_label)
 	_level_up = _make_level_up()
 	_trade = _make_trade()
-	_status = _make_status()
+	status_screen = StatusScreen.new()
+	_root.add_child(status_screen)
+	_fast_forward = Label.new()
+	_fast_forward.visible = false
+	_fast_forward.add_theme_color_override("font_outline_color", Color.BLACK)
+	_fast_forward.add_theme_constant_override("outline_size", 3)
+	_root.add_child(_fast_forward)
+	_fast_forward.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 3)
+	_fast_forward.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 
 	_banner = ColorRect.new()
 	_banner.position = Vector2(0, 56)
@@ -86,6 +96,7 @@ const FORECAST_ROWS: Array[String] = ["", "", "HP", "MP", "Dmg", "Hit", "Crit"]
 const DIM := Color(0.7, 0.75, 0.95)
 const ADVANTAGE := Color(0.5, 1.0, 0.5)
 const DISADVANTAGE := Color(1.0, 0.5, 0.5)
+const EFFECTIVE := Color(1.0, 0.82, 0.25)
 
 
 func _make_forecast() -> PanelContainer:
@@ -150,6 +161,11 @@ func _make_level_up() -> PanelContainer:
 			row.append(label)
 		_level_rows.append(row)
 	box.add_child(grid)
+	var hint := Label.new()
+	hint.text = "Z: continue"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", DIM)
+	box.add_child(hint)
 	var panel := PanelContainer.new()
 	panel.visible = false
 	panel.add_child(box)
@@ -191,7 +207,7 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void
 		if unit.team == Unit.Team.PLAYER:
 			lv += "  EXP %d" % unit.exp_points
 		var hp_line := "HP %d/%d  MP %d/%d" % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
-		text = "%s  %s\n%s\n" % [unit.unit_name, lv, hp_line]
+		text = "%s  %s  %s\n%s\n" % [unit.unit_name, unit.unit_class, lv, hp_line]
 		if not unit.weapon.is_empty() or not unit.is_caster():
 			text += weapon + "\n"
 		var others: Array[String] = []
@@ -202,10 +218,10 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void
 			text += "Items: %s\n" % ", ".join(others)
 		if not unit.spells.is_empty():
 			text += "Spells: %s\n" % ", ".join(unit.spells)
-		if unit.is_dancer:
-			text += "Skill: Dance\n"
+		for line in unit_notes(unit):
+			text += line + "\n"
 		text += "STR %d  DEX %d  AGI %d  LCK %d\nDEF %d  MOV %d" % [
-			unit.strength, unit.dexterity, unit.agility, unit.luck, unit.defense, unit.mov]
+			unit.combat_str(), unit.dexterity, unit.agility, unit.luck, unit.combat_def(), unit.mov]
 		if unit.move_type != "foot":
 			text += " (%s)" % unit.move_type.capitalize()
 		if unit.is_caster():
@@ -220,9 +236,10 @@ func hide_info() -> void:
 	_info.visible = false
 
 
-func show_menu(options: Array[String], cursor_cell: Vector2i) -> void:
+func show_menu(options: Array[String], cursor_cell: Vector2i, title := "") -> void:
 	menu_options = options
 	menu_index = 0
+	_menu_title = title
 	_refresh_menu()
 	_place(_menu, _away_right(cursor_cell), false)
 
@@ -244,6 +261,8 @@ func hide_menu() -> void:
 
 func _refresh_menu() -> void:
 	var lines: Array[String] = []
+	if _menu_title:
+		lines.append(_menu_title)
 	for i in menu_options.size():
 		lines.append(("> " if i == menu_index else "   ") + menu_options[i])
 	_menu_label.text = "\n".join(lines)
@@ -276,6 +295,13 @@ func _fill_forecast_column(col: int, unit: Unit, stats: Dictionary, can_attack: 
 		weapon_label.add_theme_color_override("font_color", DISADVANTAGE)
 	else:
 		weapon_label.remove_theme_color_override("font_color")
+	# Effectiveness and weaknesses (x3 / x2 might) beat the triangle color;
+	# resistances halve damage.
+	if stats.get("multiplier", 1) > 1:
+		weapon_label.text += " x%d" % stats.multiplier
+		weapon_label.add_theme_color_override("font_color", EFFECTIVE)
+	if stats.get("resisted", false):
+		weapon_label.text += " 1/2"
 	cells[2].text = str(unit.hp)
 	cells[3].text = str(unit.mp)
 	cells[4].text = ("%d%s" % [stats.dmg, " x2" if stats.double else ""]) if can_attack else "--"
@@ -306,6 +332,31 @@ func show_area_forecast(caster: Unit, spell_name: String, rows: Array, cursor_ce
 	_place(_spell_forecast, _away_right(cursor_cell), cursor_cell.y < 5)
 
 
+func show_rescue_forecast(target: Unit, cursor_cell: Vector2i) -> void:
+	_spell_label.text = "Rescue %s\nDEX/AGI halved while carrying" % target.unit_name
+	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
+## `verb`: "Drop" (a rescued ally) or "Unload" (a ship's passenger).
+func show_drop_forecast(carried: Unit, dest_terrain: String, cursor_cell: Vector2i, verb := "Drop") -> void:
+	_spell_label.text = "%s %s\n-> %s" % [verb, carried.unit_name, dest_terrain]
+	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
+func show_board_forecast(ship: Unit, cursor_cell: Vector2i) -> void:
+	_spell_label.text = "Board %s\nAboard: %d/%d" % [ship.unit_name, ship.passengers.size(),
+		ship.passengers.size() + ship.cargo_space()]
+	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
+func show_inspire_forecast(allies: Array[Unit], bonus: int, cursor_cell: Vector2i) -> void:
+	var names: Array[String] = []
+	for a in allies:
+		names.append(a.unit_name)
+	_spell_label.text = "Inspire  STR/DEF +%d\n%s" % [bonus, ", ".join(names)]
+	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
 func show_shove_forecast(target: Unit, dest_terrain: String, cursor_cell: Vector2i) -> void:
 	_spell_label.text = "Shove\n%s -> %s" % [target.unit_name, dest_terrain]
 	_place(_spell_forecast, _away_right(cursor_cell), false)
@@ -314,6 +365,25 @@ func show_shove_forecast(target: Unit, dest_terrain: String, cursor_cell: Vector
 func show_dance_forecast(target: Unit, cursor_cell: Vector2i) -> void:
 	_spell_label.text = "Dance\n%s can act again" % target.unit_name
 	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
+## Extra lines for the info panel and stats screen: abilities, buffs, cargo.
+static func unit_notes(unit: Unit) -> Array[String]:
+	var lines: Array[String] = []
+	for ability in unit.abilities:
+		if ability != "ship":
+			lines.append("Skill: %s" % ability.capitalize())
+	if unit.inspire_bonus > 0:
+		lines.append("Inspired: STR/DEF +%d" % unit.inspire_bonus)
+	if unit.carrying:
+		lines.append("Carrying: %s (DEX/AGI halved)" % unit.carrying.unit_name)
+	if unit.is_ship():
+		var names: Array[String] = []
+		for p in unit.passengers:
+			names.append(p.unit_name)
+		lines.append("Aboard (%d/%d): %s" % [unit.passengers.size(), unit.passengers.size() + unit.cargo_space(),
+			", ".join(names) if not names.is_empty() else "--"])
+	return lines
 
 
 static func item_label(unit: Unit, index: int) -> String:
@@ -382,8 +452,25 @@ func show_level_up(unit: Unit, before: Dictionary, gains: Dictionary) -> void:
 	_level_up.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_level_up.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_level_up.visible = true
-	await get_tree().create_timer(2.0).timeout
+	if level_up_waits:
+		await level_up_confirmed
+	else:
+		await get_tree().create_timer(2.0).timeout
 	_level_up.visible = false
+
+
+## Confirm closes the level-up window. The battle ignores input while it's busy,
+## so the window handles this itself.
+func _unhandled_input(event: InputEvent) -> void:
+	if _level_up.visible and event.is_action_pressed("confirm"):
+		get_viewport().set_input_as_handled()
+		level_up_confirmed.emit()
+
+
+## Shows the fast-forward speed in the top-right corner (hidden at normal speed).
+func show_fast_forward(speed: float) -> void:
+	_fast_forward.visible = speed > 1.0
+	_fast_forward.text = ">> x%d" % int(speed)
 
 
 func show_banner(text: String, color: Color) -> void:
@@ -409,116 +496,11 @@ func show_end(text: String, color: Color) -> void:
 	_banner.visible = true
 
 
-# --- Stats screen ----------------------------------------------------------------
-
-func _make_status() -> PanelContainer:
-	var panel := PanelContainer.new()
-	panel.visible = false
-	_root.add_child(panel)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 4)
-	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 12)
-	panel.add_child(cols)
-
-	var left := VBoxContainer.new()
-	left.add_theme_constant_override("separation", 4)
-	cols.add_child(left)
-	_status_title = Label.new()
-	left.add_child(_status_title)
-	_status_stats = _make_pair_grid()
-	left.add_child(_status_stats)
-	var hint := Label.new()
-	hint.text = "Up/Down: next unit\nX: close"
-	hint.add_theme_color_override("font_color", DIM)
-	left.add_child(hint)
-
-	var right := VBoxContainer.new()
-	right.add_theme_constant_override("separation", 4)
-	cols.add_child(right)
-	_status_combat = _make_pair_grid()
-	right.add_child(_status_combat)
-	_status_items = Label.new()
-	right.add_child(_status_items)
-	return panel
-
-
-## Grid of label/value pairs, two pairs per row.
-func _make_pair_grid() -> GridContainer:
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 5)
-	grid.add_theme_constant_override("v_separation", 0)
-	return grid
-
-
-func _fill_pair_grid(grid: GridContainer, pairs: Array) -> void:
-	for child in grid.get_children():
-		grid.remove_child(child)
-		child.queue_free()
-	for pair in pairs:
-		var key := Label.new()
-		key.text = pair[0]
-		key.add_theme_color_override("font_color", DIM)
-		grid.add_child(key)
-		var value := Label.new()
-		value.text = str(pair[1])
-		value.custom_minimum_size.x = 16
-		grid.add_child(value)
-
+# --- Status screen (see StatusScreen) ---------------------------------------------
 
 func show_status(unit: Unit) -> void:
-	var title := "%s  Lv %d" % [unit.unit_name, unit.level]
-	if unit.team == Unit.Team.PLAYER:
-		title += "  EXP %d" % unit.exp_points
-	title += "\nHP %d/%d   MP %d/%d" % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
-	_status_title.text = title
-
-	var stats := [["STR", unit.strength]]
-	if unit.is_caster():
-		stats.append(["INT", unit.intelligence])
-	stats.append_array([["DEX", unit.dexterity], ["AGI", unit.agility], ["LCK", unit.luck],
-		["DEF", unit.defense], ["MOV", "%d %s" % [unit.mov, unit.move_type.capitalize()]]])
-	_fill_pair_grid(_status_stats, stats)
-
-	# Combat numbers for the equipped weapon (before terrain and the weapon triangle).
-	var armed := not unit.weapon.is_empty()
-	var rng := "--"
-	if armed:
-		rng = str(unit.min_range) if unit.min_range == unit.max_range \
-			else "%d-%d" % [unit.min_range, unit.max_range]
-	_fill_pair_grid(_status_combat, [
-		["Atk", Combat.base_attack(unit) if armed else "--"],
-		["Hit", Combat.base_hit(unit) if armed else "--"],
-		["Avo", Combat.base_avoid(unit)],
-		["Crit", Combat.base_crit(unit) if armed else "--"],
-		["AS", Combat.attack_speed(unit)],
-		["Rng", rng],
-	])
-
-	var lines: Array[String] = ["Items"]
-	if unit.items.is_empty():
-		lines.append("  (none)")
-	var equipped := unit.equipped_index()
-	for i in unit.items.size():
-		var item := unit.items[i]
-		var mark := "E " if i == equipped else "   "
-		if Items.is_weapon(item):
-			var wr := str(item.min_rng) if item.min_rng == item.max_rng \
-				else "%d-%d" % [item.min_rng, item.max_rng]
-			lines.append("%s%s  %d  %s %s" % [mark, item.name, item.uses, item.type, wr])
-		else:
-			lines.append("%s%s  %d" % [mark, item.name, item.uses])
-	if not unit.spells.is_empty():
-		lines.append("Spells")
-		for s in unit.spells:
-			var spell := Spells.get_spell(s)
-			lines.append("   %s  %dMP  %s" % [s, spell.mp, str(spell.max_rng)
-				if spell.min_rng == spell.max_rng else "%d-%d" % [spell.min_rng, spell.max_rng]])
-	if unit.is_dancer:
-		lines.append("Skill: Dance")
-	_status_items.text = "\n".join(lines)
-	_status.visible = true
+	status_screen.show_unit(unit)
 
 
 func hide_status() -> void:
-	_status.visible = false
+	status_screen.close()

@@ -16,18 +16,53 @@ const MOVE_TYPE_BADGES := {
 	"flying": Color("f0f0ff"),
 	"ship": Color("10204a"),
 	"mermaid": Color("3ad0c0"),
+	"swim": Color("8fd0ff"),
+	"climb": Color("b0b0b0"),
+	"swim_climb": Color("8a6fd0"),
+	"rogue_swim_climb": Color("3f8f6a"),
+	"heavy": Color("505860"),
+	"spirit": Color("c070ff"),
 }
+## Corner pip on units under an Inspire buff.
+const INSPIRED_COLOR := Color("ffb030")
 ## MP bar color when there isn't enough MP for any of the unit's spells.
 const MP_EMPTY_COLOR := Color("8a8a8a")
 
 var unit_name := ""
 var team: Team = Team.PLAYER
 var is_lord := false
-## Can use Dance to let an adjacent ally that already acted act again.
-var is_dancer := false
-## Movement type: a key of BattleMap.MOVE_COSTS ("foot", "horse", "rogue", "flying",
-## "ship", "mermaid"). Decides terrain costs and whether terrain bonuses apply.
+## Class name, a key of Classes.DATA. set_class() copies what the class and race
+## decide (move type, tags, mounted, weapon types, abilities) into the fields below.
+var unit_class := ""
+## Movement type: one of BattleMap.MOVE_TYPES. Decides terrain costs and
+## whether terrain bonuses apply. The race can override the class's (see Races).
 var move_type := "foot"
+## Effectiveness tags: the class's move type plus the race's tags. Weapons are
+## effective against these, and Combat.TAG_TRAITS gives weaknesses/resistances.
+var tags: Array[String] = []
+## Race: a key of Races.DATA (roster "race", default "Human").
+var race := "Human"
+## Notable events in this unit's story, oldest first (roster "bio"); shown on the
+## status screen's Biography page. Player units only.
+var biography: Array[String] = []
+## Mounted units can Rescue allies, and can't Shove, be Shoved or be Rescued.
+var mounted := false
+## Weapon types the unit can equip (see Weapons). Others can still be carried.
+var weapon_types: Array[String] = []
+## Class abilities: "dance", "inspire", "ship" (see Classes).
+var abilities: Array[String] = []
+## Rescue (Thracia 776 style): the ally this unit is carrying, or null. A carried
+## unit is off the map (hidden, excluded from Battle.units()) until dropped.
+var carrying: Unit
+## Units aboard this ship (see Classes "ship"); off the map like a carried unit.
+var passengers: Array[Unit] = []
+## The unit (rescuer or ship) carrying this one, or null.
+var carried_by: Unit
+## STR/DEF bonus from an Inspire; cleared at the start of the unit's next phase.
+var inspire_bonus := 0:
+	set(value):
+		inspire_bonus = value
+		queue_redraw()
 ## Enemy behavior (see AIProfiles), resolved from the roster's "ai" entry.
 var ai: Dictionary = AIProfiles.resolve({})
 ## Whether a sleeping unit's wake condition has fired.
@@ -50,7 +85,14 @@ var agility := 5
 var luck := 0
 var defense := 2
 var intelligence := 0
-var mov := 5
+## MOV from the roster and level-ups; `mov` adds the race's bonus (see Races).
+var base_mov := 5
+var mov_bonus := 0
+var mov: int:
+	get:
+		return base_mov + mov_bonus
+	set(value):
+		base_mov = value
 ## Everyone has MP: casters spend it on spells, and current MP is also magic
 ## defense (see Combat.magic_defense). Only casters show an MP bar on the map.
 var max_mp := 0
@@ -88,9 +130,10 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.name = p_name
 	u.team = p_team
 	u.is_lord = stats.get("lord", false)
-	u.is_dancer = stats.get("dancer", false)
-	u.move_type = stats.get("move", "foot")
-	assert(BattleMap.MOVE_COSTS.has(u.move_type), "unknown move type: " + u.move_type)
+	u.race = stats.get("race", "Human")
+	assert(Races.DATA.has(u.race), "unknown race: " + u.race)
+	u.biography.assign(stats.get("bio", []))
+	u.set_class(stats["class"])
 	u.ai = AIProfiles.resolve(stats.get("ai", {}))
 	u.anchor = p_cell
 	u.level = stats.get("lv", 1)
@@ -117,8 +160,110 @@ static func weapon_reaches(w: Dictionary, dist: int) -> bool:
 	return not w.is_empty() and dist >= w.min_rng and dist <= w.max_rng
 
 
+## Applies a class (also how promotion will change it; the level is kept).
+func set_class(class_id: String) -> void:
+	var data := Classes.get_data(class_id)
+	assert(Races.allows(race, class_id), "%s can't be a %s" % [race, class_id])
+	unit_class = class_id
+	move_type = Races.move_type(race, class_id)
+	assert(BattleMap.MOVE_TYPES.has(move_type), "unknown move type: " + move_type)
+	mov_bonus = Races.bonus_mov(race, class_id)
+	tags.assign([data.move])
+	for tag: String in Races.get_data(race).get("tags", []):
+		if not tags.has(tag):
+			tags.append(tag)
+	mounted = data.get("mounted", false)
+	weapon_types.assign(data.weapons)
+	abilities.assign(data.get("abilities", []))
+	queue_redraw()
+
+
+## Changes race and reapplies the class, since the race shapes what it gives.
+func set_race(new_race: String) -> void:
+	race = new_race
+	set_class(unit_class)
+
+
+func race_data() -> Dictionary:
+	return Races.get_data(race)
+
+
+func has_ability(ability: String) -> bool:
+	return abilities.has(ability)
+
+
+## Cap for a stat (keys as in Experience.STATS), from the unit's class.
+func stat_cap(key: String) -> int:
+	return Classes.caps(unit_class)[key]
+
+
+func is_capped(key: String) -> bool:
+	return get(Experience.STATS[key]) >= stat_cap(key)
+
+
+func is_mounted() -> bool:
+	return mounted
+
+
+func is_ship() -> bool:
+	return has_ability("ship")
+
+
+## Rescue: mounted units and carrier races (Centaurs) can carry allies.
+func can_carry() -> bool:
+	return mounted or race_data().get("carrier", false)
+
+
+func can_be_carried() -> bool:
+	return not (mounted or is_ship() or race_data().get("carrier", false) or race_data().get("immovable", false))
+
+
+## Shove: mounted units can't (they Rescue instead), unless their race is a carrier.
+func can_shove() -> bool:
+	return not is_ship() and (not mounted or race_data().get("carrier", false))
+
+
+func can_be_shoved() -> bool:
+	return can_be_carried()
+
+
+## Free passenger slots (0 for anything that isn't a ship).
+func cargo_space() -> int:
+	if not is_ship():
+		return 0
+	return Classes.get_data(unit_class).get("capacity", 1) - passengers.size()
+
+
+## Whether the unit's class can equip this item.
+func can_wield(item: Dictionary) -> bool:
+	return Items.is_weapon(item) and weapon_types.has(item.type)
+
+
+## STR and DEF as used in combat, including an Inspire bonus.
+func combat_str() -> int:
+	return strength + inspire_bonus
+
+
+func combat_def() -> int:
+	return defense + inspire_bonus
+
+
+## DEX and AGI as used in combat: halved while carrying someone (FE5's rescue penalty).
+func combat_dex() -> int:
+	return floori(dexterity / 2.0) if carrying else dexterity
+
+
+func combat_agi() -> int:
+	return floori(agility / 2.0) if carrying else agility
+
+
 func is_caster() -> bool:
 	return not spells.is_empty()
+
+
+## MP recovered at the start of the unit's phase (some races recover more).
+func mp_regen() -> int:
+	return Spells.MP_REGEN + race_data().get("mp_regen", 0)
 
 
 func regen_mp(amount: int) -> void:
@@ -155,25 +300,27 @@ func can_attack_at(dist: int) -> bool:
 	return weapon_reaches(weapon, dist)
 
 
-## Index of the equipped weapon in `items`, or -1 when unarmed.
+## Index of the equipped weapon (the first one the unit can wield) in `items`,
+## or -1 when unarmed.
 func equipped_index() -> int:
 	for i in items.size():
-		if Items.is_weapon(items[i]):
+		if can_wield(items[i]):
 			return i
 	return -1
 
 
+## Weapons the unit can wield (it may carry others it can't).
 func weapons() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for item in items:
-		if Items.is_weapon(item):
+		if can_wield(item):
 			result.append(item)
 	return result
 
 
 ## Moves items[index] to the front, making it the equipped weapon.
 func equip(index: int) -> void:
-	if index < 0 or not Items.is_weapon(items[index]):
+	if index < 0 or not can_wield(items[index]):
 		return
 	var w := items[index]
 	items.remove_at(index)
@@ -188,6 +335,10 @@ func use_item(index: int) -> void:
 			var amount := mini(item.heal, max_hp - hp)
 			heal(amount)
 			popup("+%d" % amount, Color.PALE_GREEN)
+		"mp":
+			var amount := mini(item.mp, max_mp - mp)
+			regen_mp(amount)
+			popup("+%d MP" % amount, MP_COLOR)
 	item.uses -= 1
 	if item.uses <= 0:
 		items.remove_at(index)
@@ -285,6 +436,14 @@ func _draw() -> void:
 		draw_rect(Rect2(5, 0, 6, 2), Color.GOLD)
 	if MOVE_TYPE_BADGES.has(move_type):
 		draw_rect(Rect2(11, 2, 2, 2), MOVE_TYPE_BADGES[move_type])
+	if inspire_bonus > 0:
+		draw_rect(Rect2(11, 5, 2, 2), INSPIRED_COLOR)
+	var aboard: Unit = carrying if carrying else (passengers[0] if not passengers.is_empty() else null)
+	if aboard:
+		# Small flag in the carried unit's team color.
+		var flag := PLAYER_COLOR if aboard.team == Team.PLAYER else ENEMY_COLOR
+		draw_rect(Rect2(3, 2, 3, 3), Color.WHITE)
+		draw_rect(Rect2(3.5, 2.5, 2, 2), flag.lightened(0.3))
 	draw_string(ThemeDB.fallback_font, Vector2(2, 10), unit_name.left(1),
 		HORIZONTAL_ALIGNMENT_CENTER, 12, 9, Color.WHITE)
 	_draw_bar(13, 2, float(hp) / max_hp, HP_COLOR)

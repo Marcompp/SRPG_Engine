@@ -5,28 +5,91 @@ extends Node2D
 const TILE := 16
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
-# heal: fraction of max HP restored at the start of the occupant's phase (healing tiles).
+## Movement types (a class's "move"):
+##   foot (most units), heavy (armor), horse, rogue (scouts), climb (hills/mountains),
+##   swim (water), mermaid (aquatic), ship (seafaring), flying, spirit,
+##   swim_climb (Berserker, amphibious races) and rogue_swim_climb (amphibious
+##   scouts): hybrids, see HYBRID_MOVES.
+## A unit's race can override its class's move type (see Races).
+const MOVE_TYPES: Array[String] = ["foot", "heavy", "horse", "rogue", "climb", "swim",
+	"mermaid", "ship", "flying", "spirit", "swim_climb", "rogue_swim_climb"]
+## Hybrid move types: on each terrain, the cheapest cost among their parts.
+const HYBRID_MOVES := {"swim_climb": ["swim", "climb"], "rogue_swim_climb": ["rogue", "swim", "climb"]}
+## Move types that get no DEF/AVO from terrain (they pass over it).
+const NO_TERRAIN_BONUS: Array[String] = ["flying", "spirit"]
+const IMPASSABLE := -1.0
+
+## Terrain: DEF/AVO bonuses, `heal` (fraction of max HP restored at the start of the
+## occupant's phase) and `cost`: MOV spent to enter, by move type. "*" is the cost for
+## every type not listed; -1 = impassable. Fliers pay 1 wherever they aren't listed,
+## and spirits always pay 1 (see cost_for()).
 const TERRAIN := {
-	".": {"name": "Plain", "def": 0, "avo": 0, "color": Color("78b04f")},
-	"F": {"name": "Forest", "def": 1, "avo": 20, "color": Color("4e8a3a")},
-	"M": {"name": "Mountain", "def": 0, "avo": 0, "color": Color("8a7a5c")},
-	"~": {"name": "River", "def": 0, "avo": 0, "color": Color("3f7fd0")},
-	"W": {"name": "Sea", "def": 0, "avo": 0, "color": Color("2a5fa8")},
-	"S": {"name": "Sand", "def": 0, "avo": 5, "color": Color("d8c78a")},
-	"T": {"name": "Fort", "def": 2, "avo": 20, "heal": 0.2, "color": Color("9c8a6a")},
+	# Outdoors
+	".": {"name": "Plain", "def": 0, "avo": 0, "color": Color("78b04f"),
+		"cost": {"*": 1, "mermaid": 3, "ship": 6}},
+	"=": {"name": "Path", "def": 0, "avo": -20, "color": Color("c9ad7a"),
+		"cost": {"*": 0.7, "mermaid": 1.5, "ship": 5}},
+	"H": {"name": "House", "def": 0, "avo": 15, "color": Color("78b04f"),
+		"cost": {"*": 1, "horse": 1.2, "ship": 10}},
+	"T": {"name": "Fort", "def": 3, "avo": 25, "heal": 0.2, "color": Color("9c8a6a"),
+		"cost": {"*": 1.5}},
+	"S": {"name": "Sand", "def": 0, "avo": 5, "color": Color("d8c78a"),
+		"cost": {"*": 1, "horse": 1.5, "mermaid": 2, "ship": 5}},
+	"D": {"name": "Dune", "def": 0, "avo": 15, "color": Color("c9ac62"),
+		"cost": {"*": 1.5, "horse": 3, "mermaid": 2, "ship": 4}},
+	"F": {"name": "Forest", "def": 1, "avo": 20, "color": Color("4e8a3a"),
+		"cost": {"*": 2, "rogue": 1.5, "mermaid": 3, "horse": 4, "ship": 10}},
+	"#": {"name": "Thicket", "def": 2, "avo": 30, "color": Color("2f5f2c"),
+		"cost": {"*": 10, "horse": 20, "ship": 20, "rogue": 6}},
+	"h": {"name": "Hill", "def": 2, "avo": 20, "color": Color("9aa25a"),
+		"cost": {"*": 4, "climb": 2, "horse": 10, "mermaid": 10, "heavy": 10, "ship": 20}},
+	"M": {"name": "Mountain", "def": 3, "avo": 30, "color": Color("8a7a5c"),
+		"cost": {"*": 7, "climb": 4, "horse": 15, "mermaid": 15, "heavy": 15, "ship": 20}},
+	"~": {"name": "River", "def": 0, "avo": 10, "color": Color("3f7fd0"),
+		"cost": {"*": 6, "swim": 2, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
+	"L": {"name": "Lake", "def": 0, "avo": 10, "color": Color("4a8ad8"),
+		"cost": {"*": 6, "swim": 2, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
+	"W": {"name": "Sea", "def": 0, "avo": 10, "color": Color("2a5fa8"),
+		"cost": {"*": 6, "swim": 2, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
+	"v": {"name": "Waterfall", "def": 0, "avo": 30, "color": Color("7ab8f0"),
+		"cost": {"*": 20, "mermaid": 6, "swim": 6, "ship": 8}},
+	"*": {"name": "Snow", "def": 0, "avo": 5, "color": Color("e6edf3"),
+		"cost": {"*": 1, "horse": 1.5, "mermaid": 2, "ship": 5}},
+	"i": {"name": "Ice", "def": 0, "avo": -20, "color": Color("b6def0"),
+		"cost": {"*": 1.5, "horse": 2, "heavy": 1, "mermaid": 1, "ship": 4}},
+	# Indoors
+	"_": {"name": "Floor", "def": 0, "avo": 0, "color": Color("8c857a"),
+		"cost": {"*": 1, "mermaid": 3, "horse": 1.5, "flying": 1.5, "ship": 10}},
+	"c": {"name": "Carpet", "def": 0, "avo": 0, "color": Color("9a3a3a"),
+		"cost": {"*": 1, "mermaid": 3, "horse": 1.5, "flying": 1.5, "ship": 10}},
+	"X": {"name": "Wall", "def": 0, "avo": 0, "color": Color("4a4440"),
+		"cost": {"*": IMPASSABLE, "flying": IMPASSABLE}},
+	"I": {"name": "Pillar", "def": 0, "avo": 20, "color": Color("8c857a"),
+		"cost": {"*": 2, "ship": 20}},
+	"O": {"name": "Abyss", "def": 0, "avo": 0, "color": Color("101018"),
+		"cost": {"*": IMPASSABLE}},
+	"|": {"name": "Fence", "def": 0, "avo": 0, "color": Color("9a9282"),
+		"cost": {"*": IMPASSABLE}},
 }
 
-## Movement cost per move type and terrain key; -1 means impassable.
-const MOVE_COSTS := {
-	"foot": {".": 1, "F": 2, "M": -1, "~": -1, "W": -1, "S": 1, "T": 2},
-	"horse": {".": 1, "F": 3, "M": -1, "~": -1, "W": -1, "S": 2, "T": 2},
-	"rogue": {".": 1, "F": 1, "M": -1, "~": -1, "W": -1, "S": 1, "T": 2},
-	"flying": {".": 1, "F": 1, "M": 1, "~": 1, "W": 1, "S": 1, "T": 1},
-	"ship": {".": -1, "F": -1, "M": -1, "~": 1, "W": 1, "S": -1, "T": -1},
-	"mermaid": {".": 2, "F": 3, "M": -1, "~": 1, "W": 1, "S": 2, "T": 2},
-}
-## Move types that get no DEF/AVO from terrain (they fly over it).
-const NO_TERRAIN_BONUS: Array[String] = ["flying"]
+
+## MOV a unit of `move_type` spends entering terrain `key` (-1 = impassable).
+static func cost_for(key: String, move_type: String) -> float:
+	if move_type == "spirit":
+		return 1.0
+	if HYBRID_MOVES.has(move_type):
+		var best := IMPASSABLE
+		for part: String in HYBRID_MOVES[move_type]:
+			var c := cost_for(key, part)
+			if c >= 0 and (best < 0 or c < best):
+				best = c
+		return best
+	var cost: Dictionary = TERRAIN[key].cost
+	if cost.has(move_type):
+		return cost[move_type]
+	if move_type == "flying":
+		return 1.0
+	return cost["*"]
 
 const MOVE_COLOR := Color(0.3, 0.5, 1.0, 0.5)
 const ATTACK_COLOR := Color(1.0, 0.25, 0.25, 0.45)
@@ -94,10 +157,10 @@ func set_terrain(cell: Vector2i, key: String) -> void:
 
 
 ## Cost to enter `cell` for a unit of `move_type` (-1 = impassable or off the map).
-func move_cost(cell: Vector2i, move_type := "foot") -> int:
+func move_cost(cell: Vector2i, move_type := "foot") -> float:
 	if not in_bounds(cell):
-		return -1
-	return MOVE_COSTS[move_type][terrain_key(cell)]
+		return IMPASSABLE
+	return cost_for(terrain_key(cell), move_type)
 
 
 func terrain_def(cell: Vector2i) -> int:
@@ -137,7 +200,7 @@ func get_reachable(unit: Unit, units: Array[Unit]) -> Dictionary:
 	var occupied := {}
 	for u in units:
 		occupied[u.cell] = u
-	var costs := {unit.cell: 0}
+	var costs := {unit.cell: 0.0}
 	var parents := {}
 	var frontier: Array[Vector2i] = [unit.cell]
 	while not frontier.is_empty():
@@ -154,8 +217,9 @@ func get_reachable(unit: Unit, units: Array[Unit]) -> Dictionary:
 				continue
 			if occupied.has(nxt) and occupied[nxt].team != unit.team:
 				continue
-			var total: int = costs[cur] + step
-			if total > unit.mov or (costs.has(nxt) and costs[nxt] <= total):
+			var total: float = costs[cur] + step
+			# Costs can be fractional (Path 0.7), so allow for float rounding.
+			if total > unit.mov + 0.001 or (costs.has(nxt) and costs[nxt] <= total):
 				continue
 			costs[nxt] = total
 			parents[nxt] = cur
@@ -199,7 +263,7 @@ func get_attack_cells(move_set: Dictionary, ranges: Array[Vector2i]) -> Array:
 ## Unbounded terrain-cost distance from `target` to every cell (ignores units),
 ## for a unit of `move_type`. Used by the AI to approach targets around obstacles.
 func cost_field(target: Vector2i, move_type := "foot") -> Dictionary:
-	var costs := {target: 0}
+	var costs := {target: 0.0}
 	var frontier: Array[Vector2i] = [target]
 	while not frontier.is_empty():
 		var best := 0
@@ -213,7 +277,7 @@ func cost_field(target: Vector2i, move_type := "foot") -> Dictionary:
 			var step := move_cost(nxt, move_type)
 			if step < 0:
 				continue
-			var total: int = costs[cur] + step
+			var total: float = costs[cur] + step
 			if costs.has(nxt) and costs[nxt] <= total:
 				continue
 			costs[nxt] = total
@@ -318,4 +382,54 @@ func _draw_tile(cell: Vector2i) -> void:
 			for bx in [3, 7, 11]:
 				draw_rect(Rect2(o + Vector2(bx, 3), Vector2(2, 2)), Color("b8b0a0"))
 			draw_rect(Rect2(o + Vector2(7, 10), Vector2(2, 4)), Color("5a4630"))
+		"=":
+			draw_line(o + Vector2(0, 5), o + Vector2(16, 5), Color("b0946a"))
+			draw_line(o + Vector2(0, 11), o + Vector2(16, 11), Color("b0946a"))
+		"H":
+			draw_rect(Rect2(o + Vector2(4, 7), Vector2(8, 7)), Color("e0d0b0"))
+			draw_colored_polygon(PackedVector2Array([o + Vector2(8, 2), o + Vector2(13, 7), o + Vector2(3, 7)]), Color("b04030"))
+			draw_rect(Rect2(o + Vector2(7, 10), Vector2(2, 4)), Color("5a4630"))
+		"D":
+			draw_arc(o + Vector2(8, 13), 6.0, PI, TAU, 8, Color("a88a40"), 1.0)
+			draw_arc(o + Vector2(5, 7), 4.0, PI, TAU, 6, Color("a88a40"), 1.0)
+		"#":
+			for tx in [4, 11]:
+				draw_colored_polygon(PackedVector2Array([o + Vector2(tx, 1), o + Vector2(tx + 4, 9), o + Vector2(tx - 4, 9)]), Color("173a18"))
+				draw_colored_polygon(PackedVector2Array([o + Vector2(tx, 6), o + Vector2(tx + 4, 14), o + Vector2(tx - 4, 14)]), Color("173a18"))
+		"h":
+			draw_arc(o + Vector2(8, 14), 7.0, PI, TAU, 10, Color("6f7a3a"), 2.0)
+		"L":
+			draw_line(o + Vector2(4, 6), o + Vector2(9, 6), Color("9ccaf5"))
+			draw_line(o + Vector2(7, 11), o + Vector2(12, 11), Color("9ccaf5"))
+		"v":
+			for vx in [3, 7, 11]:
+				draw_line(o + Vector2(vx, 0), o + Vector2(vx, 16), Color("eef6ff"), 1.0)
+		"*":
+			for dot in [Vector2(3, 3), Vector2(11, 5), Vector2(6, 10), Vector2(13, 12), Vector2(2, 13)]:
+				draw_rect(Rect2(o + dot, Vector2(1, 1)), Color("aebdcc"))
+		"i":
+			draw_line(o + Vector2(3, 12), o + Vector2(12, 3), Color("eaf8ff"), 1.0)
+			draw_line(o + Vector2(8, 14), o + Vector2(14, 8), Color("eaf8ff"), 1.0)
+		"_":
+			draw_line(o + Vector2(8, 0), o + Vector2(8, 16), Color("7a746a"))
+			draw_line(o + Vector2(0, 8), o + Vector2(16, 8), Color("7a746a"))
+		"c":
+			draw_rect(Rect2(o + Vector2(1, 0), Vector2(1, 16)), Color("d0b050"))
+			draw_rect(Rect2(o + Vector2(14, 0), Vector2(1, 16)), Color("d0b050"))
+		"X":
+			for by in [0, 5, 10]:
+				draw_line(o + Vector2(0, by + 4.5), o + Vector2(16, by + 4.5), Color("2e2a27"))
+				var bx := 4 if by % 10 == 0 else 10
+				draw_line(o + Vector2(bx, by), o + Vector2(bx, by + 4), Color("2e2a27"))
+		"I":
+			draw_rect(Rect2(o + Vector2(5, 1), Vector2(6, 14)), Color("c8c2b6"))
+			draw_rect(Rect2(o + Vector2(4, 1), Vector2(8, 2)), Color("dcd6ca"))
+			draw_rect(Rect2(o + Vector2(4, 13), Vector2(8, 2)), Color("dcd6ca"))
+		"O":
+			draw_rect(Rect2(o + Vector2(2, 2), Vector2(12, 12)), Color("000000"))
+		"|":
+			for fx in [2, 8, 14]:
+				draw_rect(Rect2(o + Vector2(fx - 1, 3), Vector2(2, 11)), Color("7a4e28"))
+			draw_rect(Rect2(o + Vector2(0, 6), Vector2(16, 1)), Color("8b5a2b"))
+			draw_rect(Rect2(o + Vector2(0, 10), Vector2(16, 1)), Color("8b5a2b"))
 	draw_rect(Rect2(o, Vector2(TILE, TILE)), Color(0, 0, 0, 0.12), false, 1.0)

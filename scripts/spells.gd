@@ -10,18 +10,20 @@ const MP_REGEN := 1
 ## target: "ally"  = heal another unit on the caster's team.
 ##         "enemy" = single-target damage; the target may counter.
 ##         "area"  = damage every enemy within `radius` of a chosen cell; no counters.
+## element: "fire", "ice", "water", "earth", "lightning", "light" or "dark"; some
+##          tags are weak to or resist elements (Combat.TAG_TRAITS).
 ## terraform: terrain key the target cell becomes after the cast (area spells only).
 ##            Such spells may target empty cells, but only ones whose terrain can change.
 const DATA := {
 	"Heal": {"mp": 4, "target": "ally", "min_rng": 1, "max_rng": 1, "power": 10, "exp": 11},
-	"Fire": {"mp": 3, "target": "enemy", "min_rng": 1, "max_rng": 2, "power": 5, "hit": 90},
-	"Firestorm": {"mp": 8, "target": "area", "min_rng": 1, "max_rng": 3, "radius": 1, "power": 3, "hit": 80},
-	"Earth Spike": {"mp": 5, "target": "area", "min_rng": 1, "max_rng": 2, "radius": 0, "power": 6, "hit": 85,
+	"Fire": {"mp": 3, "target": "enemy", "element": "fire", "min_rng": 1, "max_rng": 2, "power": 5, "hit": 90},
+	"Firestorm": {"mp": 8, "target": "area", "element": "fire", "min_rng": 1, "max_rng": 3, "radius": 1, "power": 3, "hit": 80},
+	"Earth Spike": {"mp": 5, "target": "area", "element": "earth", "min_rng": 1, "max_rng": 2, "radius": 0, "power": 6, "hit": 85,
 		"terraform": "M"},
 }
 
 ## Terrain that terraforming spells can transform.
-const TERRAFORMABLE: Array[String] = [".", "F", "S"]
+const TERRAFORMABLE: Array[String] = [".", "=", "F", "S", "D", "*"]
 
 
 static func get_spell(spell_name: String) -> Dictionary:
