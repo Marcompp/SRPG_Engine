@@ -52,6 +52,7 @@ static func capture(battle: Node) -> Dictionary:
 		"campaign": Campaign.active,
 		"turn": battle.turn,
 		"grid": _encode(battle.map.grid, ids),
+		"tile_hp": battle.map.tile_hp.duplicate(),
 		"objects": _encode(battle.map.objects, ids),
 		"danger_on": battle.danger_on,
 		"marked": _encode(battle.marked, ids),
@@ -64,6 +65,7 @@ static func capture(battle: Node) -> Dictionary:
 ## references between units resolve), then battle-level state.
 static func restore(battle: Node, data: Dictionary) -> void:
 	battle.map.load_layout(data.grid)
+	battle.map.tile_hp = data.get("tile_hp", battle.map.tile_hp)
 	battle.map.load_objects(data.objects, Objectives.of(Levels.get_level(data.level)))
 	battle.turn = data.turn
 	battle.campaign_deaths.assign(data.campaign_deaths)

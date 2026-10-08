@@ -25,6 +25,8 @@ extends RefCounted
 ## retreat_attacks: whether it still attacks while retreating
 ## loot:            heads for the nearest intact village or chest; burns the village or
 ##                  takes the chest's item when it gets there (then `move` as usual)
+## breaks:          when moving, opens doors (if it can open chests) and breaks
+##                  breakable tiles that block a shorter way to its goal
 
 const DEFAULTS := {
 	"move": "charge",
@@ -41,6 +43,7 @@ const DEFAULTS := {
 	"retreat_to": "healer_or_tile",
 	"retreat_attacks": false,
 	"loot": false,
+	"breaks": true,
 }
 
 ## Classic Fire Emblem enemy archetypes.

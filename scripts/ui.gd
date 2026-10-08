@@ -207,7 +207,9 @@ func _away_right(cursor_cell: Vector2i) -> bool:
 	return cursor_cell.x < 8
 
 
-func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void:
+## `tile_hp` is the remaining HP of a breakable tile (-1 otherwise); it's shown
+## instead of the terrain bonuses.
+func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i, tile_hp := -1) -> void:
 	var text := ""
 	if unit:
 		var weapon := "No weapon"
@@ -241,7 +243,9 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void
 			text += "  INT %d" % unit.intelligence
 		text += "\n"
 	# Show the bonus the unit on the tile actually gets (fliers and spirits get none).
-	if unit and BattleMap.NO_TERRAIN_BONUS.has(unit.move_type):
+	if tile_hp >= 0:
+		text += "%s  HP %d/%d" % [terrain.name, tile_hp, terrain.breakable.hp]
+	elif unit and BattleMap.NO_TERRAIN_BONUS.has(unit.move_type):
 		text += "%s  no bonus (%s)" % [terrain.name, unit.move_type.capitalize()]
 	else:
 		text += "%s  DEF%+d AVO%+d" % [terrain.name, terrain.def, terrain.avo]
@@ -381,6 +385,12 @@ func show_shove_forecast(target: Unit, dest_terrain: String, cursor_cell: Vector
 
 func show_dance_forecast(target: Unit, cursor_cell: Vector2i) -> void:
 	_spell_label.text = "Dance\n%s can act again" % target.unit_name
+	_place(_spell_forecast, _away_right(cursor_cell), false)
+
+
+## Forecast for actions aimed at a tile (Break, Open Door).
+func show_cell_forecast(text: String, cursor_cell: Vector2i) -> void:
+	_spell_label.text = text
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 

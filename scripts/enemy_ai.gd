@@ -319,11 +319,82 @@ static func _advance(enemy: Unit, battle: Node, reach: Dictionary, players: Arra
 	await _move_toward(enemy, battle, reach, nearest.cell)
 
 
-## Moves to the reachable cell closest (by terrain cost) to `target`.
+## Moves to the reachable cell closest (by terrain cost) to `target`, then opens or
+## breaks whatever blocks the way, if that's the way it planned.
 static func _move_toward(enemy: Unit, battle: Node, reach: Dictionary, target: Vector2i) -> void:
 	var map: BattleMap = battle.map
-	var dest := _closest_cell(map.cost_field(target, enemy.move_type), reach.cells, enemy.cell)
+	var field := map.cost_field(target, enemy.move_type, _obstacle_costs(enemy, battle))
+	var dest := _closest_cell(field, reach.cells, enemy.cell)
 	await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
+	await _clear_obstacle(enemy, battle, field)
+
+
+# --- Breakable tiles and doors -----------------------------------------------------
+
+## Planning costs for the breakable tiles and doors `u` could get through: a door it
+## can open costs one turn, anything else the turns it takes to break, each turn
+## counted as a full turn of movement. Empty if `u` doesn't break things.
+static func _obstacle_costs(u: Unit, battle: Node) -> Dictionary:
+	var costs := {}
+	if not u.ai.get("breaks", true):
+		return costs
+	var map: BattleMap = battle.map
+	var damage: int = _best_tile_weapon(u).damage
+	for cell in map.tile_hp:
+		var turns := INF
+		if map.is_door(cell) and battle.can_open_chest(u):
+			turns = 1
+		elif damage > 0:
+			turns = ceilf(float(map.tile_hp[cell]) / damage)
+		if turns < INF:
+			costs[cell] = turns * maxf(u.mov, 1) + 1
+	return costs
+
+
+## The weapon that hits tiles hardest: {"index", "damage"} (index -1 if unarmed).
+static func _best_tile_weapon(u: Unit) -> Dictionary:
+	var best := {"index": -1, "damage": 0}
+	var original: Dictionary = u.weapon
+	for w in u.weapons():
+		u.equip(u.items.find(w))
+		var damage := Combat.base_attack(u)
+		if damage > best.damage:
+			best = {"index": u.items.find(w), "damage": damage}
+	if not original.is_empty():
+		u.equip(u.items.find(original))
+	return best
+
+
+## Opens or breaks the obstacle in reach that lies furthest along the way `field`
+## leads (closer to the goal than `u` is). Returns true if it did something.
+static func _clear_obstacle(u: Unit, battle: Node, field: Dictionary) -> bool:
+	if not is_instance_valid(u) or u.hp <= 0 or not u.ai.get("breaks", true):
+		return false
+	var map: BattleMap = battle.map
+	var best := Vector2i(-1, -1)
+	var opens := false
+	for d in BattleMap.DIRS:
+		var cell := u.cell + d
+		if map.is_door(cell) and battle.can_open_chest(u) and field.get(cell, INF) < field.get(u.cell, INF):
+			if best == Vector2i(-1, -1) or field[cell] < field[best]:
+				best = cell
+				opens = true
+	if opens:
+		battle.cursor.cell = best
+		await battle.do_open_door(u, best)
+		return true
+	var weapon: Dictionary = _best_tile_weapon(u)
+	if weapon.index < 0:
+		return false
+	u.equip(weapon.index)
+	for cell in battle.breakable_cells(u, u.weapon):
+		if field.get(cell, INF) < field.get(u.cell, INF) and (best == Vector2i(-1, -1) or field[cell] < field[best]):
+			best = cell
+	if best == Vector2i(-1, -1):
+		return false
+	battle.cursor.cell = best
+	await battle.do_break(u, best)
+	return true
 
 
 static func _closest_cell(field: Dictionary, cells: Dictionary, start: Vector2i) -> Vector2i:
@@ -386,8 +457,9 @@ static func _try_loot(enemy: Unit, battle: Node, reach: Dictionary) -> bool:
 		return false
 	var field: Dictionary = {}
 	var target: Dictionary = {}
+	var obstacles := _obstacle_costs(enemy, battle)
 	for o in targets:
-		var f := map.cost_field(o.cell, enemy.move_type)
+		var f := map.cost_field(o.cell, enemy.move_type, obstacles)
 		if not f.has(enemy.cell):
 			continue
 		if target.is_empty() or f[enemy.cell] < field[enemy.cell]:
@@ -400,6 +472,8 @@ static func _try_loot(enemy: Unit, battle: Node, reach: Dictionary) -> bool:
 		await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
 	if enemy.cell == target.cell:
 		await battle.loot(enemy, target)
+	else:
+		await _clear_obstacle(enemy, battle, field)
 	return true
 
 

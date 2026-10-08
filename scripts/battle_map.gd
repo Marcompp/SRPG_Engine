@@ -70,7 +70,24 @@ const TERRAIN := {
 		"cost": {"*": IMPASSABLE}},
 	"|": {"name": "Fence", "def": 0, "avo": 0, "color": Color("9a9282"),
 		"cost": {"*": IMPASSABLE}},
+	# Breakable: "breakable" gives the tile's HP and what it becomes when broken.
+	"x": {"name": "Cracked Wall", "def": 0, "avo": 0, "color": Color("4a4440"),
+		"cost": {"*": IMPASSABLE, "flying": IMPASSABLE}, "breakable": {"hp": 20, "becomes": "_"}},
+	"/": {"name": "Cracked Fence", "def": 0, "avo": 0, "color": Color("9a9282"),
+		"cost": {"*": IMPASSABLE}, "breakable": {"hp": 10, "becomes": "."}},
+	"Y": {"name": "Trunk", "def": 0, "avo": 0, "color": Color("78b04f"),
+		"cost": {"*": IMPASSABLE}, "breakable": {"hp": 15, "becomes": ".", "bridge": true}},
+	# Doors: opened by units that can open chests, or broken like a cracked wall.
+	"+": {"name": "Door", "def": 0, "avo": 0, "color": Color("4a4440"),
+		"cost": {"*": IMPASSABLE, "flying": IMPASSABLE}, "breakable": {"hp": 20, "becomes": "_"}, "door": true},
+	# Left by a fallen trunk: walkable, and water units still pass underneath.
+	"B": {"name": "Bridge", "def": 0, "avo": 0, "color": Color("3f7fd0"),
+		"cost": {"*": 1, "mermaid": 1, "ship": 1}},
 }
+
+## Water a fallen trunk can bridge, and how many tiles of it.
+const BRIDGEABLE: Array[String] = ["~", "L"]
+const BRIDGE_LENGTH := 3
 
 
 ## MOV a unit of `move_type` spends entering terrain `key` (-1 = impassable).
@@ -103,6 +120,8 @@ const ARROW_COLOR := Color(1.0, 0.85, 0.25, 0.95)
 
 var cols := 0
 var rows := 0
+## Remaining HP of breakable tiles (cracked walls, doors...), by cell.
+var tile_hp := {}
 ## Live terrain: starts as the level's layout and can be changed by spells (see set_terrain).
 var grid: Array[String] = []
 var move_cells: Array = []
@@ -141,7 +160,60 @@ func load_layout(layout: Array) -> void:
 	grid.assign(layout)
 	rows = grid.size()
 	cols = grid[0].length()
+	tile_hp.clear()
+	for y in rows:
+		for x in cols:
+			var info := breakable_info(Vector2i(x, y))
+			if not info.is_empty():
+				tile_hp[Vector2i(x, y)] = info.hp
 	queue_redraw()
+
+
+## {"hp", "becomes", ...} for a breakable tile, or {}.
+func breakable_info(cell: Vector2i) -> Dictionary:
+	if not in_bounds(cell):
+		return {}
+	return terrain_at(cell).get("breakable", {})
+
+
+func is_door(cell: Vector2i) -> bool:
+	return in_bounds(cell) and terrain_at(cell).get("door", false)
+
+
+## Damages a breakable tile; returns true if that broke it.
+func damage_tile(cell: Vector2i, amount: int, from: Vector2i) -> bool:
+	tile_hp[cell] = maxi(0, tile_hp.get(cell, 0) - amount)
+	queue_redraw()
+	if tile_hp[cell] > 0:
+		return false
+	break_tile(cell, from)
+	return true
+
+
+## Turns a breakable tile into what it becomes. A trunk falls into the water: away
+## from `from` (the breaker's cell) if there's water that way, otherwise toward the
+## first side that has some, bridging up to BRIDGE_LENGTH tiles.
+func break_tile(cell: Vector2i, from: Vector2i) -> void:
+	var info := breakable_info(cell)
+	set_terrain(cell, info.becomes)
+	if info.get("bridge", false):
+		var delta := cell - from
+		var away := Vector2i(signi(delta.x), 0) if absi(delta.x) >= absi(delta.y) else Vector2i(0, signi(delta.y))
+		var dirs: Array[Vector2i] = [away]
+		dirs.append_array(DIRS)
+		for d in dirs:
+			if d != Vector2i.ZERO and BRIDGEABLE.has(_key_or_empty(cell + d)):
+				var c := cell + d
+				for i in BRIDGE_LENGTH:
+					if not BRIDGEABLE.has(_key_or_empty(c)):
+						break
+					set_terrain(c, "B")
+					c += d
+				break
+
+
+func _key_or_empty(cell: Vector2i) -> String:
+	return terrain_key(cell) if in_bounds(cell) else ""
 
 
 func load_objects(list: Array, objective: Dictionary) -> void:
@@ -184,6 +256,9 @@ func terrain_key(cell: Vector2i) -> String:
 func set_terrain(cell: Vector2i, key: String) -> void:
 	var row := grid[cell.y]
 	grid[cell.y] = row.substr(0, cell.x) + key + row.substr(cell.x + 1)
+	tile_hp.erase(cell)
+	if TERRAIN[key].has("breakable"):
+		tile_hp[cell] = TERRAIN[key].breakable.hp
 	queue_redraw()
 
 
@@ -293,7 +368,9 @@ func get_attack_cells(move_set: Dictionary, ranges: Array[Vector2i]) -> Array:
 
 ## Unbounded terrain-cost distance from `target` to every cell (ignores units),
 ## for a unit of `move_type`. Used by the AI to approach targets around obstacles.
-func cost_field(target: Vector2i, move_type := "foot") -> Dictionary:
+## `extra` gives costs for cells that are otherwise impassable (the AI uses it to
+## plan through breakable tiles and doors).
+func cost_field(target: Vector2i, move_type := "foot", extra := {}) -> Dictionary:
 	var costs := {target: 0.0}
 	var frontier: Array[Vector2i] = [target]
 	while not frontier.is_empty():
@@ -305,7 +382,7 @@ func cost_field(target: Vector2i, move_type := "foot") -> Dictionary:
 		frontier.remove_at(best)
 		for d in DIRS:
 			var nxt := cur + d
-			var step := move_cost(nxt, move_type)
+			var step: float = extra.get(nxt, move_cost(nxt, move_type))
 			if step < 0:
 				continue
 			var total: float = costs[cur] + step
@@ -490,9 +567,32 @@ func _draw_tile(cell: Vector2i) -> void:
 			draw_rect(Rect2(o + Vector2(4, 13), Vector2(8, 2)), Color("dcd6ca"))
 		"O":
 			draw_rect(Rect2(o + Vector2(2, 2), Vector2(12, 12)), Color("000000"))
-		"|":
+		"|", "/":
 			for fx in [2, 8, 14]:
 				draw_rect(Rect2(o + Vector2(fx - 1, 3), Vector2(2, 11)), Color("7a4e28"))
 			draw_rect(Rect2(o + Vector2(0, 6), Vector2(16, 1)), Color("8b5a2b"))
-			draw_rect(Rect2(o + Vector2(0, 10), Vector2(16, 1)), Color("8b5a2b"))
+			if key == "/":  # broken rail and a split post
+				draw_rect(Rect2(o + Vector2(0, 10), Vector2(6, 1)), Color("8b5a2b"))
+				draw_line(o + Vector2(8, 3), o + Vector2(10, 8), Color("2a1a0a"), 1.0)
+			else:
+				draw_rect(Rect2(o + Vector2(0, 10), Vector2(16, 1)), Color("8b5a2b"))
+		"x":
+			for by in [0, 5, 10]:
+				draw_line(o + Vector2(0, by + 4.5), o + Vector2(16, by + 4.5), Color("2e2a27"))
+			# Crack running down the wall.
+			draw_polyline(PackedVector2Array([o + Vector2(9, 0), o + Vector2(7, 5), o + Vector2(10, 9),
+				o + Vector2(6, 16)]), Color("c8bfb4"), 1.0)
+		"Y":
+			draw_circle(o + Vector2(8, 8), 6.0, Color("6b4423"))
+			draw_arc(o + Vector2(8, 8), 4.0, 0, TAU, 12, Color("a07850"), 1.0)
+			draw_arc(o + Vector2(8, 8), 2.0, 0, TAU, 8, Color("a07850"), 1.0)
+		"+":
+			draw_rect(Rect2(o + Vector2(2, 1), Vector2(12, 15)), Color("7a4e28"))
+			draw_rect(Rect2(o + Vector2(2, 1), Vector2(12, 15)), Color("3a2410"), false, 1.0)
+			draw_line(o + Vector2(8, 1), o + Vector2(8, 16), Color("3a2410"), 1.0)
+			draw_rect(Rect2(o + Vector2(9, 8), Vector2(2, 2)), Color("f0c030"))
+		"B":
+			draw_rect(Rect2(o + Vector2(0, 3), Vector2(16, 10)), Color("9a6a3a"))
+			for px in [4, 8, 12]:
+				draw_line(o + Vector2(px, 3), o + Vector2(px, 13), Color("6b4423"), 1.0)
 	draw_rect(Rect2(o, Vector2(TILE, TILE)), Color(0, 0, 0, 0.12), false, 1.0)

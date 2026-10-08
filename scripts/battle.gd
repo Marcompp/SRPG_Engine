@@ -250,7 +250,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		State.TARGETING:
 			if dir != Vector2i.ZERO:
 				var step := 1 if dir.x + dir.y > 0 else -1
-				var count := drop_cells.size() if target_mode in ["drop", "unload"] else targets.size()
+				var count := drop_cells.size() if target_mode in ["drop", "unload", "break", "door"] else targets.size()
 				target_index = wrapi(target_index + step, 0, count)
 				show_target()
 			elif accept:
@@ -267,6 +267,10 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 				if target_mode == "drop":
 					await do_drop(selected, drop_cells[target_index])
+				elif target_mode == "break":
+					await do_break(selected, drop_cells[target_index])
+				elif target_mode == "door":
+					await do_open_door(selected, drop_cells[target_index])
 				elif target_mode == "rescue":
 					await do_rescue(selected, targets[target_index])
 				elif target_mode == "dance":
@@ -288,7 +292,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				ui.hide_forecast()
 				map.clear_ranges()
 				cursor.cell = selected.cell
-				if target_mode in ["dance", "trade", "shove", "rescue", "drop", "board", "unload", "inspire"]:
+				if target_mode in ["dance", "trade", "shove", "rescue", "drop", "board", "unload", "inspire", "break", "door"]:
 					open_unit_menu()
 				elif active_spell:
 					open_magic_menu()
@@ -391,7 +395,8 @@ func confirm_end_turn() -> void:
 
 
 func refresh_info() -> void:
-	ui.update_info(unit_at(cursor.cell), map.terrain_at(cursor.cell), cursor.cell)
+	ui.update_info(unit_at(cursor.cell), map.terrain_at(cursor.cell), cursor.cell,
+		map.tile_hp.get(cursor.cell, -1))
 	update_hover()
 
 
@@ -578,16 +583,100 @@ func can_open_chest(u: Unit) -> bool:
 func do_open() -> void:
 	state = State.BUSY
 	var chest := map.object_at(selected.cell)
-	if selected.move_type != "rogue":
-		var key := selected.items.find(selected.items.filter(func(it): return it.name == "Chest Key")[0])
-		selected.items[key].uses -= 1
-		if selected.items[key].uses <= 0:
-			selected.items.remove_at(key)
+	_spend_key(selected)
 	chest.state = "opened"
 	map.queue_redraw()
 	selected.popup(give_item(selected, chest.item), Color.GOLD)
 	await get_tree().create_timer(0.7).timeout
 	finish_action()
+
+
+## Rogues open chests and doors freely; anyone else uses up a Chest Key.
+func _spend_key(u: Unit) -> void:
+	if u.move_type == "rogue":
+		return
+	var key := u.items.find(u.items.filter(func(it): return it.name == "Chest Key")[0])
+	u.items[key].uses -= 1
+	if u.items[key].uses <= 0:
+		u.items.remove_at(key)
+
+
+# --- Breakable tiles and doors (see BattleMap breakable terrain) ---------------------
+
+## Damage dealt to a breakable tile: the unit's Attack (STR + weapon might). Always
+## hits, never crits, no counter, no EXP.
+func tile_damage(u: Unit) -> int:
+	return Combat.base_attack(u) if not u.weapon.is_empty() else 0
+
+
+## Breakable tiles `w` can reach from where `u` stands.
+func breakable_cells(u: Unit, w: Dictionary) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for cell in map.tile_hp:
+		if Unit.weapon_reaches(w, BattleMap.distance(u.cell, cell)):
+			result.append(cell)
+	return result
+
+
+func breakable_in_reach(u: Unit) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for w in u.weapons():
+		for cell in breakable_cells(u, w):
+			if not result.has(cell):
+				result.append(cell)
+	return result
+
+
+func adjacent_doors(u: Unit) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for d in BattleMap.DIRS:
+		if map.is_door(u.cell + d):
+			result.append(u.cell + d)
+	return result
+
+
+## Break: pick a weapon that reaches a breakable tile, then the tile.
+func open_break_menu() -> void:
+	var options: Array[String] = []
+	weapon_choices = []
+	for i in selected.items.size():
+		var it := selected.items[i]
+		if Items.is_weapon(it) and selected.can_wield(it) and not breakable_cells(selected, it).is_empty():
+			options.append(weapon_label(it))
+			weapon_choices.append(i)
+	_open_menu("break", options)
+
+
+func start_cell_targeting(mode: String, cells: Array[Vector2i]) -> void:
+	active_spell = ""
+	target_mode = mode
+	drop_cells = cells
+	target_index = 0
+	state = State.TARGETING
+	show_target()
+
+
+func do_break(u: Unit, cell: Vector2i) -> void:
+	map.clear_ranges()
+	var amount := tile_damage(u)
+	var tile_name: String = map.terrain_at(cell).name
+	await u.lunge(cell)
+	u.popup("%s -%d" % [tile_name, amount], Color.WHITE)
+	if u.use_weapon():
+		u.popup("Broke!", Color.LIGHT_GRAY)
+	var broke := map.damage_tile(cell, amount, u.cell)
+	if broke:
+		await get_tree().create_timer(0.3).timeout
+		u.popup(tile_name + " broken!", Color.GOLD)
+	await get_tree().create_timer(0.5).timeout
+
+
+func do_open_door(u: Unit, cell: Vector2i) -> void:
+	map.clear_ranges()
+	_spend_key(u)
+	map.set_terrain(cell, map.breakable_info(cell).becomes)
+	u.popup("Door opened", Color.GOLD)
+	await get_tree().create_timer(0.5).timeout
 
 
 ## Puts a new item in `u`'s inventory, or the convoy when it's full (campaign only).
@@ -783,8 +872,12 @@ func open_unit_menu() -> void:
 		options.append("Visit")
 	if here.get("type", "") == "chest" and here.state == "intact" and can_open_chest(selected):
 		options.append("Open")
+	if not adjacent_doors(selected).is_empty() and can_open_chest(selected):
+		options.append("Open Door")
 	if can_attack_any(selected):
 		options.append("Attack")
+	if not breakable_in_reach(selected).is_empty():
+		options.append("Break")
 	if not castable_spells(selected).is_empty():
 		options.append("Magic")
 	if not dance_targets(selected).is_empty():
@@ -903,6 +996,10 @@ func menu_accept() -> void:
 					do_open()
 				"Attack":
 					open_attack_menu()
+				"Break":
+					open_break_menu()
+				"Open Door":
+					start_cell_targeting("door", adjacent_doors(selected))
 				"Magic":
 					open_magic_menu()
 				"Dance":
@@ -928,6 +1025,9 @@ func menu_accept() -> void:
 		"attack":
 			selected.equip(weapon_choices[ui.menu_index])
 			start_targeting()
+		"break":
+			selected.equip(weapon_choices[ui.menu_index])
+			start_cell_targeting("break", breakable_cells(selected, selected.weapon))
 		"magic":
 			start_spell_targeting(spell_choices[ui.menu_index])
 		"unload":
@@ -960,7 +1060,7 @@ func menu_cancel() -> void:
 			selected.set_cell(origin_cell)
 			cursor.cell = origin_cell
 			select(selected)
-		"attack", "magic", "items", "unload":
+		"attack", "magic", "items", "unload", "break":
 			open_unit_menu()
 
 
@@ -986,6 +1086,17 @@ func start_spell_targeting(spell_name: String) -> void:
 
 
 func show_target() -> void:
+	if target_mode in ["break", "door"]:
+		var cell := drop_cells[target_index]
+		cursor.cell = cell
+		map.show_area([], [cell])
+		var tile_name: String = map.terrain_at(cell).name
+		if target_mode == "door":
+			ui.show_cell_forecast("Open Door", cursor.cell)
+		else:
+			var hp: int = map.tile_hp.get(cell, 0)
+			ui.show_cell_forecast("%s  HP %d -> %d" % [tile_name, hp, maxi(0, hp - tile_damage(selected))], cursor.cell)
+		return
 	if target_mode in ["drop", "unload"]:
 		var cell := drop_cells[target_index]
 		cursor.cell = cell

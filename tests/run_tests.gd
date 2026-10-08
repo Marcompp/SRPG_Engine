@@ -122,6 +122,12 @@ func _run_all() -> void:
 		"test_marked_enemy_freed",
 		"test_quit_to_level_select_asks_first",
 		"test_end_turn_last_and_warning_option",
+		"test_break_wall_through_menu",
+		"test_break_fence_and_trunk_bridge",
+		"test_doors_open_or_break",
+		"test_tile_hp_survives_suspend",
+		"test_enemies_break_and_open_obstacles",
+		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
 	]
@@ -1124,6 +1130,11 @@ func test_move_type_costs() -> void:
 		"I": [2, 2, 2, 2, 2, 2, 2, 20, 1, 1],
 		"O": [x, x, x, x, x, x, x, x, 1, 1],
 		"|": [x, x, x, x, x, x, x, x, 1, 1],
+		"x": [x, x, x, x, x, x, x, x, x, 1],
+		"/": [x, x, x, x, x, x, x, x, 1, 1],
+		"Y": [x, x, x, x, x, x, x, x, 1, 1],
+		"+": [x, x, x, x, x, x, x, x, x, 1],
+		"B": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 	}
 	check_eq(spec.size(), BattleMap.TERRAIN.size(), "every terrain is covered by the spec")
 	for key in spec:
@@ -2328,3 +2339,175 @@ func test_end_turn_last_and_warning_option() -> void:
 	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
 		await process_frame
 	reset_settings()
+
+
+# --- Breakable tiles and doors (Ruined Fort) ------------------------------------
+
+func start_level(id: String) -> void:
+	Levels.selected = id
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	Levels.selected = "river_crossing"
+
+
+## Selects `u` and opens its menu without moving it.
+func open_menu_in_place(u: Unit) -> void:
+	b.cursor.cell = u.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+
+
+func test_break_wall_through_menu() -> void:
+	await start_level("ruined_fort")
+	var wall := Vector2i(6, 2)
+	var fighter := unit_named("Fighter")
+	check_eq(b.map.tile_hp.get(wall), 20, "a cracked wall starts at 20 HP")
+	check_eq(b.map.cost_for("x", "flying"), BattleMap.IMPASSABLE, "fliers can't cross walls, cracked or not")
+	fighter.set_cell(Vector2i(2, 7))
+	await open_menu_in_place(fighter)
+	check(not b.ui.menu_options.has("Break"), "nothing breakable in reach, no Break")
+	await press(KEY_X)
+	await press(KEY_X)
+	fighter.set_cell(Vector2i(7, 2))
+	await open_menu_in_place(fighter)
+	await pick("Break")
+	check_eq(b.ui.menu_options.size(), 2, "both axes reach the wall")
+	await press(KEY_Z)  # Iron Axe
+	check_eq(b.target_mode, "break", "then pick the tile")
+	check_eq(b.cursor.cell, wall, "the cursor jumps to it")
+	check(b.ui._spell_label.text.contains("Cracked Wall  HP 20 -> 5"), "forecast: STR 7 + Mt 8 = 15 damage")
+	await press(KEY_Z)
+	check_eq(b.map.tile_hp.get(wall), 5, "the wall takes the damage")
+	b.cursor.cell = wall
+	b.refresh_info()
+	check(b.ui._info_label.text.contains("Cracked Wall  HP 5/20"), "hovering shows its remaining HP")
+	check(not b.ui._info_label.text.contains("AVO"), "instead of terrain bonuses")
+	check_eq(b.map.terrain_key(wall), "x", "and still stands")
+	check(fighter.has_acted, "breaking ends the unit's turn")
+	check_eq(fighter.items[0].uses, 44, "and uses the weapon")
+	await b.do_break(fighter, wall)
+	check_eq(b.map.terrain_key(wall), "_", "broken: it becomes floor")
+	check(not b.map.tile_hp.has(wall), "and has no HP left to track")
+	check(b.can_stand_on(fighter, wall), "units can walk through")
+
+
+func test_break_fence_and_trunk_bridge() -> void:
+	await start_level("ruined_fort")
+	var archer := unit_named("Archer")
+	# A cracked fence becomes plain; bows break it from range.
+	var fence := Vector2i(8, 5)
+	archer.set_cell(Vector2i(6, 5))
+	check(b.breakable_in_reach(archer).has(fence), "the bow reaches the fence at range 2")
+	await b.do_break(archer, fence)
+	check_eq(b.map.terrain_key(fence), ".", "10 HP: one shot (STR 5 + Mt 6) breaks it into a plain")
+	# A trunk falls into the river next to it, away from the attacker if possible.
+	var trunk := Vector2i(11, 2)
+	archer.set_cell(Vector2i(9, 2))
+	b.map.tile_hp[trunk] = 1
+	await b.do_break(archer, trunk)
+	check_eq(b.map.terrain_key(trunk), ".", "the trunk leaves a plain")
+	check_eq(b.map.terrain_key(Vector2i(10, 2)), "B", "and bridges the river")
+	check_eq(b.map.terrain_key(Vector2i(9, 2)), ".", "the bridge stops at dry land")
+	check_eq(BattleMap.cost_for("B", "mermaid"), 1.0, "water units pass under the bridge")
+	# With water on both sides, it falls away from whoever broke it.
+	var trunk2 := Vector2i(11, 5)
+	for x in [12, 13, 14]:
+		b.map.set_terrain(Vector2i(x, 5), "~")
+	archer.set_cell(Vector2i(9, 5))
+	b.map.tile_hp[trunk2] = 1
+	await b.do_break(archer, trunk2)
+	check_eq(b.map.terrain_key(Vector2i(10, 5)), "~", "not toward the archer")
+	for x in [12, 13, 14]:
+		check_eq(b.map.terrain_key(Vector2i(x, 5)), "B", "away from it, up to 3 tiles (%d)" % x)
+
+
+func test_doors_open_or_break() -> void:
+	await start_level("ruined_fort")
+	var door := Vector2i(3, 4)
+	var scout := unit_named("Scout")
+	var knight := unit_named("Knight")
+	check(b.map.is_door(door), "a locked door")
+	# Anyone without a key can only break it.
+	knight.set_cell(Vector2i(3, 5))
+	await open_menu_in_place(knight)
+	check(not b.ui.menu_options.has("Open Door"), "no key, no Open Door")
+	check(b.ui.menu_options.has("Break"), "but it can be broken")
+	await press(KEY_X)
+	await press(KEY_X)
+	# A rogue opens it freely.
+	knight.set_cell(Vector2i(4, 7))
+	scout.set_cell(Vector2i(3, 5))
+	await open_menu_in_place(scout)
+	await pick("Open Door")
+	check(b.ui._spell_label.text.contains("Open Door"), "forecast")
+	await press(KEY_Z)
+	check_eq(b.map.terrain_key(door), "_", "the door opens onto floor")
+	check(scout.has_acted, "opening ends the turn")
+	check(not b.map.tile_hp.has(door), "an open door has nothing left to break")
+	# A Chest Key works too, and is used up.
+	b.map.set_terrain(door, "+")
+	check_eq(b.map.tile_hp.get(door), 20, "a fresh door has full HP")
+	scout.set_cell(Vector2i(5, 7))
+	knight.set_cell(Vector2i(3, 5))
+	knight.items.append(Items.make("Chest Key"))
+	await open_menu_in_place(knight)
+	await pick("Open Door")
+	await press(KEY_Z)
+	check_eq(b.map.terrain_key(door), "_", "opened with a key")
+	check(not knight.items.any(func(it): return it.name == "Chest Key"), "the key is used up")
+
+
+func test_tile_hp_survives_suspend() -> void:
+	await start_level("ruined_fort")
+	b.map.damage_tile(Vector2i(6, 2), 7, Vector2i(7, 2))
+	b.map.damage_tile(Vector2i(8, 5), 10, Vector2i(7, 5))
+	SaveGame.write_suspend(b)
+	Levels.selected = "ruined_fort"
+	Levels.resume = true
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	Levels.selected = "river_crossing"
+	check_eq(b.map.tile_hp.get(Vector2i(6, 2)), 13, "damaged wall keeps its HP")
+	check_eq(b.map.terrain_key(Vector2i(8, 5)), ".", "broken fence stays broken")
+	check_eq(b.map.tile_hp.get(Vector2i(3, 4)), 20, "untouched door at full HP")
+	SaveGame.delete_suspend()
+
+
+func test_ruined_fort_phases_run_without_errors() -> void:
+	await start_level("ruined_fort")
+	await test_enemy_phases_run_without_errors()
+
+
+func test_enemies_break_and_open_obstacles() -> void:
+	await start_level("ruined_fort")
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([lord, brig])
+	await process_frame
+	brig.ai = AIProfiles.resolve({})  # a charger
+	brig.items.assign([Items.make("Iron Axe")])
+	brig.equip(0)
+	lord.set_cell(Vector2i(2, 2))  # walled in
+	# The cracked wall is the short way in: it walks up and hits it (STR 5 + Mt 8).
+	brig.set_cell(Vector2i(7, 2))
+	await EnemyAI.take_turn(brig, b)
+	check_eq(b.map.tile_hp.get(Vector2i(6, 2)), 7, "a charger breaks the wall in its way")
+	# Units that don't break things leave it alone.
+	b.map.set_terrain(Vector2i(6, 2), "x")
+	brig.has_acted = false
+	brig.ai = AIProfiles.resolve({"breaks": false})
+	await EnemyAI.take_turn(brig, b)
+	check_eq(b.map.tile_hp.get(Vector2i(6, 2)), 20, "breaks: false leaves the wall alone")
+	# With a Chest Key, a door is quicker: it walks up and opens it.
+	brig.has_acted = false
+	brig.ai = AIProfiles.resolve({})
+	brig.items.append(Items.make("Chest Key"))
+	lord.set_cell(Vector2i(3, 2))
+	brig.set_cell(Vector2i(3, 7))
+	await EnemyAI.take_turn(brig, b)
+	check_eq(brig.cell, Vector2i(3, 5), "it walks to the door")
+	check_eq(b.map.terrain_key(Vector2i(3, 4)), "_", "and opens it")
+	check(not brig.items.any(func(it): return it.name == "Chest Key"), "using up its key")
+	check_eq(b.map.tile_hp.get(Vector2i(6, 2)), 20, "the wall is left alone")

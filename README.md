@@ -23,6 +23,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Desert Outpost | Sand, dunes, paths, houses, an oasis; horses vs. scouts in the desert |
 | Frozen Pass | Snow, ice, hills, mountains, thickets, a waterfall; climbers, a swimmer and armor on ice |
 | Castle Keep | Indoors: floor, carpet, walls, pillars, pits and fences; slow mounted units and a wall-walking Wraith |
+| Ruined Fort | Breakable terrain: a cracked wall and fence, a locked door (the Scout opens it) and trunks to fell across the river |
 
 ## Campaign
 
@@ -88,6 +89,8 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - Map readability: enemy danger zone, per-enemy range view, a movement arrow that follows the cursor's trail, full unit stats screen
 - Configurable enemy behaviors (see below) and Fort tiles (DEF +2, AVO +20, heal 20% max HP at the start of the occupant's phase)
 - Movement types (see below), shown as a small colored badge on each unit
+- Breakable tiles: **Break** picks a weapon that reaches a breakable tile, then the tile. It always hits for the unit's Attack (STR + Mt), with no counter, crit or EXP, and uses weapon durability. Works at range. Cracked Wall (20 HP) becomes floor, Cracked Fence (10 HP) becomes plain, and a Trunk (15 HP) becomes plain and falls into adjacent river/lake water as a Bridge of up to 3 tiles (away from the attacker if there's water that way, otherwise toward the first side with water). Hovering a breakable tile shows its remaining HP. Tile HP is kept when suspending
+- Doors (20 HP): **Open Door** for an adjacent unit that could open a chest (rogues freely, anyone else uses up a Chest Key); otherwise they must be broken
 
 ## Classes
 
@@ -178,6 +181,9 @@ Movement types: **foot** (most units), **heavy** (armor), **horse**, **rogue** (
 | Wall `X` | | | – | – | – | – | – | – | – | – | – |
 | Pillar `I` | | +20 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 20 | 1 |
 | Abyss `O` / Fence `\|` | | | – | – | – | – | – | – | – | – | 1 |
+| Cracked Fence `/` (10 HP) / Trunk `Y` (15 HP) | | | – | – | – | – | – | – | – | – | 1 |
+| Cracked Wall `x` / Door `+` (20 HP) | | | – | – | – | – | – | – | – | – | – |
+| Bridge `B` (water units pass under) | | | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
 
 ## Enemy behaviors
 
@@ -197,6 +203,7 @@ Each enemy roster entry in `scripts/levels.gd` can have an `"ai"` dictionary: a 
 | `targeting` / `priority` | `damage`, `kill`, `weakest`; plus a list of unit names to prefer |
 | `caution` | Weight on expected counter damage (0 = reckless) |
 | `retreat_below` / `retreat_until` / `retreat_to` / `retreat_attacks` | Retreat at low HP to a healer, a healing tile, or away from players |
+| `breaks` | Default `true`: when moving, opens doors (if it could open a chest) and breaks breakable tiles that block a shorter way to its goal |
 
 Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`, `reinforcement`, `coward`, `thief`.
 

@@ -11,7 +11,7 @@ static var selected := "river_crossing"
 ## Set by the level select to resume the suspended battle instead of starting fresh.
 static var resume := false
 
-const ORDER: Array[String] = ["river_crossing", "coastal_raid", "desert_outpost", "frozen_pass", "castle_keep"]
+const ORDER: Array[String] = ["river_crossing", "coastal_raid", "desert_outpost", "frozen_pass", "castle_keep", "ruined_fort"]
 
 const DATA := {
 	"river_crossing": {
@@ -319,6 +319,57 @@ const DATA := {
 				"ai": {"preset": "ambusher"}},
 			{"name": "Footman", "cell": Vector2i(12, 7), "class": "Footman", "items": ["Iron Spear", "Javelin"], "lv": 2,
 				"hp": 19, "str": 6, "dex": 4, "agi": 4, "lck": 1, "def": 5, "mov": 5, "mp": 1,
+				"ai": {"preset": "ambusher"}},
+		],
+	},
+	"ruined_fort": {
+		"name": "Ruined Fort",
+		"description": "Breakable terrain: a cracked wall and fence, a locked door
+(the Scout opens it) and trunks to fell across the river.",
+		"layout": [
+			"XXXXXXX...~....",
+			"X__T__X...~..F.",
+			"X_____x...~Y...",
+			"X_____X...~....",
+			"XXX+XXX.|.~....",
+			"......../.~Y...",
+			"........|.~....",
+			".F......|.~..F.",
+			"..........~....",
+			"..........~....",
+		],
+		"objects": [
+			{"type": "chest", "cell": Vector2i(1, 3), "item": "Silver Sword"},
+		],
+		"players": [
+			{"name": "Lord", "cell": Vector2i(1, 8), "class": "Swordsman", "lord": true, "items": ["Iron Sword", "Potion"], "lv": 2,
+				"hp": 20, "str": 6, "dex": 8, "agi": 9, "lck": 7, "def": 5, "mov": 5, "mp": 4,
+				"growths": {"hp": 80, "str": 45, "dex": 50, "agi": 40, "lck": 45, "def": 30, "mp": 30}},
+			{"name": "Fighter", "cell": Vector2i(2, 8), "class": "Axeman", "items": ["Iron Axe", "Hammer"], "lv": 2,
+				"hp": 24, "str": 7, "dex": 4, "agi": 5, "lck": 3, "def": 3, "mp": 0, "mov": 5,
+				"growths": {"hp": 80, "str": 60, "dex": 40, "agi": 20, "lck": 45, "def": 25, "mp": 15}},
+			{"name": "Scout", "cell": Vector2i(1, 9), "class": "Rogue", "items": ["Iron Sword"], "lv": 2,
+				"hp": 17, "str": 4, "dex": 7, "agi": 10, "lck": 6, "def": 2, "mp": 2, "mov": 6,
+				"growths": {"hp": 60, "str": 30, "dex": 50, "agi": 65, "lck": 50, "def": 15, "mp": 25}},
+			{"name": "Archer", "cell": Vector2i(2, 9), "class": "Archer", "items": ["Iron Bow"], "lv": 2,
+				"hp": 18, "str": 5, "dex": 7, "agi": 6, "lck": 4, "def": 3, "mov": 5, "mp": 1,
+				"growths": {"hp": 60, "str": 40, "dex": 50, "agi": 60, "lck": 50, "def": 15, "mp": 25}},
+			{"name": "Knight", "cell": Vector2i(3, 9), "class": "Guard", "items": ["Iron Spear", "Javelin"], "lv": 2,
+				"hp": 23, "str": 7, "dex": 4, "agi": 2, "lck": 2, "def": 9, "mp": 1, "mov": 4,
+				"growths": {"hp": 90, "str": 40, "dex": 30, "agi": 30, "lck": 35, "def": 55, "mp": 15}},
+		],
+		"enemies": [
+			{"name": "Warden", "cell": Vector2i(3, 1), "class": "Guard", "items": ["Iron Spear"], "lv": 4,
+				"hp": 26, "str": 8, "dex": 5, "agi": 3, "lck": 2, "def": 10, "mov": 4, "mp": 0,
+				"ai": {"preset": "boss"}},
+			{"name": "Archer", "cell": Vector2i(13, 3), "class": "Archer", "items": ["Iron Bow"], "lv": 2,
+				"hp": 17, "str": 5, "dex": 5, "agi": 5, "lck": 1, "def": 2, "mov": 5, "mp": 1,
+				"ai": {"preset": "turret"}},
+			{"name": "Brigand", "cell": Vector2i(13, 7), "class": "Brigand", "items": ["Iron Axe"], "lv": 2,
+				"hp": 20, "str": 5, "dex": 1, "agi": 4, "lck": 0, "def": 3, "mp": 0, "mov": 5,
+				"ai": {"preset": "sentry"}},
+			{"name": "Brigand", "cell": Vector2i(12, 1), "class": "Brigand", "items": ["Iron Axe", "Hatchet"], "lv": 2,
+				"hp": 20, "str": 5, "dex": 1, "agi": 4, "lck": 0, "def": 3, "mp": 0, "mov": 5,
 				"ai": {"preset": "ambusher"}},
 		],
 	},
