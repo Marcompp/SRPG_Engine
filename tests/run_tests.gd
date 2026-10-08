@@ -202,7 +202,7 @@ func press(code: Key) -> void:
 	e.physical_keycode = code
 	e.keycode = code
 	e.pressed = true
-	b._unhandled_input(e)
+	b.input._unhandled_input(e)
 	await process_frame
 	while b.state == b.State.BUSY:
 		await process_frame
@@ -271,7 +271,7 @@ func test_weapon_break_ends_strikes() -> void:
 	lord.set_cell(Vector2i(5, 2))
 	brig.set_cell(Vector2i(6, 2))
 	lord.items[0].uses = 1
-	await b.do_combat(lord, brig)
+	await b.actions.do_combat(lord, brig)
 	check_eq(lord.weapon.get("name", ""), "Knife", "next weapon equipped after break")
 	check_eq(lord.weapon.get("uses", 0), 30, "no follow-up strike with the new weapon")
 	check(lord.items.all(func(i): return i.name != "Iron Sword"), "broken weapon removed")
@@ -284,7 +284,7 @@ func test_exp_formula_and_level_up() -> void:
 	check_eq(Experience.combat_exp(lord, brig, true, true), 33, "kill EXP vs Lv2")
 	check_eq(Experience.combat_exp(lord, brig, false, false), 1, "no-damage EXP")
 	lord.exp_points = 95
-	await b.gain_exp(lord, 33)
+	await b.actions.gain_exp(lord, 33)
 	check_eq(lord.level, 2, "level after 95 + 36 EXP (33 x1.1 for Humans)")
 	check_eq(lord.exp_points, 31, "leftover EXP")
 
@@ -340,7 +340,7 @@ func test_fire_forecast_and_counter() -> void:
 	sold.equip(1)
 	f = Combat.spell_forecast(mage, sold, fire, b.map)
 	check(f.can_counter, "Javelin counters at range 2")
-	await b.do_spell_attack(mage, sold, "Fire")
+	await b.actions.do_spell_attack(mage, sold, "Fire")
 	check_eq(mage.mp, 11, "Fire costs 3 MP")
 
 
@@ -357,7 +357,7 @@ func test_firestorm_targets_and_cast() -> void:
 	check_eq(Spells.area_targets(mage, "Firestorm", Vector2i(8, 2), b.units(), b.map).size(), 3, "blast hits 3")
 	var centers := Spells.area_centers(mage, "Firestorm", b.map, b.units())
 	check(not centers.has(Vector2i(9, 2)), "center beyond range 3 not allowed")
-	await b.cast_area(mage, Vector2i(8, 2), "Firestorm")
+	await b.actions.cast_area(mage, Vector2i(8, 2), "Firestorm")
 	check_eq(mage.mp, 6, "Firestorm costs 8 MP")
 	check(mage.exp_points >= 3, "EXP awarded per target")
 
@@ -375,7 +375,7 @@ func test_earth_spike_raises_mountain() -> void:
 	var centers := Spells.area_centers(lord, "Earth Spike", b.map, b.units())
 	check(not centers.has(Vector2i(2, 4)), "can't target an existing mountain")
 	check(centers.has(Vector2i(3, 4)), "can target an enemy's tile")
-	await b.cast_area(lord, Vector2i(3, 4), "Earth Spike")
+	await b.actions.cast_area(lord, Vector2i(3, 4), "Earth Spike")
 	check_eq(b.map.terrain_key(Vector2i(3, 4)), "M", "tile became a mountain")
 	check_eq(lord.mp, 3, "Earth Spike costs 5 MP")
 	check(b.map.get_reachable(brig, b.units()).cells.size() > 1, "unit on the mountain can still leave")
@@ -479,14 +479,14 @@ func test_trade_swap_and_give() -> void:
 	# Give the Knife (slot 1) to the Dancer's empty slot 1.
 	await press(KEY_DOWN)
 	await press(KEY_Z)
-	check_eq(b.trade_cursor, Vector2i(1, 1), "cursor jumps to the same row on the partner's side")
+	check_eq(b.input.trade_cursor, Vector2i(1, 1), "cursor jumps to the same row on the partner's side")
 	await press(KEY_Z)
 	check_eq(dancer.items.map(func(i): return i.name), ["Potion", "Knife"], "Knife handed over")
 	check_eq(lord.items.map(func(i): return i.name), ["Iron Sword", "Potion"], "Lord lost the Knife")
 	# Swap the Dancer's Potion (right slot 0) with the Lord's Iron Sword (left slot 0).
 	await press(KEY_UP)
 	await press(KEY_Z)
-	check_eq(b.trade_cursor, Vector2i(0, 0), "cursor jumps back to the Lord's row 0")
+	check_eq(b.input.trade_cursor, Vector2i(0, 0), "cursor jumps back to the Lord's row 0")
 	await press(KEY_Z)
 	check_eq(lord.items.map(func(i): return i.name), ["Potion", "Potion"], "swap: Lord")
 	check_eq(dancer.items.map(func(i): return i.name), ["Iron Sword", "Knife"], "swap: Dancer")
@@ -514,7 +514,7 @@ func test_trade_repeatable_and_keeps_action() -> void:
 	await press(KEY_Z)
 	for partner in [knight, dancer, knight]:
 		await pick("Trade")
-		while b.targets[b.target_index] != partner:
+		while b.input.targets[b.input.target_index] != partner:
 			await press(KEY_RIGHT)
 		await press(KEY_Z)
 		# Give the Lord's last item to the partner (or swap if full).
@@ -552,7 +552,7 @@ func test_enemy_phases_run_without_errors() -> void:
 	for turn in 3:
 		if b.state == b.State.GAME_OVER:
 			break
-		b.end_player_phase()
+		b.phases.end_player_phase()
 		while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
 			await process_frame
 	check(b.state == b.State.IDLE or b.state == b.State.GAME_OVER, "battle loop settles")
@@ -594,10 +594,10 @@ func test_hover_and_mark_enemy() -> void:
 	brig.set_cell(Vector2i(10, 8))
 	b.cursor.cell = Vector2i(9, 4)
 	await press(KEY_RIGHT)
-	check(b.hovered == sold, "hovering an enemy tracks it")
+	check(b.input.hovered == sold, "hovering an enemy tracks it")
 	check(not b.map.move_cells.is_empty() and not b.map.attack_cells.is_empty(), "hover shows its ranges")
 	await press(KEY_LEFT)
-	check(b.hovered == null and b.map.move_cells.is_empty(), "moving off clears the ranges")
+	check(b.input.hovered == null and b.map.move_cells.is_empty(), "moving off clears the ranges")
 	await press(KEY_RIGHT)
 	await press(KEY_Z)
 	check(b.marked.has(sold), "Z marks the enemy")
@@ -760,7 +760,7 @@ func test_hover_own_units() -> void:
 	var cleric := unit_named("Cleric")
 	b.cursor.cell = lord.cell + Vector2i.UP
 	await press(KEY_DOWN)
-	check(b.hovered == lord, "hovering your own unit tracks it")
+	check(b.input.hovered == lord, "hovering your own unit tracks it")
 	var lord_reach: Dictionary = b.map.get_reachable(lord, b.units())
 	check_eq(b.map.move_cells.size(), lord_reach.cells.size(), "hover shows its move range")
 	check(not b.map.attack_cells.is_empty(), "and its attack range")
@@ -812,28 +812,28 @@ func test_shove_blocked_cases() -> void:
 	# Into a mountain: Knight at (3, 4) pushed toward (2, 4).
 	lord.set_cell(Vector2i(4, 4))
 	knight.set_cell(Vector2i(3, 4))
-	check(not b.can_shove(lord, knight), "can't shove into a mountain")
+	check(not b.actions.can_shove(lord, knight), "can't shove into a mountain")
 	# Into a river: (7, 5) is water.
 	lord.set_cell(Vector2i(5, 5))
 	knight.set_cell(Vector2i(6, 5))
-	check(not b.can_shove(lord, knight), "can't shove into a river")
+	check(not b.actions.can_shove(lord, knight), "can't shove into a river")
 	# Into another unit.
 	lord.set_cell(Vector2i(4, 2))
 	knight.set_cell(Vector2i(5, 2))
 	archer.set_cell(Vector2i(6, 2))
-	check(not b.can_shove(lord, knight), "can't shove into an occupied cell")
+	check(not b.actions.can_shove(lord, knight), "can't shove into an occupied cell")
 	# Enemies can't be shoved; neither can non-adjacent allies.
 	brig.set_cell(Vector2i(4, 3))
-	check(not b.can_shove(lord, brig), "enemies can't be shoved")
+	check(not b.actions.can_shove(lord, brig), "enemies can't be shoved")
 	archer.set_cell(Vector2i(4, 0))
-	check(not b.can_shove(lord, archer), "ally must be adjacent")
+	check(not b.actions.can_shove(lord, archer), "ally must be adjacent")
 	# Off a raised mountain is fine.
 	b.map.set_terrain(Vector2i(4, 3), "M")
 	brig.set_cell(Vector2i(10, 9))
 	knight.set_cell(Vector2i(4, 3))
 	lord.set_cell(Vector2i(4, 4))
-	check(b.can_shove(lord, knight), "a unit standing on a mountain can be shoved off it")
-	check_eq(b.shove_targets(lord), [knight], "shove_targets lists only valid allies")
+	check(b.actions.can_shove(lord, knight), "a unit standing on a mountain can be shoved off it")
+	check_eq(b.actions.shove_targets(lord), [knight], "shove_targets lists only valid allies")
 
 
 # --- Enemy behaviors ---------------------------------------------------------------
@@ -971,7 +971,7 @@ func test_ai_retreat_to_healer_then_fort() -> void:
 	thief.set_cell(Vector2i(12, 2))
 	await EnemyAI.take_turn(thief, b)
 	check_eq(thief.cell, Vector2i(13, 0), "no usable healer: retreats onto the Fort")
-	await b.heal_on_tiles(Unit.Team.ENEMY)
+	await b.phases.heal_on_tiles(Unit.Team.ENEMY)
 	check_eq(thief.hp, 11, "Fort heals 20% of max HP (ceil 3.2 = 4)")
 	thief.hp = thief.max_hp
 	EnemyAI.update_retreat(thief)
@@ -1027,7 +1027,7 @@ func test_fort_heal_and_boss_threat() -> void:
 	check_eq(b.enemy_threat(merc).size(), 5, "hold enemy threatens only from its tile")
 	lord.set_cell(Vector2i(1, 9))
 	lord.hp = 10
-	await b.heal_on_tiles(Unit.Team.PLAYER)
+	await b.phases.heal_on_tiles(Unit.Team.PLAYER)
 	check_eq(lord.hp, 14, "Fort heals ceil(18 * 0.2) = 4 at phase start")
 
 
@@ -1177,16 +1177,16 @@ func test_mounted_units_cannot_shove() -> void:
 	isolate([fighter, knight])
 	fighter.set_cell(Vector2i(4, 6))
 	knight.set_cell(Vector2i(5, 6))
-	check(b.can_shove(fighter, knight), "two foot units can shove")
+	check(b.actions.can_shove(fighter, knight), "two foot units can shove")
 	fighter.set_class("Cavalry")
-	check(not b.can_shove(fighter, knight), "a mounted unit can't shove")
-	check(not b.can_shove(knight, fighter), "a mounted unit can't be shoved")
+	check(not b.actions.can_shove(fighter, knight), "a mounted unit can't shove")
+	check(not b.actions.can_shove(knight, fighter), "a mounted unit can't be shoved")
 	knight.set_class("Flier")
 	fighter.set_class("Axeman")
-	check(not b.can_shove(fighter, knight), "Fliers are mounted")
+	check(not b.actions.can_shove(fighter, knight), "Fliers are mounted")
 	knight.set_race("Harpy")
 	knight.set_class("Archer")
-	check(knight.move_type == "flying" and b.can_shove(fighter, knight),
+	check(knight.move_type == "flying" and b.actions.can_shove(fighter, knight),
 		"Harpies fly but aren't mounted, so they can be shoved")
 
 
@@ -1198,16 +1198,16 @@ func test_rescue_rules() -> void:
 	fighter.set_cell(Vector2i(4, 6))
 	knight.set_cell(Vector2i(5, 6))
 	archer.set_cell(Vector2i(3, 6))
-	check(b.rescue_targets(fighter).is_empty(), "foot units can't rescue")
+	check(b.actions.rescue_targets(fighter).is_empty(), "foot units can't rescue")
 	fighter.set_class("Cavalry")
-	check_eq(b.rescue_targets(fighter).size(), 2, "a mounted unit can rescue adjacent foot allies")
+	check_eq(b.actions.rescue_targets(fighter).size(), 2, "a mounted unit can rescue adjacent foot allies")
 	archer.set_class("Flier")
-	check_eq(b.rescue_targets(fighter), [knight], "mounted allies can't be rescued")
+	check_eq(b.actions.rescue_targets(fighter), [knight], "mounted allies can't be rescued")
 	archer.set_race("Harpy")
 	archer.set_class("Archer")
-	check(b.rescue_targets(fighter).has(archer), "unmounted fliers (Harpy) can be rescued")
+	check(b.actions.rescue_targets(fighter).has(archer), "unmounted fliers (Harpy) can be rescued")
 	archer.set_class("Galley")
-	check(not b.rescue_targets(fighter).has(archer), "ships can't be rescued")
+	check(not b.actions.rescue_targets(fighter).has(archer), "ships can't be rescued")
 
 
 func test_rescue_and_drop_ferry() -> void:
@@ -1246,7 +1246,7 @@ func test_rescue_and_drop_ferry() -> void:
 	await press(KEY_Z)
 	check_eq(fighter.cell, Vector2i(8, 6), "carrier moved (across the river ford)")
 	await pick("Drop")
-	var drop_cell: Vector2i = b.drop_cells[0]
+	var drop_cell: Vector2i = b.input.target_cells[0]
 	await press(KEY_Z)
 	check(fighter.carrying == null and lord.carried_by == null, "dropped")
 	check_eq(lord.cell, drop_cell, "Lord set down on the chosen cell")
@@ -1266,11 +1266,11 @@ func test_fallen_carrier_drops_passenger() -> void:
 	fighter.set_class("Cavalry")
 	fighter.set_cell(Vector2i(4, 6))
 	lord.set_cell(Vector2i(5, 6))
-	await b.do_rescue(fighter, lord)
+	await b.actions.do_rescue(fighter, lord)
 	brig.set_cell(Vector2i(4, 5))
 	fighter.hp = 1
 	brig.dexterity = 60  # guaranteed hit
-	await b.do_combat(brig, fighter)
+	await b.actions.do_combat(brig, fighter)
 	check(not is_instance_valid(fighter) or fighter.hp <= 0, "carrier fell")
 	check_eq(lord.cell, Vector2i(4, 6), "passenger set down where the carrier fell")
 	check(b.units().has(lord) and lord.visible and lord.carried_by == null, "passenger back on the map")
@@ -1378,9 +1378,9 @@ func test_inspire_buffs_adjacent_allies() -> void:
 	check_eq(banner.exp_points, roundi(Experience.INSPIRE_EXP * 1.1), "Inspire EXP (Human x1.1)")
 	check_eq(Classes.inspire_bonus(5), 2, "Lv 5: +2")
 	check_eq(Classes.inspire_bonus(20), 5, "Lv 20: +5")
-	b.clear_inspire(Unit.Team.ENEMY)
+	b.phases.clear_inspire(Unit.Team.ENEMY)
 	check_eq(knight.inspire_bonus, 1, "lasts through the enemy phase")
-	b.clear_inspire(Unit.Team.PLAYER)
+	b.phases.clear_inspire(Unit.Team.PLAYER)
 	check_eq(knight.inspire_bonus, 0, "gone at the next player phase")
 
 
@@ -1398,7 +1398,7 @@ func test_ship_board_and_unload() -> void:
 	knight.set_cell(Vector2i(6, 5))
 	fighter.set_cell(Vector2i(0, 0))
 	brig.set_cell(Vector2i(14, 9))
-	check(not b.can_shove(lord, ship), "ships can't be shoved")
+	check(not b.actions.can_shove(lord, ship), "ships can't be shoved")
 	# The Lord boards without moving.
 	b.cursor.cell = lord.cell
 	await press(KEY_Z)
@@ -1419,10 +1419,10 @@ func test_ship_board_and_unload() -> void:
 	await press(KEY_Z)
 	check_eq(ship.passengers.size(), 2, "two aboard")
 	fighter.set_cell(Vector2i(8, 4))
-	check(b.board_targets(fighter).is_empty(), "a full ship takes nobody else")
+	check(b.actions.board_targets(fighter).is_empty(), "a full ship takes nobody else")
 	fighter.set_cell(Vector2i(0, 0))
 	# New phase: passengers are refreshed even while aboard.
-	await b.start_player_phase()
+	await b.phases.start_player_phase()
 	check(not lord.has_acted and not knight.has_acted, "passengers get their action back")
 	# The ship sails one tile and unloads the Lord, then the Knight, without ending its turn.
 	b.cursor.cell = ship.cell
@@ -1433,7 +1433,7 @@ func test_ship_board_and_unload() -> void:
 	await pick("Unload")
 	check_eq(b.state, b.State.MENU, "two passengers: pick who to unload")
 	await pick("Lord")
-	var lord_cell: Vector2i = b.drop_cells[0]
+	var lord_cell: Vector2i = b.input.target_cells[0]
 	await press(KEY_Z)
 	check(lord.carried_by == null and lord.visible and b.units().has(lord), "Lord unloaded")
 	check_eq(lord.cell, lord_cell, "onto the chosen cell")
@@ -1460,11 +1460,11 @@ func test_sunk_ship_sets_passengers_ashore() -> void:
 	ship.set_class("Galley")
 	ship.set_cell(Vector2i(7, 4))
 	knight.set_cell(Vector2i(6, 4))
-	await b.do_board(knight, ship)
+	await b.actions.do_board(knight, ship)
 	brig.set_cell(Vector2i(8, 4))
 	ship.hp = 1
 	brig.dexterity = 60  # guaranteed hit
-	await b.do_combat(brig, ship)
+	await b.actions.do_combat(brig, ship)
 	check(not is_instance_valid(ship) or ship.hp <= 0, "ship sank")
 	check(b.units().has(knight) and knight.visible and knight.carried_by == null, "passenger back on the map")
 	check_eq(b.map.move_cost(knight.cell, knight.move_type) >= 0, true, "on a cell it can stand on")
@@ -1509,7 +1509,7 @@ func test_level_up_waits_for_confirm() -> void:
 	lord.exp_points = 95
 	var done := [false]
 	var run := func():
-		await b.gain_exp(lord, 33)
+		await b.actions.gain_exp(lord, 33)
 		done[0] = true
 	run.call()
 	await create_timer(2.6).timeout
@@ -1531,7 +1531,7 @@ func test_end_turn_warning() -> void:
 	b.cursor.cell = Vector2i(5, 5)
 	await press(KEY_Z)
 	await pick("End Turn")
-	check_eq(b.menu_context, "end_turn", "End Turn with units waiting asks first")
+	check_eq(b.input.menu_context, "end_turn", "End Turn with units waiting asks first")
 	check_eq(b.ui.menu_options, ["Cancel", "End Turn"], "Cancel is listed (and selected) first")
 	check(b.ui._menu_label.text.contains("%d units haven't acted" % waiting), "the prompt says how many")
 	await press(KEY_Z)
@@ -1765,21 +1765,21 @@ func test_race_carry_and_shove() -> void:
 	knight.set_cell(Vector2i(5, 6))
 	archer.set_cell(Vector2i(3, 6))
 	fighter.set_race("Centaur")
-	check(b.can_shove(fighter, knight), "Centaurs can shove")
-	check(not b.can_shove(knight, fighter), "but can't be shoved")
-	check_eq(b.rescue_targets(fighter).size(), 2, "and can carry allies on foot")
+	check(b.actions.can_shove(fighter, knight), "Centaurs can shove")
+	check(not b.actions.can_shove(knight, fighter), "but can't be shoved")
+	check_eq(b.actions.rescue_targets(fighter).size(), 2, "and can carry allies on foot")
 	archer.set_class("Cavalry")
-	check(not b.rescue_targets(archer).has(fighter), "but can't be carried")
+	check(not b.actions.rescue_targets(archer).has(fighter), "but can't be carried")
 	fighter.set_race("Human")
 	fighter.set_class("Cavalry")
 	knight.set_race("Ent")
-	check(not b.rescue_targets(fighter).has(knight), "Ents can't be carried")
+	check(not b.actions.rescue_targets(fighter).has(knight), "Ents can't be carried")
 	fighter.set_class("Axeman")
-	check(not b.can_shove(fighter, knight), "or shoved")
+	check(not b.actions.can_shove(fighter, knight), "or shoved")
 	knight.set_race("Stoneborn")
-	check(not b.can_shove(fighter, knight), "nor can the Stoneborn")
+	check(not b.actions.can_shove(fighter, knight), "nor can the Stoneborn")
 	archer.set_cell(Vector2i(0, 0))  # clear the landing cell
-	check(b.can_shove(knight, fighter), "though they can shove others")
+	check(b.actions.can_shove(knight, fighter), "though they can shove others")
 
 
 func test_race_regen_and_exp() -> void:
@@ -1789,16 +1789,16 @@ func test_race_regen_and_exp() -> void:
 	lord.set_cell(Vector2i(6, 2))  # plain: no tile healing
 	lord.set_race("Troll")
 	lord.hp = 5
-	await b.heal_on_tiles(Unit.Team.PLAYER)
+	await b.phases.heal_on_tiles(Unit.Team.PLAYER)
 	check_eq(lord.hp, 5 + ceili(lord.max_hp * 0.1), "Trolls regenerate 10% HP")
 	check_eq(mage.mp_regen(), Spells.MP_REGEN, "normal MP regen")
 	mage.set_race("Fairy")
 	check_eq(mage.mp_regen(), Spells.MP_REGEN + 1, "Fairies recover 1 more")
 	lord.exp_points = 0
-	await b.gain_exp(lord, 10)
+	await b.actions.gain_exp(lord, 10)
 	check_eq(lord.exp_points, 10, "Trolls earn plain EXP")
 	lord.set_race("Human")
-	await b.gain_exp(lord, 10)
+	await b.actions.gain_exp(lord, 10)
 	check_eq(lord.exp_points, 21, "Humans earn 10% more")
 
 
@@ -1808,15 +1808,15 @@ func test_info_panel_terrain_bonus() -> void:
 	var lord := unit_named("Lord")
 	lord.set_cell(Vector2i(4, 0))  # forest: DEF +1, AVO +20
 	b.cursor.cell = lord.cell
-	b.refresh_info()
+	b.input.refresh_info()
 	check(b.ui._info_label.text.contains("Forest  DEF+1 AVO+20"), "foot unit sees the forest bonus")
 	lord.move_type = "flying"
-	b.refresh_info()
+	b.input.refresh_info()
 	check(b.ui._info_label.text.contains("Forest  no bonus (Flying)"), "a flier gets no terrain bonus")
 	lord.move_type = "foot"
 	b.map.set_terrain(Vector2i(5, 2), "=")
 	b.cursor.cell = Vector2i(5, 2)
-	b.refresh_info()
+	b.input.refresh_info()
 	check(b.ui._info_label.text.contains("Path  DEF+0 AVO-20"), "negative bonuses read AVO-20, not AVO+-20")
 
 
@@ -1882,7 +1882,7 @@ func test_suspend_round_trip() -> void:
 	lord.biography.append("Suspended mid-battle.")
 	fighter.set_cell(Vector2i(4, 6))
 	archer.set_cell(Vector2i(5, 6))
-	await b.do_rescue(fighter, archer)
+	await b.actions.do_rescue(fighter, archer)
 	brig.ai_awake = true
 	brig.was_attacked = true
 	b.map.set_terrain(Vector2i(3, 4), "M")
@@ -1934,7 +1934,7 @@ func test_suspend_discarded_when_map_ends() -> void:
 	SaveGame.write_suspend(b)
 	for e in b.units_of(Unit.Team.ENEMY):
 		e.hp = 0
-	b.check_game_over()
+	b.phases.check_game_over()
 	check_eq(b.state, b.State.GAME_OVER, "victory")
 	check(not SaveGame.has_suspend(), "the finished map's suspend is deleted")
 
@@ -1943,7 +1943,7 @@ func test_restart_asks_first() -> void:
 	b.cursor.cell = Vector2i(5, 5)
 	await press(KEY_Z)
 	await pick("Restart")
-	check_eq(b.menu_context, "restart", "Restart asks for confirmation")
+	check_eq(b.input.menu_context, "restart", "Restart asks for confirmation")
 	check_eq(b.ui.menu_options, ["Cancel", "Restart"], "Cancel first")
 	await press(KEY_Z)
 	check_eq(b.state, b.State.IDLE, "Z right away cancels")
@@ -2015,7 +2015,7 @@ func test_option_level_up_auto() -> void:
 	b.ui.level_up_waits = true  # the window itself would wait...
 	var lord := unit_named("Lord")
 	lord.exp_points = 95
-	await b.gain_exp(lord, 33)  # ...but the option says Auto, so this returns on its own
+	await b.actions.gain_exp(lord, 33)  # ...but the option says Auto, so this returns on its own
 	check(not b.ui._level_up.visible, "Auto: the level-up window closes by itself")
 	reset_settings()
 
@@ -2107,23 +2107,23 @@ func test_seize_objective() -> void:
 
 func test_boss_objective() -> void:
 	await start_chapter(2)
-	check(not b.check_game_over(), "boss alive: battle goes on")
+	check(not b.phases.check_game_over(), "boss alive: battle goes on")
 	remove_unit(unit_named("Bandit King", Unit.Team.ENEMY))
-	check(b.check_game_over(), "boss down: it's over...")
+	check(b.phases.check_game_over(), "boss down: it's over...")
 	check_eq(b.battle_result, "victory", "...and won, though other enemies remain")
 
 
 func test_defend_objective() -> void:
 	await start_chapter(3)
 	b.turn = 6
-	check(not b.check_game_over(true), "turn 6 of 7: not yet")
+	check(not b.phases.check_game_over(true), "turn 6 of 7: not yet")
 	b.turn = 7
-	check(b.check_game_over(true), "after enemy phase 7: over")
+	check(b.phases.check_game_over(true), "after enemy phase 7: over")
 	check_eq(b.battle_result, "victory", "held out: victory")
 	await start_chapter(3)
 	var soldier: Unit = b.units_of(Unit.Team.ENEMY)[0]
 	soldier.set_cell(Vector2i(6, 3))
-	b.check_game_over()
+	b.phases.check_game_over()
 	check_eq(b.battle_result, "defeat", "an enemy on the town hall: defeat")
 
 
@@ -2178,9 +2178,9 @@ func test_chests() -> void:
 	check_eq(b.map.object_at(Vector2i(3, 2)).state, "opened", "chest opened")
 	# Anyone else needs a Chest Key, which is used up.
 	lord.set_cell(Vector2i(11, 2))
-	check(not b.can_open_chest(lord), "no key, no Open")
+	check(not b.actions.can_open_chest(lord), "no key, no Open")
 	lord.items.append(Items.make("Chest Key"))
-	check(b.can_open_chest(lord), "with a key: Open")
+	check(b.actions.can_open_chest(lord), "with a key: Open")
 	b.cursor.cell = lord.cell
 	await press(KEY_Z)
 	await press(KEY_Z)
@@ -2193,7 +2193,7 @@ func test_reinforcements() -> void:
 	await start_chapter(3)
 	var before: int = b.units_of(Unit.Team.ENEMY).size()
 	b.turn = 2
-	await b.spawn_reinforcements()
+	await b.phases.spawn_reinforcements()
 	var arrived: Array = b.units_of(Unit.Team.ENEMY).filter(func(u): return u.has_acted)
 	check_eq(b.units_of(Unit.Team.ENEMY).size(), before + 2, "turn 2: two reinforcements arrive")
 	check_eq(arrived.size(), 2, "and wait until the next phase to act")
@@ -2208,7 +2208,7 @@ func test_campaign_army_carries_over() -> void:
 	lord.items.append(Items.make("Chest Key"))
 	fighter.hp = 0
 	var involved: Array[Unit] = [fighter]
-	await b._remove_dead_and_award(involved, [])
+	await b.actions._remove_dead_and_award(involved, [])
 	b.battle_result = "victory"
 	Campaign.finish_chapter(b)
 	check_eq(Campaign.chapter, 1, "on to chapter 2")
@@ -2291,7 +2291,7 @@ func test_chapters_enemy_phases_run() -> void:
 		for round in 3:
 			if b.state == b.State.GAME_OVER:
 				break
-			b.end_player_phase()
+			b.phases.end_player_phase()
 			while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
 				Engine.time_scale = 8.0
 				await process_frame
@@ -2318,7 +2318,7 @@ func test_quit_to_level_select_asks_first() -> void:
 	b.cursor.cell = Vector2i(5, 5)
 	await press(KEY_Z)
 	await pick("Level Select")
-	check_eq(b.menu_context, "quit", "Level Select asks for confirmation")
+	check_eq(b.input.menu_context, "quit", "Level Select asks for confirmation")
 	check_eq(b.ui.menu_choice(), "Cancel", "Cancel is selected first")
 	await press(KEY_Z)
 	check_eq(b.state, b.State.IDLE, "Cancel returns to the map")
@@ -2374,19 +2374,19 @@ func test_break_wall_through_menu() -> void:
 	await pick("Break")
 	check_eq(b.ui.menu_options.size(), 2, "both axes reach the wall")
 	await press(KEY_Z)  # Iron Axe
-	check_eq(b.target_mode, "break", "then pick the tile")
+	check_eq(b.input.target_mode, "break", "then pick the tile")
 	check_eq(b.cursor.cell, wall, "the cursor jumps to it")
 	check(b.ui._spell_label.text.contains("Cracked Wall  HP 20 -> 5"), "forecast: STR 7 + Mt 8 = 15 damage")
 	await press(KEY_Z)
 	check_eq(b.map.tile_hp.get(wall), 5, "the wall takes the damage")
 	b.cursor.cell = wall
-	b.refresh_info()
+	b.input.refresh_info()
 	check(b.ui._info_label.text.contains("Cracked Wall  HP 5/20"), "hovering shows its remaining HP")
 	check(not b.ui._info_label.text.contains("AVO"), "instead of terrain bonuses")
 	check_eq(b.map.terrain_key(wall), "x", "and still stands")
 	check(fighter.has_acted, "breaking ends the unit's turn")
 	check_eq(fighter.items[0].uses, 44, "and uses the weapon")
-	await b.do_break(fighter, wall)
+	await b.actions.do_break(fighter, wall)
 	check_eq(b.map.terrain_key(wall), "_", "broken: it becomes floor")
 	check(not b.map.tile_hp.has(wall), "and has no HP left to track")
 	check(b.can_stand_on(fighter, wall), "units can walk through")
@@ -2398,14 +2398,14 @@ func test_break_fence_and_trunk_bridge() -> void:
 	# A cracked fence becomes plain; bows break it from range.
 	var fence := Vector2i(8, 5)
 	archer.set_cell(Vector2i(6, 5))
-	check(b.breakable_in_reach(archer).has(fence), "the bow reaches the fence at range 2")
-	await b.do_break(archer, fence)
+	check(b.actions.breakable_in_reach(archer).has(fence), "the bow reaches the fence at range 2")
+	await b.actions.do_break(archer, fence)
 	check_eq(b.map.terrain_key(fence), ".", "10 HP: one shot (STR 5 + Mt 6) breaks it into a plain")
 	# A trunk falls into the river next to it, away from the attacker if possible.
 	var trunk := Vector2i(11, 2)
 	archer.set_cell(Vector2i(9, 2))
 	b.map.tile_hp[trunk] = 1
-	await b.do_break(archer, trunk)
+	await b.actions.do_break(archer, trunk)
 	check_eq(b.map.terrain_key(trunk), ".", "the trunk leaves a plain")
 	check_eq(b.map.terrain_key(Vector2i(10, 2)), "B", "and bridges the river")
 	check_eq(b.map.terrain_key(Vector2i(9, 2)), ".", "the bridge stops at dry land")
@@ -2416,7 +2416,7 @@ func test_break_fence_and_trunk_bridge() -> void:
 		b.map.set_terrain(Vector2i(x, 5), "~")
 	archer.set_cell(Vector2i(9, 5))
 	b.map.tile_hp[trunk2] = 1
-	await b.do_break(archer, trunk2)
+	await b.actions.do_break(archer, trunk2)
 	check_eq(b.map.terrain_key(Vector2i(10, 5)), "~", "not toward the archer")
 	for x in [12, 13, 14]:
 		check_eq(b.map.terrain_key(Vector2i(x, 5)), "B", "away from it, up to 3 tiles (%d)" % x)

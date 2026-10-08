@@ -61,7 +61,7 @@ static func can_escape(obj: Dictionary, u: Unit) -> bool:
 
 ## "victory", "defeat" or "" for the battle's current state. `turn_over` is true
 ## right after an enemy phase ends (when survive/defend count a turn as done).
-static func result(battle: Node, turn_over := false) -> String:
+static func result(battle: Battle, turn_over := false) -> String:
 	var obj := of(Levels.get_level(Levels.selected))
 	if not _lord_alive(battle):
 		return "defeat"
@@ -89,7 +89,7 @@ static func result(battle: Node, turn_over := false) -> String:
 
 
 ## A carried or escaped Lord is still alive, so this looks past units().
-static func _lord_alive(battle: Node) -> bool:
+static func _lord_alive(battle: Battle) -> bool:
 	for u in battle.units_root.get_children():
 		if u is Unit and u.hp > 0 and u.team == Unit.Team.PLAYER and u.is_lord:
 			return true

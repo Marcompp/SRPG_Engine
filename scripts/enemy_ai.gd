@@ -28,7 +28,7 @@ static func current_move(u: Unit) -> String:
 
 
 ## Checks a sleeping unit's wake conditions; waking also wakes the rest of its group.
-static func update_wake(u: Unit, battle: Node) -> void:
+static func update_wake(u: Unit, battle: Battle) -> void:
 	var wake: Dictionary = u.ai.wake
 	if wake.is_empty() or u.ai_awake:
 		return
@@ -58,13 +58,13 @@ static func update_wake(u: Unit, battle: Node) -> void:
 			ally.ai_awake = true
 
 
-static func update_all_wake(battle: Node) -> void:
+static func update_all_wake(battle: Battle) -> void:
 	for e in battle.units_of(Unit.Team.ENEMY):
 		update_wake(e, battle)
 
 
 ## Other units on the same side sharing this unit's wake group.
-static func _group(u: Unit, battle: Node) -> Array[Unit]:
+static func _group(u: Unit, battle: Battle) -> Array[Unit]:
 	var result: Array[Unit] = []
 	var group: String = u.ai.wake.get("group", "")
 	if group == "":
@@ -105,7 +105,7 @@ static func allowed_cells(u: Unit, mode: String, reach_cells: Dictionary) -> Dic
 ## Where an enemy could act from next phase, for the danger zone and hover ranges.
 ## A sleeper counts as already awake (it could wake before it acts), so this
 ## never understates the threat.
-static func movement_cells(u: Unit, battle: Node) -> Dictionary:
+static func movement_cells(u: Unit, battle: Battle) -> Dictionary:
 	var reach: Dictionary = battle.map.get_reachable(u, battle.units())
 	var mode := current_move(u)
 	if not u.ai.wake.is_empty() and not u.ai_awake:
@@ -117,7 +117,7 @@ static func movement_cells(u: Unit, battle: Node) -> Dictionary:
 
 ## Cells threatened from the given movement cells with the unit's weapons and
 ## affordable damage spells (the movement cells themselves included).
-static func threat_from(u: Unit, battle: Node, move_cells: Dictionary) -> Dictionary:
+static func threat_from(u: Unit, battle: Battle, move_cells: Dictionary) -> Dictionary:
 	var cells := {}
 	var ranges: Array[Vector2i] = battle.offense_ranges(u, true)
 	if ranges.is_empty() or not u.ai.attack:
@@ -161,7 +161,7 @@ static func _counter_risk(enemy: Unit, target: Unit, map: BattleMap) -> float:
 
 # --- Turn ---------------------------------------------------------------------------
 
-static func take_turn(enemy: Unit, battle: Node) -> void:
+static func take_turn(enemy: Unit, battle: Battle) -> void:
 	var map: BattleMap = battle.map
 	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
 	if players.is_empty():
@@ -224,7 +224,7 @@ static func _finish(enemy) -> void:
 ## cell, target or blast center). Range affects the triangle and whether the target
 ## can counter, so each candidate is scored with the enemy standing on that cell.
 ## Returns {} if nothing can be attacked.
-static func _best_attack(enemy: Unit, battle: Node, cells: Dictionary) -> Dictionary:
+static func _best_attack(enemy: Unit, battle: Battle, cells: Dictionary) -> Dictionary:
 	var map: BattleMap = battle.map
 	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
 	var all_units: Array[Unit] = battle.units()
@@ -284,27 +284,27 @@ static func _best_attack(enemy: Unit, battle: Node, cells: Dictionary) -> Dictio
 	return best
 
 
-static func _execute_attack(enemy: Unit, battle: Node, plan: Dictionary, parents: Dictionary) -> void:
+static func _execute_attack(enemy: Unit, battle: Battle, plan: Dictionary, parents: Dictionary) -> void:
 	var map: BattleMap = battle.map
 	if plan.spell == "":
 		enemy.equip(enemy.items.find(plan.weapon))
 	await enemy.move_along(map.build_path(parents, enemy.cell, plan.cell))
 	if plan.spell == "":
 		battle.cursor.cell = plan.target.cell
-		await battle.do_combat(enemy, plan.target)
+		await battle.actions.do_combat(enemy, plan.target)
 	elif Spells.get_spell(plan.spell).target == "area":
 		battle.cursor.cell = plan.center
-		await battle.cast_area(enemy, plan.center, plan.spell)
+		await battle.actions.cast_area(enemy, plan.center, plan.spell)
 	else:
 		battle.cursor.cell = plan.target.cell
-		await battle.do_spell_attack(enemy, plan.target, plan.spell)
+		await battle.actions.do_spell_attack(enemy, plan.target, plan.spell)
 
 
 # --- Fallback movement -----------------------------------------------------------
 
 ## Advance toward the nearest player (measured by terrain cost). Units that can't
 ## attack follow their nearest ally instead of walking into the enemy.
-static func _advance(enemy: Unit, battle: Node, reach: Dictionary, players: Array[Unit]) -> void:
+static func _advance(enemy: Unit, battle: Battle, reach: Dictionary, players: Array[Unit]) -> void:
 	var goals: Array[Unit] = players
 	var offensive_spells := enemy.spells.filter(func(s: String) -> bool: return not Spells.is_support(s))
 	if enemy.weapon.is_empty() and offensive_spells.is_empty():
@@ -321,7 +321,7 @@ static func _advance(enemy: Unit, battle: Node, reach: Dictionary, players: Arra
 
 ## Moves to the reachable cell closest (by terrain cost) to `target`, then opens or
 ## breaks whatever blocks the way, if that's the way it planned.
-static func _move_toward(enemy: Unit, battle: Node, reach: Dictionary, target: Vector2i) -> void:
+static func _move_toward(enemy: Unit, battle: Battle, reach: Dictionary, target: Vector2i) -> void:
 	var map: BattleMap = battle.map
 	var field := map.cost_field(target, enemy.move_type, _obstacle_costs(enemy, battle))
 	var dest := _closest_cell(field, reach.cells, enemy.cell)
@@ -334,7 +334,7 @@ static func _move_toward(enemy: Unit, battle: Node, reach: Dictionary, target: V
 ## Planning costs for the breakable tiles and doors `u` could get through: a door it
 ## can open costs one turn, anything else the turns it takes to break, each turn
 ## counted as a full turn of movement. Empty if `u` doesn't break things.
-static func _obstacle_costs(u: Unit, battle: Node) -> Dictionary:
+static func _obstacle_costs(u: Unit, battle: Battle) -> Dictionary:
 	var costs := {}
 	if not u.ai.get("breaks", true):
 		return costs
@@ -342,7 +342,7 @@ static func _obstacle_costs(u: Unit, battle: Node) -> Dictionary:
 	var damage: int = _best_tile_weapon(u).damage
 	for cell in map.tile_hp:
 		var turns := INF
-		if map.is_door(cell) and battle.can_open_chest(u):
+		if map.is_door(cell) and battle.actions.can_open_chest(u):
 			turns = 1
 		elif damage > 0:
 			turns = ceilf(float(map.tile_hp[cell]) / damage)
@@ -367,7 +367,7 @@ static func _best_tile_weapon(u: Unit) -> Dictionary:
 
 ## Opens or breaks the obstacle in reach that lies furthest along the way `field`
 ## leads (closer to the goal than `u` is). Returns true if it did something.
-static func _clear_obstacle(u: Unit, battle: Node, field: Dictionary) -> bool:
+static func _clear_obstacle(u: Unit, battle: Battle, field: Dictionary) -> bool:
 	if not is_instance_valid(u) or u.hp <= 0 or not u.ai.get("breaks", true):
 		return false
 	var map: BattleMap = battle.map
@@ -375,25 +375,25 @@ static func _clear_obstacle(u: Unit, battle: Node, field: Dictionary) -> bool:
 	var opens := false
 	for d in BattleMap.DIRS:
 		var cell := u.cell + d
-		if map.is_door(cell) and battle.can_open_chest(u) and field.get(cell, INF) < field.get(u.cell, INF):
+		if map.is_door(cell) and battle.actions.can_open_chest(u) and field.get(cell, INF) < field.get(u.cell, INF):
 			if best == Vector2i(-1, -1) or field[cell] < field[best]:
 				best = cell
 				opens = true
 	if opens:
 		battle.cursor.cell = best
-		await battle.do_open_door(u, best)
+		await battle.actions.do_open_door(u, best)
 		return true
 	var weapon: Dictionary = _best_tile_weapon(u)
 	if weapon.index < 0:
 		return false
 	u.equip(weapon.index)
-	for cell in battle.breakable_cells(u, u.weapon):
+	for cell in battle.actions.breakable_cells(u, u.weapon):
 		if field.get(cell, INF) < field.get(u.cell, INF) and (best == Vector2i(-1, -1) or field[cell] < field[best]):
 			best = cell
 	if best == Vector2i(-1, -1):
 		return false
 	battle.cursor.cell = best
-	await battle.do_break(u, best)
+	await battle.actions.do_break(u, best)
 	return true
 
 
@@ -407,7 +407,7 @@ static func _closest_cell(field: Dictionary, cells: Dictionary, start: Vector2i)
 
 ## Where a retreating unit heads this turn, per `retreat_to`: next to the nearest
 ## ally that can heal, onto the nearest free healing tile, or away from players.
-static func _retreat_cell(u: Unit, battle: Node, reach: Dictionary) -> Vector2i:
+static func _retreat_cell(u: Unit, battle: Battle, reach: Dictionary) -> Vector2i:
 	var map: BattleMap = battle.map
 	var mode: String = u.ai.retreat_to
 	if mode == "healer_or_tile" or mode == "healer":
@@ -450,7 +450,7 @@ static func _retreat_cell(u: Unit, battle: Node, reach: Dictionary) -> Vector2i:
 
 ## Looters head for the nearest intact village or chest and loot it on arrival.
 ## Returns false when there's nothing left to loot (the unit then moves as usual).
-static func _try_loot(enemy: Unit, battle: Node, reach: Dictionary) -> bool:
+static func _try_loot(enemy: Unit, battle: Battle, reach: Dictionary) -> bool:
 	var map: BattleMap = battle.map
 	var targets: Array = map.lootable_objects()
 	if targets.is_empty():
@@ -471,14 +471,14 @@ static func _try_loot(enemy: Unit, battle: Node, reach: Dictionary) -> bool:
 		var dest := _closest_cell(field, reach.cells, enemy.cell)
 		await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
 	if enemy.cell == target.cell:
-		await battle.loot(enemy, target)
+		await battle.actions.loot(enemy, target)
 	else:
 		await _clear_obstacle(enemy, battle, field)
 	return true
 
 
 ## Moves to and heals the ally that would gain the most HP. Returns true if it cast.
-static func _try_heal(caster: Unit, battle: Node, reach: Dictionary) -> bool:
+static func _try_heal(caster: Unit, battle: Battle, reach: Dictionary) -> bool:
 	var cells: Dictionary = reach.cells
 	var best_spell := ""
 	var best_target: Unit = null
@@ -512,5 +512,5 @@ static func _try_heal(caster: Unit, battle: Node, reach: Dictionary) -> bool:
 	var map: BattleMap = battle.map
 	await caster.move_along(map.build_path(reach.parents, caster.cell, best_cell))
 	battle.cursor.cell = best_target.cell
-	await battle.cast_heal(caster, best_target, best_spell)
+	await battle.actions.cast_heal(caster, best_target, best_spell)
 	return true

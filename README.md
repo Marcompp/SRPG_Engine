@@ -212,7 +212,10 @@ Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`,
 - `scenes/level_select.tscn`, `scripts/level_select.gd`: the start screen
 - `scenes/main.tscn`: the battle scene
 - `scripts/levels.gd`: levels (terrain layout + both rosters)
-- `scripts/battle.gd`: turn flow and input
+- `scripts/battle.gd`: the battle scene root: shared state (`state`, `turn`, ...), unit queries and enemy threat. Its parts are child nodes reached as `battle.input`, `battle.actions` and `battle.phases`:
+  - `battle_input.gd`: player input, menus, targeting and forecasts, the trade and info screens
+  - `battle_actions.gd`: what units can do and doing it (shove, rescue, ships, break, combat, EXP...), shared by the player and the enemy AI
+  - `battle_phases.gd`: player/enemy phases, reinforcements, game over, campaign and suspend flow
 - `scripts/combat.gd`, `experience.gd`: formulas
 - `scripts/classes.gd`, `races.gd`, `weapons.gd`, `items.gd`, `spells.gd`: data
 - `scripts/enemy_ai.gd`, `ai_profiles.gd`: enemy behavior and its settings/presets

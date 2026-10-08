@@ -15,7 +15,7 @@ static func has_suspend() -> bool:
 	return FileAccess.file_exists(path)
 
 
-static func write_suspend(battle: Node) -> void:
+static func write_suspend(battle: Battle) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	file.store_var(capture(battle))
 
@@ -38,7 +38,7 @@ static func delete_suspend() -> void:
 # --- Capture / restore ----------------------------------------------------------
 
 ## Everything needed to rebuild the battle at the current point of the player phase.
-static func capture(battle: Node) -> Dictionary:
+static func capture(battle: Battle) -> Dictionary:
 	var all: Array[Unit] = battle.all_units()
 	var ids := {}
 	for i in all.size():
@@ -63,7 +63,7 @@ static func capture(battle: Node) -> Dictionary:
 
 ## Rebuilds the battle from capture() data: terrain, then every unit (two passes, so
 ## references between units resolve), then battle-level state.
-static func restore(battle: Node, data: Dictionary) -> void:
+static func restore(battle: Battle, data: Dictionary) -> void:
 	battle.map.load_layout(data.grid)
 	battle.map.tile_hp = data.get("tile_hp", battle.map.tile_hp)
 	battle.map.load_objects(data.objects, Objectives.of(Levels.get_level(data.level)))

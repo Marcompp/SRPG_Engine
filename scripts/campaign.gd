@@ -117,7 +117,7 @@ static func default_deployment() -> Array:
 ## Called on victory: deployed survivors bring back their levels, EXP and items
 ## (healed and reset for the next map); units that fell move to `fallen`. Then the
 ## campaign moves to the next chapter and saves.
-static func finish_chapter(battle: Node) -> void:
+static func finish_chapter(battle: Battle) -> void:
 	var name: String = chapter_data().name
 	var survivors := {}
 	for u in battle.all_units():
