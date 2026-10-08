@@ -68,6 +68,32 @@ const DATA := {
 const DEFAULT_CAPS := {"hp": 80, "mp": 40, "str": 20, "int": 20, "dex": 20, "agi": 20, "lck": 20, "def": 20}
 
 
+## Promotion (in the campaign's prep screen): a unit at PROMOTION_LEVEL or above can
+## promote into one of its class's "promotes_to" classes. It keeps its level and gains
+## the new class's bonus (keys as in Experience.STATS; capped by the new class's caps).
+const PROMOTION_LEVEL := 15
+const DEFAULT_PROMOTION_BONUS := {"hp": 3, "str": 1, "dex": 1, "agi": 1, "def": 1, "mp": 1}
+const PROMOTION_BONUS := {
+	"Swordsmaster": {"hp": 3, "str": 2, "dex": 3, "agi": 3, "def": 1},
+	"Hoplite": {"hp": 4, "str": 2, "dex": 1, "agi": 1, "def": 3},
+	"Marksman": {"hp": 3, "str": 2, "dex": 3, "agi": 2, "def": 1},
+	"Assassin": {"hp": 2, "str": 1, "dex": 3, "agi": 3, "lck": 2},
+	"Swashbuckler": {"hp": 4, "str": 2, "dex": 2, "agi": 2, "def": 1},
+	"Berserker": {"hp": 5, "str": 3, "dex": 1, "agi": 1, "def": 1},
+	"Reaver": {"hp": 3, "str": 2, "dex": 2, "agi": 2, "def": 1},
+	"Juggernaut": {"hp": 4, "str": 2, "def": 4},
+	"Sorcerer": {"hp": 2, "int": 3, "dex": 1, "agi": 1, "mp": 4},
+	"Bishop": {"hp": 3, "int": 2, "agi": 1, "lck": 2, "mp": 4},
+	"Gendarme": {"hp": 3, "str": 2, "dex": 1, "agi": 1, "def": 2},
+	"Hussar": {"hp": 3, "str": 1, "dex": 2, "agi": 2, "def": 1},
+	"Whitewing": {"hp": 3, "str": 1, "dex": 2, "agi": 2, "lck": 1, "def": 1},
+}
+
+
+static func promotion_bonus(class_id: String) -> Dictionary:
+	return PROMOTION_BONUS.get(class_id, DEFAULT_PROMOTION_BONUS)
+
+
 static func caps(class_id: String) -> Dictionary:
 	var result: Dictionary = DEFAULT_CAPS.duplicate()
 	result.merge(get_data(class_id).get("caps", {}), true)

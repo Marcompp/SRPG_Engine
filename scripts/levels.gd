@@ -8,6 +8,8 @@ extends RefCounted
 ## Every unit needs a "class" (see Classes), which sets its movement and weapons.
 
 static var selected := "river_crossing"
+## Set by the level select to resume the suspended battle instead of starting fresh.
+static var resume := false
 
 const ORDER: Array[String] = ["river_crossing", "coastal_raid", "desert_outpost", "frozen_pass", "castle_keep"]
 
@@ -323,5 +325,6 @@ const DATA := {
 }
 
 
+## A test map (DATA) or a campaign chapter (Chapters.DATA).
 static func get_level(id: String) -> Dictionary:
-	return DATA[id]
+	return DATA[id] if DATA.has(id) else Chapters.DATA[id]

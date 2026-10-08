@@ -58,6 +58,8 @@ var carrying: Unit
 var passengers: Array[Unit] = []
 ## The unit (rescuer or ship) carrying this one, or null.
 var carried_by: Unit
+## Left the map through an exit (escape objective): off the map but alive.
+var escaped := false
 ## STR/DEF bonus from an Inspire; cleared at the start of the unit's next phase.
 var inspire_bonus := 0:
 	set(value):
@@ -85,6 +87,9 @@ var agility := 5
 var luck := 0
 var defense := 2
 var intelligence := 0
+## Computed properties (getters over other fields) that suspend saves must skip:
+## they're rebuilt from the fields they read. Add any new computed property here.
+const SAVE_SKIP: Array[String] = ["mov", "weapon", "min_range", "max_range"]
 ## MOV from the roster and level-ups; `mov` adds the race's bonus (see Races).
 var base_mov := 5
 var mov_bonus := 0

@@ -1,7 +1,7 @@
 extends Node2D
 ## Battle controller: spawns units, runs the turn loop and routes input.
 
-enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, BUSY, GAME_OVER }
+enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, UNIT_LIST, OBJECTIVE, OPTIONS, BUSY, GAME_OVER }
 
 @onready var map: BattleMap = $Map
 @onready var units_root: Node2D = $Units
@@ -53,31 +53,71 @@ var status_return_state := State.IDLE
 var turn := 0
 ## True during the enemy phase, when holding cancel fast-forwards.
 var enemy_phase := false
-## Game speed while fast-forwarding the enemy phase.
-const FAST_FORWARD_SPEED := 4.0
+## Set by Seize, or by the Lord's Escape: wins seize/escape objectives.
+var objective_done := false
+## Player units that fell this battle ({"name", "turn"}), for campaign permadeath.
+var campaign_deaths: Array = []
+## "victory" or "defeat" once the battle has ended.
+var battle_result := ""
 
 
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 
 
 func _ready() -> void:
+	if Levels.resume:
+		Levels.resume = false
+		resume_suspended()
+		return
+	danger_on = Settings.value("danger_zone_default")
 	var level := Levels.get_level(Levels.selected)
 	map.load_layout(level.layout)
-	for data in level.players:
-		units_root.add_child(Unit.create(data.name, Unit.Team.PLAYER, data.cell, data))
+	map.load_objects(level.get("objects", []), Objectives.of(level))
+	if level.has("deploy"):
+		deploy_army(level)
+	else:
+		for data in level.players:
+			units_root.add_child(Unit.create(data.name, Unit.Team.PLAYER, data.cell, data))
 	for data in level.enemies:
 		units_root.add_child(Unit.create(data.name, Unit.Team.ENEMY, data.cell, data))
-	cursor.cell = level.players[0].cell
+	var players := units_of(Unit.Team.PLAYER)
+	cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	start_player_phase()
 
 
+## Campaign chapter: the units picked in the prep screen, on the chapter's deploy
+## cells in order (the Lord first).
+func deploy_army(level: Dictionary) -> void:
+	var cells: Array = level.deploy
+	var names: Array = Campaign.deployed if not Campaign.deployed.is_empty() else Campaign.default_deployment()
+	var i := 0
+	for unit_name in names:
+		var data := Campaign.army_unit(unit_name)
+		if data.is_empty() or i >= cells.size():
+			continue
+		var u := SaveGame.unit_from_dict(data)
+		u.team = Unit.Team.PLAYER
+		u.set_cell(cells[i])
+		units_root.add_child(u)
+		i += 1
+
+
 # --- Queries -----------------------------------------------------------------
+
+## Every living unit, including carried and boarded ones (which are off the map).
+func all_units() -> Array[Unit]:
+	var result: Array[Unit] = []
+	for child in units_root.get_children():
+		if child is Unit and child.hp > 0:
+			result.append(child)
+	return result
+
 
 ## Units on the map (carried units are off the map and excluded).
 func units() -> Array[Unit]:
 	var result: Array[Unit] = []
 	for child in units_root.get_children():
-		if child is Unit and child.hp > 0 and child.carried_by == null:
+		if child is Unit and child.hp > 0 and child.carried_by == null and not child.escaped:
 			result.append(child)
 	return result
 
@@ -138,7 +178,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					toggle_mark(u)
 				elif u == null:
 					ui.hide_info()
-					var options: Array[String] = ["End Turn", "Level Select"]
+					var options: Array[String] = ["Units", "Objective", "Options", "Suspend", "Restart", "Level Select", "End Turn"]
 					_open_menu("map", options)
 		State.SELECTED:
 			if dir != Vector2i.ZERO:
@@ -150,6 +190,35 @@ func _unhandled_input(event: InputEvent) -> void:
 				map.clear_ranges()
 				cursor.cell = selected.cell
 				selected = null
+				state = State.IDLE
+				refresh_info()
+		State.UNIT_LIST:
+			var list := ui.unit_list
+			if dir.y != 0:
+				list.move(dir.y)
+			elif dir.x != 0:
+				list.change_sort(dir.x)
+			elif accept and list.selected_unit():
+				var target := list.selected_unit()
+				close_unit_list()
+				cursor.cell = target.cell
+				refresh_info()
+			elif info and list.selected_unit():
+				open_status(list.selected_unit())
+			elif cancel:
+				close_unit_list()
+		State.OPTIONS:
+			if dir.y != 0:
+				ui.options_screen.move(dir.y)
+			elif dir.x != 0:
+				ui.options_screen.change(dir.x)
+			elif accept or cancel:
+				ui.options_screen.close()
+				state = State.IDLE
+				refresh_info()
+		State.OBJECTIVE:
+			if accept or cancel:
+				ui.hide_objective()
 				state = State.IDLE
 				refresh_info()
 		State.STATUS:
@@ -249,7 +318,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif cancel:
 				trade_cancel()
 		State.GAME_OVER:
-			if accept:
+			if Campaign.active:
+				if accept:
+					continue_campaign()
+				elif cancel:
+					Campaign.active = false
+					get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
+			elif accept:
 				get_tree().reload_current_scene()
 			elif cancel:
 				get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
@@ -272,12 +347,14 @@ func move_cursor(dir: Vector2i) -> void:
 	refresh_info()
 
 
-## Holding cancel during the enemy phase runs the game at FAST_FORWARD_SPEED.
+## Game speed comes from Options; holding cancel during the enemy phase multiplies
+## it by the fast-forward speed (also from Options).
 func _process(_delta: float) -> void:
-	var speed := FAST_FORWARD_SPEED if enemy_phase and Input.is_action_pressed("cancel") else 1.0
+	var ff: float = Settings.value("fast_forward_speed") if enemy_phase and Input.is_action_pressed("cancel") else 1.0
+	var speed: float = Settings.value("game_speed") * ff
 	if Engine.time_scale != speed:
 		Engine.time_scale = speed
-		ui.show_fast_forward(speed)
+		ui.show_fast_forward(ff)
 
 
 func _exit_tree() -> void:
@@ -305,7 +382,7 @@ func confirm_end_turn() -> void:
 	for u in units_of(Unit.Team.PLAYER):
 		if not u.has_acted:
 			waiting += 1
-	if waiting == 0:
+	if waiting == 0 or not Settings.value("end_turn_warning"):
 		end_player_phase()
 		return
 	var options: Array[String] = ["Cancel", "End Turn"]
@@ -425,7 +502,13 @@ func threat_of(enemies: Array[Unit]) -> Dictionary:
 ## Recomputes the purple (all enemies) and red (marked enemies) overlays. Called
 ## whenever positions may have changed, and drops marks on enemies that died.
 func refresh_threat() -> void:
-	marked = marked.filter(func(e: Unit) -> bool: return is_instance_valid(e) and e.hp > 0)
+	# A plain loop, not filter(): a marked enemy that died has been freed, and a
+	# lambda with a `Unit` parameter can't even be called with a freed object.
+	var alive: Array[Unit] = []
+	for e in marked:
+		if is_instance_valid(e) and e.hp > 0:
+			alive.append(e)
+	marked = alive
 	map.danger_cells = threat_of(units_of(Unit.Team.ENEMY)) if danger_on else {}
 	map.marked_cells = threat_of(marked)
 
@@ -443,6 +526,205 @@ func cycle_status(step: int) -> void:
 	var side := units_of(status_unit.team)
 	status_unit = side[wrapi(side.find(status_unit) + step, 0, side.size())]
 	ui.show_status(status_unit)
+
+
+# --- Objectives, map objects, reinforcements (see Objectives) ----------------------
+
+## "Turn N", or "Turn N / M" on maps with a turn limit.
+func turn_text() -> String:
+	var objective := Objectives.of(Levels.get_level(Levels.selected))
+	if objective.type in ["survive", "defend"]:
+		return "Turn %d / %d" % [turn, objective.turns]
+	return "Turn %d" % turn
+
+
+func do_seize() -> void:
+	state = State.BUSY
+	selected.popup("Seize!", Color.GOLD)
+	selected.biography.append("Seized %s." % Levels.get_level(Levels.selected).name.get_slice(": ", 1))
+	objective_done = true
+	await get_tree().create_timer(0.5).timeout
+	finish_action()
+
+
+## The unit (and whoever it carries) leaves the map for good; the Lord leaving wins.
+func do_escape() -> void:
+	state = State.BUSY
+	var u := selected
+	u.popup("Escape", Color.PALE_GREEN)
+	await get_tree().create_timer(0.4).timeout
+	u.escaped = true
+	u.visible = false
+	if u.is_lord:
+		objective_done = true
+	finish_action()
+
+
+func do_visit() -> void:
+	state = State.BUSY
+	var village := map.object_at(selected.cell)
+	village.state = "visited"
+	map.queue_redraw()
+	selected.popup(give_item(selected, village.item), Color.GOLD)
+	await get_tree().create_timer(0.7).timeout
+	finish_action()
+
+
+## Rogue-movement units open chests freely; anyone else needs a Chest Key.
+func can_open_chest(u: Unit) -> bool:
+	return u.move_type == "rogue" or u.items.any(func(it): return it.name == "Chest Key")
+
+
+func do_open() -> void:
+	state = State.BUSY
+	var chest := map.object_at(selected.cell)
+	if selected.move_type != "rogue":
+		var key := selected.items.find(selected.items.filter(func(it): return it.name == "Chest Key")[0])
+		selected.items[key].uses -= 1
+		if selected.items[key].uses <= 0:
+			selected.items.remove_at(key)
+	chest.state = "opened"
+	map.queue_redraw()
+	selected.popup(give_item(selected, chest.item), Color.GOLD)
+	await get_tree().create_timer(0.7).timeout
+	finish_action()
+
+
+## Puts a new item in `u`'s inventory, or the convoy when it's full (campaign only).
+## Returns the popup text.
+func give_item(u: Unit, item_name: String) -> String:
+	if u.items.size() < Unit.MAX_ITEMS:
+		u.items.append(Items.make(item_name))
+		return "Got " + item_name
+	if Campaign.active:
+		Campaign.convoy.append(Items.make(item_name))
+		return item_name + " to convoy"
+	return "No room: " + item_name
+
+
+## An enemy on a village burns it (its reward is lost); on a chest, takes the item.
+func loot(enemy: Unit, object: Dictionary) -> void:
+	if object.type == "village":
+		object.state = "looted"
+		enemy.popup("Looted!", Color.ORANGE_RED)
+	else:
+		object.state = "opened"
+		if enemy.items.size() < Unit.MAX_ITEMS:
+			enemy.items.append(Items.make(object.item))
+		enemy.popup("Stole " + object.item, Color.ORANGE_RED)
+	map.queue_redraw()
+	await get_tree().create_timer(0.6).timeout
+
+
+## The level's reinforcements for this turn appear on their cell, or the nearest
+## free cell they can stand on within 2 tiles (blocked otherwise), and wait a phase.
+func spawn_reinforcements() -> void:
+	var arrived := false
+	for wave in Levels.get_level(Levels.selected).get("reinforcements", []):
+		if wave.turn != turn:
+			continue
+		for data in wave.units:
+			var u := Unit.create(data.name, Unit.Team.ENEMY, data.cell, data)
+			var cell := _free_cell_near(u, data.cell)
+			if cell == Vector2i(-1, -1):
+				u.free()
+				continue
+			u.set_cell(cell)
+			u.has_acted = true
+			units_root.add_child(u)
+			arrived = true
+	if arrived:
+		refresh_threat()
+		await ui.show_banner("Reinforcements!", Color("b02828"))
+
+
+func _free_cell_near(u: Unit, origin: Vector2i) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			var c := origin + Vector2i(dx, dy)
+			if absi(dx) + absi(dy) > 2 or unit_at(c) != null or not can_stand_on(u, c):
+				continue
+			if best == Vector2i(-1, -1) or BattleMap.distance(origin, c) < BattleMap.distance(origin, best):
+				best = c
+	return best
+
+
+# --- Campaign flow (see Campaign) ----------------------------------------------------
+
+const PREP_SCENE := "res://scenes/prep.tscn"
+
+## End screen, Z: after a win, bank the chapter and move on; after a loss, retry it
+## with the army as it was before (the last campaign save).
+func continue_campaign() -> void:
+	if battle_result == "victory":
+		Campaign.finish_chapter(self)
+	else:
+		Campaign.load_save()
+	if Campaign.is_complete():
+		Campaign.active = false
+		get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
+	else:
+		get_tree().change_scene_to_file(PREP_SCENE)
+
+
+# --- Suspend / resume (see SaveGame) ---------------------------------------------
+
+## Map menu > Suspend: save the battle and go back to the level select, which then
+## offers to resume it.
+func suspend() -> void:
+	SaveGame.write_suspend(self)
+	get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
+
+
+## Rebuilds a suspended battle and picks the player phase up where it stopped.
+func resume_suspended() -> void:
+	var data := SaveGame.read_suspend()
+	# A campaign chapter needs the campaign it belongs to (army, convoy, chapter).
+	Campaign.active = data.get("campaign", false) and Campaign.load_save()
+	SaveGame.restore(self, data)
+	var players := units_of(Unit.Team.PLAYER)
+	cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
+	enemy_phase = false
+	refresh_threat()
+	state = State.IDLE
+	refresh_info()
+
+
+## A map that ended can't be resumed.
+func discard_suspend() -> void:
+	var data := SaveGame.read_suspend()
+	if not data.is_empty() and data.level == Levels.selected:
+		SaveGame.delete_suspend()
+
+
+func open_unit_list() -> void:
+	state = State.UNIT_LIST
+	ui.hide_info()
+	ui.unit_list.open(units())
+
+
+func close_unit_list() -> void:
+	ui.unit_list.close()
+	state = State.IDLE
+	refresh_info()
+
+
+## Map menu > Objective: win/lose conditions (levels can override the text with
+## "objective" / "defeat"), the turn and how many units each side has left.
+func open_objective() -> void:
+	var level := Levels.get_level(Levels.selected)
+	var objective := Objectives.of(level)
+	var lines: Array[String] = [
+		level.name,
+		"Victory: " + Objectives.victory_text(objective),
+		"Defeat: " + Objectives.defeat_text(objective),
+		turn_text(),
+		"Allies %d   Enemies %d" % [units_of(Unit.Team.PLAYER).size(), units_of(Unit.Team.ENEMY).size()],
+		"Z/X: close",
+	]
+	state = State.OBJECTIVE
+	ui.show_objective(lines)
 
 
 func close_status() -> void:
@@ -491,6 +773,16 @@ func trade_partners(u: Unit) -> Array[Unit]:
 
 func open_unit_menu() -> void:
 	var options: Array[String] = []
+	var objective := Objectives.of(Levels.get_level(Levels.selected))
+	if Objectives.can_seize(objective, selected):
+		options.append("Seize")
+	if Objectives.can_escape(objective, selected):
+		options.append("Escape")
+	var here := map.object_at(selected.cell)
+	if here.get("type", "") == "village" and here.state == "intact":
+		options.append("Visit")
+	if here.get("type", "") == "chest" and here.state == "intact" and can_open_chest(selected):
+		options.append("Open")
 	if can_attack_any(selected):
 		options.append("Attack")
 	if not castable_spells(selected).is_empty():
@@ -567,14 +859,48 @@ func menu_accept() -> void:
 			else:
 				state = State.IDLE
 				refresh_info()
+		"restart":
+			if ui.menu_choice() == "Restart":
+				get_tree().reload_current_scene()
+			else:
+				state = State.IDLE
+				refresh_info()
+		"quit":
+			if ui.menu_choice() == "Quit":
+				Campaign.active = false
+				get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
+			else:
+				state = State.IDLE
+				refresh_info()
 		"map":
 			match ui.menu_choice():
 				"End Turn":
 					confirm_end_turn()
+				"Units":
+					open_unit_list()
+				"Objective":
+					open_objective()
+				"Options":
+					state = State.OPTIONS
+					ui.options_screen.open()
+				"Suspend":
+					suspend()
+				"Restart":
+					var options: Array[String] = ["Cancel", "Restart"]
+					_open_menu("restart", options, "Restart this map?")
 				"Level Select":
-					get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
+					var options: Array[String] = ["Cancel", "Quit"]
+					_open_menu("quit", options, "Quit to the level select?\nProgress on this map is lost.")
 		"unit":
 			match ui.menu_choice():
+				"Seize":
+					do_seize()
+				"Escape":
+					do_escape()
+				"Visit":
+					do_visit()
+				"Open":
+					do_open()
 				"Attack":
 					open_attack_menu()
 				"Magic":
@@ -623,7 +949,7 @@ func menu_accept() -> void:
 
 func menu_cancel() -> void:
 	match menu_context:
-		"map", "end_turn":
+		"map", "end_turn", "restart", "quit":
 			state = State.IDLE
 			refresh_info()
 		"unit":
@@ -1231,6 +1557,8 @@ func _finish_exchange(attacker: Unit, defender: Unit, dealt: Array[Unit]) -> voi
 
 func _remove_dead_and_award(involved: Array[Unit], awards: Array) -> void:
 	for u in involved:
+		if u.hp <= 0 and u.team == Unit.Team.PLAYER:
+			campaign_deaths.append({"name": u.unit_name, "turn": turn})
 		if u.hp <= 0:
 			var cell := u.cell
 			var carried := u.carrying
@@ -1281,12 +1609,12 @@ func finish_action() -> void:
 	refresh_threat()
 	if check_game_over():
 		return
-	for u in units_of(Unit.Team.PLAYER):
-		if not u.has_acted:
-			state = State.IDLE
-			refresh_info()
-			return
-	end_player_phase()
+	var all_acted := units_of(Unit.Team.PLAYER).all(func(u: Unit) -> bool: return u.has_acted)
+	if all_acted and Settings.value("auto_end_turn"):
+		end_player_phase()
+		return
+	state = State.IDLE
+	refresh_info()
 
 
 # --- Phases ------------------------------------------------------------------
@@ -1303,7 +1631,7 @@ func start_player_phase() -> void:
 	for u in units_of(Unit.Team.PLAYER):
 		u.regen_mp(u.mp_regen())
 	turn += 1
-	await ui.show_banner("Player Phase\nTurn %d" % turn, Color("2850b0"))
+	await ui.show_banner("Player Phase\n" + turn_text(), Color("2850b0"))
 	await heal_on_tiles(Unit.Team.PLAYER)
 	var players := units_of(Unit.Team.PLAYER)
 	if not players.is_empty():
@@ -1344,32 +1672,37 @@ func end_player_phase() -> void:
 	for e in units_of(Unit.Team.ENEMY):
 		e.regen_mp(e.mp_regen())
 	await heal_on_tiles(Unit.Team.ENEMY)
+	await spawn_reinforcements()
 	EnemyAI.update_all_wake(self)
 	for e in units_of(Unit.Team.ENEMY):
-		if not is_instance_valid(e) or e.hp <= 0:
+		# has_acted: reinforcements that just arrived wait for the next phase.
+		if not is_instance_valid(e) or e.hp <= 0 or e.has_acted:
 			continue
 		await EnemyAI.take_turn(e, self)
 		if check_game_over():
 			return
+	if check_game_over(true):
+		return
 	start_player_phase()
 
 
-func check_game_over() -> bool:
+## Checks the map objective (see Objectives); `turn_over` is true right after an
+## enemy phase ends, when survive/defend maps count a turn as done.
+func check_game_over(turn_over := false) -> bool:
 	if state == State.GAME_OVER:
 		return true
-	if units_of(Unit.Team.ENEMY).is_empty():
-		enemy_phase = false
-		state = State.GAME_OVER
-		ui.show_end("Victory!", Color("2850b0"))
-		return true
-	# A carried Lord is still alive, so look past units() here.
-	var lord_alive := false
-	for u in units_root.get_children():
-		if u is Unit and u.hp > 0 and u.team == Unit.Team.PLAYER and u.is_lord:
-			lord_alive = true
-	if not lord_alive:
-		enemy_phase = false
-		state = State.GAME_OVER
-		ui.show_end("Defeat...", Color("602020"))
-		return true
-	return false
+	var result := Objectives.result(self, turn_over)
+	if result == "":
+		return false
+	enemy_phase = false
+	state = State.GAME_OVER
+	battle_result = result
+	discard_suspend()
+	var won := result == "victory"
+	var hint := "Z: restart   X: level select"
+	if Campaign.active:
+		var last := Campaign.chapter >= Chapters.ORDER.size() - 1
+		hint = ("Z: continue" if not last else "Z: finish the campaign") if won \
+			else "Z: retry the chapter   X: level select"
+	ui.show_end("Victory!" if won else "Defeat...", Color("2850b0") if won else Color("602020"), hint)
+	return true

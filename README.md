@@ -4,7 +4,17 @@ A tactical RPG prototype in the style of the GBA Fire Emblem games, built with G
 
 ## Running
 
-Open the folder in Godot 4.4 and press F5. The game starts on a level select screen (for testing). In a battle, Z on an empty tile opens a menu with **Level Select**; on the Victory/Defeat screen, X returns there.
+Open the folder in Godot 4.4 and press F5. The game starts on a level select screen (for testing), which also has **Options** and, after a suspend, **Resume**. In a battle, Z on an empty tile opens the map menu:
+
+| Entry | What it does |
+|---|---|
+| Units | Sortable table of every unit (Left/Right: sort column, Z: go to unit, D: status) |
+| Objective | Victory/defeat conditions, turn, units left |
+| Options | Game speed, fast-forward speed, danger zone at start, auto-end turn, end turn warning, level-up window (saved to `user://settings.cfg`) |
+| Suspend | Saves the battle to `user://suspend.save` and returns to the level select (deleted when the map ends) |
+| Restart | Restarts the map (asks first) |
+| Level Select | Back to the level select (on the Victory/Defeat screen, X also goes there) |
+| End Turn | Ends the player phase. Always last, so Up from the top of the menu reaches it. Asks first if units haven't acted, unless the "End turn warning" option is off |
 
 | Level | Shows off |
 |---|---|
@@ -13,6 +23,25 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Desert Outpost | Sand, dunes, paths, houses, an oasis; horses vs. scouts in the desert |
 | Frozen Pass | Snow, ice, hills, mountains, thickets, a waterfall; climbers, a swimmer and armor on ice |
 | Castle Keep | Indoors: floor, carpet, walls, pillars, pits and fences; slow mounted units and a wall-walking Wraith |
+
+## Campaign
+
+**New Campaign** on the level select starts five chapters played by one army (`scripts/chapters.gd`, state in `scripts/campaign.gd`, saved to `user://campaign.save`):
+
+| Chapter | Objective | Also introduces | Recruits |
+|---|---|---|---|
+| 1. Border Village | Rout | Villages to Visit; a Thief that burns them | Lord, Rider, Fighter, Archer, Cleric |
+| 2. Hill Fort | Seize the throne | Chests (Rogues open them freely, others need a Chest Key) | Scout |
+| 3. The Bandit King | Defeat the boss | Boss on a hilltop fort | Pegasus |
+| 4. The Siege | Defend the town hall 7 turns | Reinforcement waves; losing if an enemy reaches the tile | Guard, Mage |
+| 5. Flight from the Keep | Escape (Lord through the gate) | Escape command; other units can leave early | Dancer |
+
+- **Carried over:** levels, EXP, items and promotions. Survivors are healed between chapters.
+- **Permadeath:** fallen units leave the army for good. They're kept in `Campaign.fallen` (with chapter and turn) for future mechanics, and "Fell in …" is added to their biography.
+- **Defeat** retries the chapter with the army as it was before it.
+- **Prep screen** before each chapter: Pick Units (the Lord always deploys), Items (unit ↔ convoy), Promote (Lv 15+, class-dependent stat bonus, level kept), Status, Fight!
+- **Biography** logs joining, promotion, seizing and falling.
+- **Objectives** (`scripts/objectives.gd`) work on any level: `"objective": {"type": "rout" | "boss" | "seize" | "survive" | "defend" | "escape", ...}`, plus `"objects"` (villages, chests) and `"reinforcements"` (enemies arriving on a given turn).
 
 ## Tests
 
@@ -182,3 +211,6 @@ Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`,
 - `scripts/enemy_ai.gd`, `ai_profiles.gd`: enemy behavior and its settings/presets
 - `scripts/battle_map.gd`, `unit.gd`, `cursor.gd`, `ui.gd`: map, units and HUD
 - `scripts/status_screen.gd`, `glossary.gd`: the GBA-style status screen and its detail-mode help text
+- `scripts/unit_list.gd`, `options_screen.gd`: the Units and Options screens
+- `scripts/save_game.gd`, `settings.gd`: suspend data (units saved generically; see `Unit.SAVE_SKIP`) and options
+- `scripts/campaign.gd`, `chapters.gd`, `objectives.gd`, `prep_screen.gd` (+ `scenes/prep.tscn`): the campaign, its chapters, map objectives and the prep screen

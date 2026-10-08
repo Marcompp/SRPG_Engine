@@ -8,6 +8,8 @@ extends RefCounted
 const CONSUMABLES := {
 	"Potion": {"kind": "heal", "heal": 15, "uses": 3},
 	"Ether": {"kind": "mp", "mp": 15, "uses": 3},
+	# Opens a chest (one use per chest). Rogue-movement units open chests without one.
+	"Chest Key": {"kind": "key", "uses": 1},
 }
 
 

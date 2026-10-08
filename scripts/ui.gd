@@ -32,6 +32,12 @@ var _banner: ColorRect
 var _banner_label: Label
 ## GBA-style unit info screen.
 var status_screen: StatusScreen
+## Sortable table of every unit (map menu > Units).
+var unit_list: UnitListScreen
+## Map menu > Options.
+var options_screen: OptionsScreen
+var _objective: PanelContainer
+var _objective_label: Label
 
 
 func _ready() -> void:
@@ -60,8 +66,15 @@ func _ready() -> void:
 	_spell_forecast = _make_panel(_spell_label)
 	_level_up = _make_level_up()
 	_trade = _make_trade()
+	# The unit list goes under the status screen, which can be opened from it.
+	unit_list = UnitListScreen.new()
+	_root.add_child(unit_list)
 	status_screen = StatusScreen.new()
 	_root.add_child(status_screen)
+	options_screen = OptionsScreen.new()
+	_root.add_child(options_screen)
+	_objective_label = Label.new()
+	_objective = _make_panel(_objective_label)
 	_fast_forward = Label.new()
 	_fast_forward.visible = false
 	_fast_forward.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -227,7 +240,11 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void
 		if unit.is_caster():
 			text += "  INT %d" % unit.intelligence
 		text += "\n"
-	text += "%s  DEF+%d AVO+%d" % [terrain.name, terrain.def, terrain.avo]
+	# Show the bonus the unit on the tile actually gets (fliers and spirits get none).
+	if unit and BattleMap.NO_TERRAIN_BONUS.has(unit.move_type):
+		text += "%s  no bonus (%s)" % [terrain.name, unit.move_type.capitalize()]
+	else:
+		text += "%s  DEF%+d AVO%+d" % [terrain.name, terrain.def, terrain.avo]
 	_info_label.text = text
 	_place(_info, _away_right(cursor_cell), cursor_cell.y < 4)
 
@@ -452,7 +469,7 @@ func show_level_up(unit: Unit, before: Dictionary, gains: Dictionary) -> void:
 	_level_up.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_level_up.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_level_up.visible = true
-	if level_up_waits:
+	if level_up_waits and Settings.value("level_up_wait"):
 		await level_up_confirmed
 	else:
 		await get_tree().create_timer(2.0).timeout
@@ -486,11 +503,11 @@ func show_banner(text: String, color: Color) -> void:
 	_banner.visible = false
 
 
-func show_end(text: String, color: Color) -> void:
+func show_end(text: String, color: Color, hint := "Z: restart   X: level select") -> void:
 	hide_info()
 	hide_menu()
 	hide_forecast()
-	_banner_label.text = text + "\nZ: restart   X: level select"
+	_banner_label.text = text + "\n" + hint
 	_banner.color = Color(color, 0.85)
 	_banner.modulate.a = 1.0
 	_banner.visible = true
@@ -504,3 +521,19 @@ func show_status(unit: Unit) -> void:
 
 func hide_status() -> void:
 	status_screen.close()
+
+
+# --- Objective (map menu > Objective) ------------------------------------------------
+
+func show_objective(lines: Array[String]) -> void:
+	hide_info()
+	_objective_label.text = "\n".join(lines)
+	_objective.reset_size()
+	_objective.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	_objective.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_objective.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_objective.visible = true
+
+
+func hide_objective() -> void:
+	_objective.visible = false

@@ -182,6 +182,10 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 		_finish(enemy)
 		return
 
+	if enemy.ai.get("loot", false) and not enemy.retreating and await _try_loot(enemy, battle, reach):
+		_finish(enemy)
+		return
+
 	if enemy.retreating:
 		var dest := _retreat_cell(enemy, battle, reach)
 		await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
@@ -371,6 +375,32 @@ static func _retreat_cell(u: Unit, battle: Node, reach: Dictionary) -> Vector2i:
 			best_dist = nearest
 			best = c
 	return best
+
+
+## Looters head for the nearest intact village or chest and loot it on arrival.
+## Returns false when there's nothing left to loot (the unit then moves as usual).
+static func _try_loot(enemy: Unit, battle: Node, reach: Dictionary) -> bool:
+	var map: BattleMap = battle.map
+	var targets: Array = map.lootable_objects()
+	if targets.is_empty():
+		return false
+	var field: Dictionary = {}
+	var target: Dictionary = {}
+	for o in targets:
+		var f := map.cost_field(o.cell, enemy.move_type)
+		if not f.has(enemy.cell):
+			continue
+		if target.is_empty() or f[enemy.cell] < field[enemy.cell]:
+			target = o
+			field = f
+	if target.is_empty():
+		return false
+	if enemy.cell != target.cell:
+		var dest := _closest_cell(field, reach.cells, enemy.cell)
+		await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
+	if enemy.cell == target.cell:
+		await battle.loot(enemy, target)
+	return true
 
 
 ## Moves to and heals the ally that would gain the most HP. Returns true if it cast.

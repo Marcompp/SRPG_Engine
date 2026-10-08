@@ -124,6 +124,13 @@ var arrow_path: Array[Vector2i] = []:
 	set(value):
 		arrow_path = value
 		queue_redraw()
+## Map objects from the level's "objects": dictionaries with "type" ("village" or
+## "chest"), "cell", "item" (the reward) and "state": "intact", "visited" (village
+## a player visited), "looted" (village an enemy destroyed) or "opened" (chest).
+var objects: Array = []
+## Objective tiles to outline (see Objectives.marked_cells) and the objective type.
+var objective_cells: Array[Vector2i] = []
+var objective_type := ""
 
 
 static func distance(a: Vector2i, b: Vector2i) -> int:
@@ -135,6 +142,30 @@ func load_layout(layout: Array) -> void:
 	rows = grid.size()
 	cols = grid[0].length()
 	queue_redraw()
+
+
+func load_objects(list: Array, objective: Dictionary) -> void:
+	objects = []
+	for o in list:
+		var copy: Dictionary = o.duplicate()
+		copy["state"] = copy.get("state", "intact")
+		objects.append(copy)
+	objective_type = objective.type
+	objective_cells = Objectives.marked_cells(objective)
+	queue_redraw()
+
+
+## The map object on `cell`, or {} if there's none.
+func object_at(cell: Vector2i) -> Dictionary:
+	for o in objects:
+		if o.cell == cell:
+			return o
+	return {}
+
+
+## Villages not yet visited or looted, and chests not yet opened.
+func lootable_objects() -> Array:
+	return objects.filter(func(o): return o.state == "intact")
 
 
 func in_bounds(cell: Vector2i) -> bool:
@@ -314,6 +345,7 @@ func _draw() -> void:
 	for y in rows:
 		for x in cols:
 			_draw_tile(Vector2i(x, y))
+	_draw_objects()
 	_draw_zone(danger_cells, DANGER_COLOR, DANGER_EDGE_COLOR)
 	_draw_zone(marked_cells, MARKED_COLOR, MARKED_EDGE_COLOR)
 	for c in move_cells:
@@ -338,6 +370,37 @@ func _draw_zone(cells: Dictionary, fill: Color, edge: Color) -> void:
 			var a := o + Vector2(TILE / 2.0, TILE / 2.0) + Vector2(d) * (TILE / 2.0 - 0.5)
 			var side := Vector2(d.y, d.x) * (TILE / 2.0)
 			draw_line(a - side, a + side, edge, 1.0)
+
+
+## Villages, chests and objective tiles, drawn over the terrain.
+func _draw_objects() -> void:
+	for o in objects:
+		var p := Vector2(o.cell * TILE)
+		match o.type:
+			"village":
+				match o.state:
+					"intact":  # yellow banner on the roof
+						draw_rect(Rect2(p + Vector2(11, 1), Vector2(1, 6)), Color("5a4630"))
+						draw_rect(Rect2(p + Vector2(12, 1), Vector2(3, 2)), Color("f0c030"))
+					"visited":  # door closed
+						draw_rect(Rect2(p + Vector2(7, 10), Vector2(2, 4)), Color("3a3a3a"))
+					"looted":  # burned down
+						draw_rect(Rect2(p + Vector2(2, 2), Vector2(12, 12)), Color(0.15, 0.1, 0.08, 0.75))
+						draw_line(p + Vector2(4, 12), p + Vector2(12, 4), Color("ff7030"), 1.0)
+			"chest":
+				var body := Color("8b5a2b")
+				draw_rect(Rect2(p + Vector2(4, 7), Vector2(8, 6)), body)
+				draw_rect(Rect2(p + Vector2(4, 7), Vector2(8, 6)), Color.BLACK, false, 1.0)
+				if o.state == "opened":
+					draw_rect(Rect2(p + Vector2(5, 8), Vector2(6, 2)), Color("2a1a0a"))
+					draw_rect(Rect2(p + Vector2(4, 4), Vector2(8, 2)), body)
+				else:
+					draw_rect(Rect2(p + Vector2(7, 9), Vector2(2, 2)), Color("f0c030"))
+	var colors := {"seize": Color("f0c030"), "defend": Color("50a0ff"), "escape": Color("50e070")}
+	for c in objective_cells:
+		var p := Vector2(c * TILE)
+		var color: Color = colors.get(objective_type, Color.WHITE)
+		draw_rect(Rect2(p + Vector2(1, 1), Vector2(TILE - 2, TILE - 2)), color, false, 2.0)
 
 
 func _draw_arrow() -> void:

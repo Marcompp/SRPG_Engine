@@ -23,6 +23,8 @@ extends RefCounted
 ## retreat_until:   HP fraction at which it returns to normal
 ## retreat_to:      "healer_or_tile", "healer", "tile" (healing terrain) or "away" (from players)
 ## retreat_attacks: whether it still attacks while retreating
+## loot:            heads for the nearest intact village or chest; burns the village or
+##                  takes the chest's item when it gets there (then `move` as usual)
 
 const DEFAULTS := {
 	"move": "charge",
@@ -38,6 +40,7 @@ const DEFAULTS := {
 	"retreat_until": 1.0,
 	"retreat_to": "healer_or_tile",
 	"retreat_attacks": false,
+	"loot": false,
 }
 
 ## Classic Fire Emblem enemy archetypes.
@@ -50,7 +53,7 @@ const PRESETS := {
 	"sleeper": {"move": "hold", "wake": {"in_threat": true, "attacked": true}},
 	"reinforcement": {"move": "hold", "wake": {"turn": 3}},
 	"coward": {"retreat_below": 0.5},
-	"thief": {"move": "goto", "attack": false},
+	"thief": {"move": "goto", "attack": false, "loot": true},
 }
 
 

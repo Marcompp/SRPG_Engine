@@ -14,6 +14,16 @@ var current_test := ""
 
 
 func _initialize() -> void:
+	# Never touch a real suspend file.
+	SaveGame.path = "user://test_suspend.save"
+	SaveGame.delete_suspend()
+	# ...or real settings: tests run with the defaults.
+	Settings.path = "user://test_settings.cfg"
+	DirAccess.remove_absolute(Settings.path)
+	Settings.reload()
+	# ...or a real campaign.
+	Campaign.path = "user://test_campaign.save"
+	Campaign.delete_save()
 	_run_all()
 
 
@@ -84,17 +94,52 @@ func _run_all() -> void:
 		"test_race_spell_elements",
 		"test_race_carry_and_shove",
 		"test_race_regen_and_exp",
+		"test_info_panel_terrain_bonus",
+		"test_unit_list",
+		"test_objective_screen",
+		"test_suspend_round_trip",
+		"test_level_select_offers_resume",
+		"test_suspend_discarded_when_map_ends",
+		"test_restart_asks_first",
+		"test_options_screen_saves",
+		"test_option_danger_zone_at_start",
+		"test_option_auto_end_turn_off",
+		"test_option_level_up_auto",
+		"test_level_select_has_options",
+		"test_all_chapters_are_valid",
+		"test_seize_objective",
+		"test_boss_objective",
+		"test_defend_objective",
+		"test_escape_objective",
+		"test_villages_visit_and_loot",
+		"test_chests",
+		"test_reinforcements",
+		"test_campaign_army_carries_over",
+		"test_promotion",
+		"test_prep_screen",
+		"test_campaign_suspend_resume",
+		"test_chapters_enemy_phases_run",
+		"test_marked_enemy_freed",
+		"test_quit_to_level_select_asks_first",
+		"test_end_turn_last_and_warning_option",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
 	]
 	for t in tests:
 		current_test = t
+		# Every test starts on the default test map, outside the campaign.
+		Levels.selected = "river_crossing"
+		Campaign.active = false
+		Campaign.deployed = []
 		await _fresh_battle()
 		var before := failures.size()
 		await call(t)
 		print(("PASS  " if failures.size() == before else "FAIL  ") + t)
 		b.queue_free()
 		await process_frame
+	SaveGame.delete_suspend()
+	DirAccess.remove_absolute(Settings.path)
+	Campaign.delete_save()
 	print("")
 	if failures.is_empty():
 		print("All %d tests passed." % tests.size())
@@ -1438,7 +1483,7 @@ func test_fast_forward_enemy_phase() -> void:
 	check_eq(Engine.time_scale, 1.0, "holding X on the player phase does nothing")
 	b.enemy_phase = true
 	await process_frame
-	check_eq(Engine.time_scale, b.FAST_FORWARD_SPEED, "holding X on the enemy phase speeds up the game")
+	check_eq(Engine.time_scale, Settings.value("fast_forward_speed"), "holding X on the enemy phase speeds up the game")
 	check(b.ui._fast_forward.visible, "with an on-screen indicator")
 	Input.action_release("cancel")
 	await process_frame
@@ -1744,3 +1789,542 @@ func test_race_regen_and_exp() -> void:
 	lord.set_race("Human")
 	await b.gain_exp(lord, 10)
 	check_eq(lord.exp_points, 21, "Humans earn 10% more")
+
+
+# --- Info panel, unit list, objective ------------------------------------------------------
+
+func test_info_panel_terrain_bonus() -> void:
+	var lord := unit_named("Lord")
+	lord.set_cell(Vector2i(4, 0))  # forest: DEF +1, AVO +20
+	b.cursor.cell = lord.cell
+	b.refresh_info()
+	check(b.ui._info_label.text.contains("Forest  DEF+1 AVO+20"), "foot unit sees the forest bonus")
+	lord.move_type = "flying"
+	b.refresh_info()
+	check(b.ui._info_label.text.contains("Forest  no bonus (Flying)"), "a flier gets no terrain bonus")
+	lord.move_type = "foot"
+	b.map.set_terrain(Vector2i(5, 2), "=")
+	b.cursor.cell = Vector2i(5, 2)
+	b.refresh_info()
+	check(b.ui._info_label.text.contains("Path  DEF+0 AVO-20"), "negative bonuses read AVO-20, not AVO+-20")
+
+
+func test_unit_list() -> void:
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("Units")
+	var list: UnitListScreen = b.ui.unit_list
+	check_eq(b.state, b.State.UNIT_LIST, "map menu > Units opens the list")
+	check(list.visible, "list shown")
+	check_eq(list.units.size(), b.units().size(), "lists every unit on the map")
+	# Sort by level (column 2): highest first.
+	await press(KEY_RIGHT)
+	await press(KEY_RIGHT)
+	check_eq(list.COLUMNS[list.sort_col].key, "lv", "Right twice: sort by level")
+	var levels: Array = list.units.map(func(u): return u.level)
+	var sorted_levels := levels.duplicate()
+	sorted_levels.sort()
+	sorted_levels.reverse()
+	check_eq(levels, sorted_levels, "sorted high to low")
+	# D opens the status screen; closing it comes back to the list.
+	await press(KEY_DOWN)
+	var picked := list.selected_unit()
+	await press(KEY_D)
+	check(b.state == b.State.STATUS and b.ui.status_screen.unit == picked, "D shows the unit's status")
+	await press(KEY_X)
+	check_eq(b.state, b.State.UNIT_LIST, "closing the status screen returns to the list")
+	# Z jumps the cursor to the unit.
+	await press(KEY_Z)
+	check_eq(b.state, b.State.IDLE, "Z closes the list")
+	check_eq(b.cursor.cell, picked.cell, "and puts the cursor on the unit")
+	check(not list.visible, "list hidden")
+
+
+func test_objective_screen() -> void:
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("Objective")
+	check_eq(b.state, b.State.OBJECTIVE, "map menu > Objective opens it")
+	var text: String = b.ui._objective_label.text
+	check(text.contains("River Crossing"), "names the map")
+	check(text.contains("Victory: Defeat every enemy."), "victory condition")
+	check(text.contains("Defeat: Your Lord falls."), "defeat condition")
+	check(text.contains("Turn 1"), "turn number")
+	check(text.contains("Enemies %d" % b.units_of(Unit.Team.ENEMY).size()), "enemy count")
+	await press(KEY_X)
+	check_eq(b.state, b.State.IDLE, "X closes it")
+
+
+# --- Suspend / resume / restart ---------------------------------------------------------
+
+func test_suspend_round_trip() -> void:
+	var lord := unit_named("Lord")
+	var fighter := unit_named("Fighter")
+	var archer := unit_named("Archer")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	# Change a bit of everything.
+	lord.set_cell(Vector2i(5, 2))
+	lord.hp = 7
+	lord.luck = 13
+	lord.items[0].uses = 10
+	lord.has_acted = true
+	lord.biography.append("Suspended mid-battle.")
+	fighter.set_cell(Vector2i(4, 6))
+	archer.set_cell(Vector2i(5, 6))
+	await b.do_rescue(fighter, archer)
+	brig.ai_awake = true
+	brig.was_attacked = true
+	b.map.set_terrain(Vector2i(3, 4), "M")
+	b.turn = 3
+	b.danger_on = true
+	b.marked.assign([brig])
+	var before := SaveGame.capture(b)
+	SaveGame.write_suspend(b)
+	# Resume into a fresh battle scene.
+	Levels.resume = true
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	check_eq(var_to_str(SaveGame.capture(b)), var_to_str(before), "resumed battle captures identically")
+	lord = unit_named("Lord")
+	fighter = unit_named("Fighter")
+	check_eq(lord.cell, Vector2i(5, 2), "unit position")
+	check_eq(lord.hp, 7, "HP")
+	check_eq(lord.items[0].uses, 10, "item uses")
+	check(lord.has_acted, "acted units stay acted")
+	check_eq(lord.position, Vector2(Vector2i(5, 2) * BattleMap.TILE), "drawn where it stands")
+	check(fighter.carrying != null and fighter.carrying.unit_name == "Archer", "carried unit restored")
+	check(not b.units().has(fighter.carrying) and not fighter.carrying.visible, "and still off the map")
+	check_eq(b.map.terrain_key(Vector2i(3, 4)), "M", "terrain changes restored")
+	check_eq(b.turn, 3, "turn")
+	check_eq(b.state, b.State.IDLE, "resumes on the player phase, ready for input")
+	check(b.marked.size() == 1 and b.marked[0].unit_name == "Brigand", "marked enemies restored")
+	SaveGame.delete_suspend()
+
+
+func test_level_select_offers_resume() -> void:
+	SaveGame.write_suspend(b)
+	var select: Node = load("res://scenes/level_select.tscn").instantiate()
+	root.add_child(select)
+	await process_frame
+	check(select.choices[0].resume, "a Resume entry comes first")
+	check_eq(select.choices[0].label, "Resume: River Crossing, Turn 1", "it names the map and turn")
+	check_eq(select.index, 0, "and is preselected")
+	select.queue_free()
+	SaveGame.delete_suspend()
+	select = load("res://scenes/level_select.tscn").instantiate()
+	root.add_child(select)
+	await process_frame
+	check(not select.choices[0].get("resume", false), "no suspend, no Resume entry")
+	select.queue_free()
+
+
+func test_suspend_discarded_when_map_ends() -> void:
+	SaveGame.write_suspend(b)
+	for e in b.units_of(Unit.Team.ENEMY):
+		e.hp = 0
+	b.check_game_over()
+	check_eq(b.state, b.State.GAME_OVER, "victory")
+	check(not SaveGame.has_suspend(), "the finished map's suspend is deleted")
+
+
+func test_restart_asks_first() -> void:
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("Restart")
+	check_eq(b.menu_context, "restart", "Restart asks for confirmation")
+	check_eq(b.ui.menu_options, ["Cancel", "Restart"], "Cancel first")
+	await press(KEY_Z)
+	check_eq(b.state, b.State.IDLE, "Z right away cancels")
+
+
+# --- Options ----------------------------------------------------------------------------
+
+## Back to default options (removes the test settings file).
+func reset_settings() -> void:
+	DirAccess.remove_absolute(Settings.path)
+	Settings.reload()
+
+
+func test_options_screen_saves() -> void:
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("Options")
+	check_eq(b.state, b.State.OPTIONS, "map menu > Options opens it")
+	check(b.ui.options_screen.visible, "options screen shown")
+	await press(KEY_RIGHT)  # Game speed: Normal -> Fast
+	check_eq(Settings.value("game_speed"), 1.5, "Right changes the highlighted option")
+	await press(KEY_DOWN)
+	await press(KEY_DOWN)
+	await press(KEY_RIGHT)  # Danger zone at start: Off -> On
+	check_eq(Settings.value("danger_zone_default"), true, "Down + Right changes another option")
+	await press(KEY_X)
+	check_eq(b.state, b.State.IDLE, "X closes it")
+	await process_frame
+	check_eq(Engine.time_scale, 1.5, "game speed applies right away")
+	Settings.reload()
+	check_eq(Settings.value("game_speed"), 1.5, "saved to disk and read back")
+	check_eq(Settings.value("danger_zone_default"), true, "every changed option is saved")
+	reset_settings()
+	await process_frame
+	check_eq(Engine.time_scale, 1.0, "back to normal speed")
+
+
+func test_option_danger_zone_at_start() -> void:
+	Settings.set_value("danger_zone_default", true)
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	check(b.danger_on and not b.map.danger_cells.is_empty(), "battle starts with the danger zone on")
+	reset_settings()
+
+
+func test_option_auto_end_turn_off() -> void:
+	Settings.set_value("auto_end_turn", false)
+	var lord := unit_named("Lord")
+	for u in b.units_of(Unit.Team.PLAYER):
+		if u != lord:
+			u.has_acted = true
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Wait")
+	check(not b.enemy_phase and b.state == b.State.IDLE, "everyone acted, but the turn waits for End Turn")
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("End Turn")
+	check(b.enemy_phase or b.turn == 2, "End Turn with nobody waiting ends it without asking")
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+	reset_settings()
+
+
+func test_option_level_up_auto() -> void:
+	Settings.set_value("level_up_wait", false)
+	b.ui.level_up_waits = true  # the window itself would wait...
+	var lord := unit_named("Lord")
+	lord.exp_points = 95
+	await b.gain_exp(lord, 33)  # ...but the option says Auto, so this returns on its own
+	check(not b.ui._level_up.visible, "Auto: the level-up window closes by itself")
+	reset_settings()
+
+
+func test_level_select_has_options() -> void:
+	var select: Node = load("res://scenes/level_select.tscn").instantiate()
+	root.add_child(select)
+	await process_frame
+	check(select.choices[-1].get("options", false), "Options is the last entry")
+	select.queue_free()
+
+
+# --- Campaign: objectives, map objects, reinforcements, army, prep -----------------------
+
+## Starts campaign chapter `index` with a fresh campaign whose army has every
+## recruit up to it, deployed by default.
+func start_chapter(index: int) -> void:
+	Campaign.start_new()
+	for i in range(1, index + 1):
+		Campaign.chapter = i
+		Campaign.add_recruits()
+	Campaign.active = true
+	Campaign.deployed = Campaign.default_deployment()
+	Levels.selected = Chapters.ORDER[index]
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+
+
+func remove_unit(u: Unit) -> void:
+	u.get_parent().remove_child(u)
+	u.free()
+
+
+func test_all_chapters_are_valid() -> void:
+	for id in Chapters.ORDER:
+		var level := Levels.get_level(id)
+		var layout: Array = level.layout
+		var at := func(c: Vector2i) -> String: return layout[c.y][c.x]
+		var inside := func(c: Vector2i) -> bool:
+			return c.x >= 0 and c.y >= 0 and c.y < layout.size() and c.x < layout[0].length()
+		for row in layout:
+			check_eq(row.length(), layout[0].length(), "%s: rows have equal length" % id)
+		var taken := {}
+		for c in level.deploy:
+			check(inside.call(c) and BattleMap.cost_for(at.call(c), "foot") >= 0, "%s: deploy cell %s usable" % [id, c])
+			check(not taken.has(c), "%s: deploy cell %s listed once" % [id, c])
+			taken[c] = true
+		var all_units: Array = level.enemies + level.recruits
+		for wave in level.get("reinforcements", []):
+			all_units += wave.units
+		for data in all_units:
+			check(Classes.DATA.has(data.get("class", "")), "%s: %s has a known class" % [id, data.name])
+			var cls := Classes.get_data(data["class"])
+			for item_name in data.get("items", []):
+				if Weapons.DATA.has(item_name):
+					check(cls.weapons.has(Weapons.DATA[item_name].type), "%s: %s can wield %s" % [id, data.name, item_name])
+				else:
+					check(Items.CONSUMABLES.has(item_name), "%s: %s carries a known item %s" % [id, data.name, item_name])
+		for data in level.enemies:
+			var move_type := Races.move_type(data.get("race", "Human"), data["class"])  # races can change movement
+			check(inside.call(data.cell) and BattleMap.cost_for(at.call(data.cell), move_type) >= 0,
+				"%s: %s can stand on its start tile" % [id, data.name])
+			check(not taken.has(data.cell), "%s: %s shares a tile" % [id, data.name])
+			taken[data.cell] = true
+		for o in level.get("objects", []):
+			check(inside.call(o.cell), "%s: object at %s on the map" % [id, o.cell])
+			check(Items.CONSUMABLES.has(o.item) or Weapons.DATA.has(o.item), "%s: reward %s exists" % [id, o.item])
+		var obj := Objectives.of(level)
+		for c in Objectives.marked_cells(obj):
+			check(inside.call(c) and BattleMap.cost_for(at.call(c), "foot") >= 0, "%s: objective tile %s reachable" % [id, c])
+		if obj.type == "boss":
+			check(level.enemies.any(func(e): return e.name == obj.boss), "%s: the boss is on the map" % id)
+
+
+func test_seize_objective() -> void:
+	await start_chapter(1)
+	var lord := unit_named("Lord")
+	remove_unit(unit_named("Commander", Unit.Team.ENEMY))
+	lord.set_cell(Vector2i(7, 0))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	check(b.ui.menu_options.has("Seize"), "the Lord on the throne can Seize")
+	await pick("Seize")
+	check_eq(b.battle_result, "victory", "seizing wins")
+	check(lord.biography.any(func(e): return e.begins_with("Seized")), "logged in the Lord's biography")
+
+
+func test_boss_objective() -> void:
+	await start_chapter(2)
+	check(not b.check_game_over(), "boss alive: battle goes on")
+	remove_unit(unit_named("Bandit King", Unit.Team.ENEMY))
+	check(b.check_game_over(), "boss down: it's over...")
+	check_eq(b.battle_result, "victory", "...and won, though other enemies remain")
+
+
+func test_defend_objective() -> void:
+	await start_chapter(3)
+	b.turn = 6
+	check(not b.check_game_over(true), "turn 6 of 7: not yet")
+	b.turn = 7
+	check(b.check_game_over(true), "after enemy phase 7: over")
+	check_eq(b.battle_result, "victory", "held out: victory")
+	await start_chapter(3)
+	var soldier: Unit = b.units_of(Unit.Team.ENEMY)[0]
+	soldier.set_cell(Vector2i(6, 3))
+	b.check_game_over()
+	check_eq(b.battle_result, "defeat", "an enemy on the town hall: defeat")
+
+
+func test_escape_objective() -> void:
+	await start_chapter(4)
+	var lord := unit_named("Lord")
+	var other: Unit = b.units_of(Unit.Team.PLAYER).filter(func(u): return not u.is_lord)[0]
+	other.set_cell(Vector2i(6, 9))
+	b.cursor.cell = other.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Escape")
+	check(other.escaped and not b.units().has(other), "a unit escapes off the map")
+	check(b.all_units().has(other), "but stays in the army")
+	check_eq(b.battle_result, "", "only the Lord escaping wins")
+	lord.set_cell(Vector2i(7, 9))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Escape")
+	check_eq(b.battle_result, "victory", "the Lord escaping wins")
+
+
+func test_villages_visit_and_loot() -> void:
+	await start_chapter(0)
+	var lord := unit_named("Lord")
+	var items_before := lord.items.size()
+	lord.set_cell(Vector2i(5, 0))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Visit")
+	check_eq(b.map.object_at(Vector2i(5, 0)).state, "visited", "village visited")
+	check_eq(lord.items.size(), items_before + 1, "its reward is added")
+	check_eq(lord.items[-1].name, "Potion", "the village's item")
+	var thief := unit_named("Thief", Unit.Team.ENEMY)
+	thief.set_cell(Vector2i(11, 2))  # one step from the other village
+	await EnemyAI.take_turn(thief, b)
+	check_eq(b.map.object_at(Vector2i(11, 3)).state, "looted", "the thief burns the other village")
+
+
+func test_chests() -> void:
+	await start_chapter(1)
+	var scout := unit_named("Scout")
+	var lord := unit_named("Lord")
+	scout.set_cell(Vector2i(3, 2))
+	b.cursor.cell = scout.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Open")
+	check_eq(scout.items[-1].name, "Silver Sword", "a rogue opens chests without a key")
+	check_eq(b.map.object_at(Vector2i(3, 2)).state, "opened", "chest opened")
+	# Anyone else needs a Chest Key, which is used up.
+	lord.set_cell(Vector2i(11, 2))
+	check(not b.can_open_chest(lord), "no key, no Open")
+	lord.items.append(Items.make("Chest Key"))
+	check(b.can_open_chest(lord), "with a key: Open")
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Open")
+	check(not lord.items.any(func(it): return it.name == "Chest Key"), "the key is used up")
+	check(lord.items.any(func(it): return it.name == "Hammer"), "and the chest's item received")
+
+
+func test_reinforcements() -> void:
+	await start_chapter(3)
+	var before: int = b.units_of(Unit.Team.ENEMY).size()
+	b.turn = 2
+	await b.spawn_reinforcements()
+	var arrived: Array = b.units_of(Unit.Team.ENEMY).filter(func(u): return u.has_acted)
+	check_eq(b.units_of(Unit.Team.ENEMY).size(), before + 2, "turn 2: two reinforcements arrive")
+	check_eq(arrived.size(), 2, "and wait until the next phase to act")
+
+
+func test_campaign_army_carries_over() -> void:
+	await start_chapter(0)
+	check_eq(Campaign.army.size(), 5, "starting army")
+	var lord := unit_named("Lord")
+	var fighter := unit_named("Fighter")
+	lord.exp_points = 60
+	lord.items.append(Items.make("Chest Key"))
+	fighter.hp = 0
+	var involved: Array[Unit] = [fighter]
+	await b._remove_dead_and_award(involved, [])
+	b.battle_result = "victory"
+	Campaign.finish_chapter(b)
+	check_eq(Campaign.chapter, 1, "on to chapter 2")
+	check(Campaign.army_unit("Fighter").is_empty(), "the fallen Fighter left the army (permadeath)")
+	check_eq(Campaign.fallen.size(), 1, "kept among the fallen")
+	check(Campaign.fallen[0].unit.biography[-1].begins_with("Fell in Chapter 1"), "with the event in its biography")
+	check_eq(Campaign.army_unit("Lord").exp_points, 60, "EXP carried over")
+	check(Campaign.army_unit("Lord").items.any(func(it): return it.name == "Chest Key"), "items carried over")
+	check(not Campaign.army_unit("Scout").is_empty(), "chapter 2's recruit joined")
+	check(Campaign.army_unit("Scout").biography[-1].begins_with("Joined the army in Chapter 2"), "and logged it")
+	# Saved: a reload gets the same campaign back.
+	var army_before := var_to_str(Campaign.army)
+	Campaign.army = []
+	check(Campaign.load_save(), "campaign saved")
+	check_eq(var_to_str(Campaign.army), army_before, "and loads back unchanged")
+
+
+func test_promotion() -> void:
+	Campaign.start_new()
+	var lord: Dictionary = Campaign.army_unit("Lord")
+	check(not Campaign.can_promote(lord), "Lv 1 can't promote")
+	lord.level = 15
+	check(Campaign.can_promote(lord), "Lv 15 can")
+	var str_before: int = lord.strength
+	var gains := Campaign.promote("Lord", "Swordsmaster")
+	var promoted := Campaign.army_unit("Lord")
+	check_eq(promoted.unit_class, "Swordsmaster", "new class")
+	check_eq(promoted.level, 15, "level kept")
+	check_eq(promoted.strength, str_before + Classes.promotion_bonus("Swordsmaster").str, "class bonus applied")
+	check_eq(gains.str, Classes.promotion_bonus("Swordsmaster").str, "gains reported")
+	check(promoted.biography[-1].begins_with("Promoted to Swordsmaster"), "logged")
+
+
+func test_prep_screen() -> void:
+	Campaign.start_new()
+	var prep: Control = load("res://scenes/prep.tscn").instantiate()
+	root.add_child(prep)
+	await process_frame
+	check_eq(prep.picked.size(), 5, "default deployment: everyone (5 of 6 slots)")
+	prep._enter("pick")
+	prep._toggle_pick("Lord")
+	check(prep.picked.has("Lord"), "the Lord can't be benched")
+	prep._toggle_pick("Archer")
+	check(not prep.picked.has("Archer"), "others can")
+	# Items: Lord's Potion to the convoy and back.
+	prep.current_unit = "Lord"
+	prep.mode = "items"
+	prep.column = 0
+	prep.index = 1
+	prep._move_item()
+	check_eq(Campaign.convoy.size(), 1, "item stored in the convoy")
+	prep.column = 1
+	prep.index = 0
+	prep._move_item()
+	check(Campaign.convoy.is_empty() and Campaign.army_unit("Lord").items.size() == 2, "and taken back")
+	prep.queue_free()
+
+
+func test_campaign_suspend_resume() -> void:
+	await start_chapter(0)
+	b.map.object_at(Vector2i(5, 0)).state = "visited"
+	SaveGame.write_suspend(b)
+	Campaign.active = false
+	Levels.resume = true
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	check(Campaign.active, "resuming a chapter reactivates the campaign")
+	check_eq(b.map.object_at(Vector2i(5, 0)).state, "visited", "map objects restored")
+	check_eq(Levels.selected, "ch1", "on the right chapter")
+	SaveGame.delete_suspend()
+
+
+func test_chapters_enemy_phases_run() -> void:
+	# Three full rounds of enemy phases on every chapter (looting, reinforcements,
+	# goto/defend AI...), sped up. Runtime errors here fail the run via run_tests.sh.
+	for i in Chapters.ORDER.size():
+		await start_chapter(i)
+		Settings.set_value("game_speed", 2.0)
+		for round in 3:
+			if b.state == b.State.GAME_OVER:
+				break
+			b.end_player_phase()
+			while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+				Engine.time_scale = 8.0
+				await process_frame
+		check(b.state == b.State.IDLE or b.state == b.State.GAME_OVER, "%s: enemy phases settle" % Chapters.ORDER[i])
+	reset_settings()
+	Engine.time_scale = 1.0
+
+
+func test_marked_enemy_freed() -> void:
+	# Regression: killing a marked enemy froze the game. Dead units are freed, and
+	# refresh_threat() crashed rebuilding the mark list.
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	var sold := unit_named("Soldier", Unit.Team.ENEMY)
+	b.marked.assign([brig, sold])
+	b.refresh_threat()
+	remove_unit(brig)
+	b.refresh_threat()
+	check_eq(b.marked.size(), 1, "the freed enemy's mark is dropped")
+	check(b.marked[0] == sold, "the other mark stays")
+	check_eq(b.map.marked_cells, b.enemy_threat(sold), "overlay shows only the survivor's threat")
+
+
+func test_quit_to_level_select_asks_first() -> void:
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("Level Select")
+	check_eq(b.menu_context, "quit", "Level Select asks for confirmation")
+	check_eq(b.ui.menu_choice(), "Cancel", "Cancel is selected first")
+	await press(KEY_Z)
+	check_eq(b.state, b.State.IDLE, "Cancel returns to the map")
+	check(is_instance_valid(b) and b.is_inside_tree(), "still in the battle")
+
+
+func test_end_turn_last_and_warning_option() -> void:
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	check_eq(b.ui.menu_options[-1], "End Turn", "End Turn is the last map menu entry")
+	await press(KEY_UP)
+	check_eq(b.ui.menu_choice(), "End Turn", "so Up from the top reaches it")
+	await press(KEY_X)
+	Settings.set_value("end_turn_warning", false)
+	await press(KEY_Z)
+	await pick("End Turn")
+	check(b.enemy_phase or b.turn == 2, "warning off: End Turn ends it right away, units still waiting")
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+	reset_settings()
