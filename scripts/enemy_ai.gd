@@ -1,34 +1,168 @@
 class_name EnemyAI
 extends RefCounted
-## Simple AI: heal a wounded ally if possible, otherwise make the attack (weapon or
-## spell) with the best expected damage, otherwise advance. Units with no way to
-## attack stay with their allies.
+## Enemy turns, driven by each unit's `ai` settings (see AIProfiles):
+##   1. wake check (sleepers switch from `move` to `awake_move` for good)
+##   2. retreat check (HP at or below `retreat_below` until back to `retreat_until`)
+##   3. heal a wounded ally, if it has healing magic
+##   4. retreating: head for a healer / healing tile / away from players
+##      otherwise: make the best attack from the cells its move mode allows,
+##      or fall back to that mode's movement (advance, stay, return, go to a tile)
 
 ## Casters only bother healing when it restores at least this much HP.
 const MIN_USEFUL_HEAL := 5
 ## Score penalty per MP spent, so expensive spells are saved for worthwhile casts.
 const MP_COST_WEIGHT := 20.0
+## targeting "kill" multiplies the kill bonus by this.
+const KILL_FOCUS := 4.0
+## Bonus for damaging a target named in `priority`; large enough to dominate.
+const PRIORITY_BONUS := 5000.0
 
 
-## Expected damage, plus a bonus scaled by the chance of a kill.
-static func _hit_score(dmg: int, hit: int, target: Unit) -> float:
-	var score: float = dmg * hit - target.hp
-	if dmg >= target.hp:
-		score += 10.0 * hit
+# --- Behavior state ---------------------------------------------------------------
+
+## The move mode in effect: sleeping units use `move`, woken ones `awake_move`.
+static func current_move(u: Unit) -> String:
+	if not u.ai.wake.is_empty() and u.ai_awake:
+		return u.ai.awake_move
+	return u.ai.move
+
+
+## Checks a sleeping unit's wake conditions; waking also wakes the rest of its group.
+static func update_wake(u: Unit, battle: Node) -> void:
+	var wake: Dictionary = u.ai.wake
+	if wake.is_empty() or u.ai_awake:
+		return
+	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
+	var woke := false
+	if wake.get("attacked", false) and u.was_attacked:
+		woke = true
+	if wake.has("turn") and battle.turn >= wake.turn:
+		woke = true
+	if wake.has("radius"):
+		for p in players:
+			if BattleMap.distance(u.cell, p.cell) <= wake.radius:
+				woke = true
+	if wake.get("in_threat", false):
+		var reach: Dictionary = battle.map.get_reachable(u, battle.units())
+		var threat := threat_from(u, battle, reach.cells)
+		for p in players:
+			if threat.has(p.cell):
+				woke = true
+	if wake.has("group"):
+		for ally in _group(u, battle):
+			if ally.ai_awake:
+				woke = true
+	if woke:
+		u.ai_awake = true
+		for ally in _group(u, battle):
+			ally.ai_awake = true
+
+
+static func update_all_wake(battle: Node) -> void:
+	for e in battle.units_of(Unit.Team.ENEMY):
+		update_wake(e, battle)
+
+
+## Other units on the same side sharing this unit's wake group.
+static func _group(u: Unit, battle: Node) -> Array[Unit]:
+	var result: Array[Unit] = []
+	var group: String = u.ai.wake.get("group", "")
+	if group == "":
+		return result
+	for ally in battle.units_of(u.team):
+		if ally != u and ally.ai.wake.get("group", "") == group:
+			result.append(ally)
+	return result
+
+
+## Updates `retreating` from HP. Returns true when a retreat just started.
+static func update_retreat(u: Unit) -> bool:
+	var frac := float(u.hp) / u.max_hp
+	if u.retreating and frac >= u.ai.retreat_until:
+		u.retreating = false
+	elif not u.retreating and u.ai.retreat_below > 0.0 and frac <= u.ai.retreat_below:
+		u.retreating = true
+		return true
+	return false
+
+
+# --- Movement areas -----------------------------------------------------------------
+
+## Cells (with move cost) a unit in `mode` may act from, out of its full reach.
+static func allowed_cells(u: Unit, mode: String, reach_cells: Dictionary) -> Dictionary:
+	match mode:
+		"hold":
+			return {u.cell: 0}
+		"guard":
+			var result := {u.cell: 0}
+			for c in reach_cells:
+				if BattleMap.distance(c, u.anchor) <= u.ai.guard_radius:
+					result[c] = reach_cells[c]
+			return result
+	return reach_cells
+
+
+## Where an enemy could act from next phase, for the danger zone and hover ranges.
+## A sleeper counts as already awake (it could wake before it acts), so this
+## never understates the threat.
+static func movement_cells(u: Unit, battle: Node) -> Dictionary:
+	var reach: Dictionary = battle.map.get_reachable(u, battle.units())
+	var mode := current_move(u)
+	if not u.ai.wake.is_empty() and not u.ai_awake:
+		mode = u.ai.awake_move
+	if u.retreating:
+		return reach.cells
+	return allowed_cells(u, mode, reach.cells)
+
+
+## Cells threatened from the given movement cells with the unit's weapons and
+## affordable damage spells (the movement cells themselves included).
+static func threat_from(u: Unit, battle: Node, move_cells: Dictionary) -> Dictionary:
+	var cells := {}
+	var ranges: Array[Vector2i] = battle.offense_ranges(u, true)
+	if ranges.is_empty() or not u.ai.attack:
+		return cells
+	for c in move_cells:
+		cells[c] = true
+	for c in battle.map.get_attack_cells(move_cells, ranges):
+		cells[c] = true
+	return cells
+
+
+# --- Scoring ------------------------------------------------------------------------
+
+## How much the attacker wants to hit `target` for `dmg` at `hit`%, per its targeting settings.
+static func _target_score(attacker: Unit, dmg: int, hit: int, target: Unit) -> float:
+	var score: float
+	match attacker.ai.targeting:
+		"weakest":
+			# Lowest current HP first; expected damage only breaks ties.
+			score = dmg * hit * 0.1 - target.hp * 100.0
+		"kill":
+			score = dmg * hit - target.hp
+			if dmg >= target.hp:
+				score += 10.0 * hit * KILL_FOCUS
+		_:
+			score = dmg * hit - target.hp
+			if dmg >= target.hp:
+				score += 10.0 * hit
+	if dmg > 0 and attacker.ai.priority.has(target.unit_name):
+		score += PRIORITY_BONUS
 	return score
 
 
-## Expected counter damage (halved) if `target` can strike back at the enemy's current cell.
+## Expected counter damage if `target` can strike back at the enemy's current cell,
+## weighted by the enemy's caution.
 static func _counter_risk(enemy: Unit, target: Unit, map: BattleMap) -> float:
 	if not Combat.can_counter(enemy, target):
 		return 0.0
-	return 0.5 * Combat.damage(target, enemy, map) * Combat.hit_chance(target, enemy, map)
+	return enemy.ai.caution * Combat.damage(target, enemy, map) * Combat.hit_chance(target, enemy, map)
 
+
+# --- Turn ---------------------------------------------------------------------------
 
 static func take_turn(enemy: Unit, battle: Node) -> void:
 	var map: BattleMap = battle.map
-	var reach := map.get_reachable(enemy, battle.units())
-	var cells: Dictionary = reach.cells
 	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
 	if players.is_empty():
 		return
@@ -36,20 +170,61 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 	battle.cursor.cell = enemy.cell
 	await battle.get_tree().create_timer(0.2).timeout
 
-	if await _try_heal(enemy, battle, reach):
-		if is_instance_valid(enemy) and enemy.hp > 0:
-			enemy.has_acted = true
+	update_wake(enemy, battle)
+	if update_retreat(enemy):
+		enemy.popup("Retreat!", Color.LIGHT_GRAY)
+
+	var reach: Dictionary = map.get_reachable(enemy, battle.units())
+	var mode := current_move(enemy)
+	var allowed: Dictionary = reach.cells if enemy.retreating else allowed_cells(enemy, mode, reach.cells)
+
+	if await _try_heal(enemy, battle, {"cells": allowed, "parents": reach.parents}):
+		_finish(enemy)
 		return
 
-	# Find the best attack: every (weapon, cell, target) and every (spell, cell, target
-	# or blast center). Range affects the triangle and whether the target can counter,
-	# so evaluate each candidate with the enemy temporarily standing on that cell.
+	if enemy.retreating:
+		var dest := _retreat_cell(enemy, battle, reach)
+		await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
+		if enemy.ai.retreat_attacks:
+			var parting_shot := _best_attack(enemy, battle, {enemy.cell: 0})
+			if not parting_shot.is_empty():
+				await _execute_attack(enemy, battle, parting_shot, reach.parents)
+		_finish(enemy)
+		return
+
+	var plan := _best_attack(enemy, battle, allowed) if enemy.ai.attack else {}
+	if not plan.is_empty():
+		await _execute_attack(enemy, battle, plan, reach.parents)
+	else:
+		match mode:
+			"charge":
+				await _advance(enemy, battle, reach, players)
+			"guard":
+				if enemy.cell != enemy.anchor:
+					await _move_toward(enemy, battle, reach, enemy.anchor)
+			"goto":
+				if enemy.ai.destination != Vector2i(-1, -1):
+					await _move_toward(enemy, battle, reach, enemy.ai.destination)
+			# "hold" and "in_range" stay put.
+	_finish(enemy)
+
+
+## Untyped on purpose: the enemy may have died (and been freed) during its own
+## attack, and a typed parameter rejects freed objects before the check below runs.
+static func _finish(enemy) -> void:
+	if is_instance_valid(enemy) and enemy.hp > 0:
+		enemy.has_acted = true
+
+
+## Best attack from any of `cells`: every (weapon, cell, target) and every (spell,
+## cell, target or blast center). Range affects the triangle and whether the target
+## can counter, so each candidate is scored with the enemy standing on that cell.
+## Returns {} if nothing can be attacked.
+static func _best_attack(enemy: Unit, battle: Node, cells: Dictionary) -> Dictionary:
+	var map: BattleMap = battle.map
+	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
 	var all_units: Array[Unit] = battle.units()
-	var best_target: Unit = null
-	var best_cell := enemy.cell
-	var best_weapon: Dictionary = {}
-	var best_spell := ""
-	var best_center := Vector2i.ZERO
+	var best := {}
 	var best_score := -INF
 	var home := enemy.cell
 	var original: Dictionary = enemy.weapon
@@ -60,15 +235,12 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 				if not enemy.can_attack_at(BattleMap.distance(cell, p.cell)):
 					continue
 				enemy.cell = cell
-				var score: float = _hit_score(Combat.damage(enemy, p, map), Combat.hit_chance(enemy, p, map), p) \
+				var score: float = _target_score(enemy, Combat.damage(enemy, p, map), Combat.hit_chance(enemy, p, map), p) \
 					- cells[cell] * 0.01 - _counter_risk(enemy, p, map)
 				enemy.cell = home
 				if score > best_score:
 					best_score = score
-					best_target = p
-					best_cell = cell
-					best_weapon = w
-					best_spell = ""
+					best = {"target": p, "cell": cell, "weapon": w, "spell": ""}
 	if not original.is_empty():
 		enemy.equip(enemy.items.find(original))
 
@@ -86,14 +258,12 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 				for p in players:
 					if not Spells.reaches(s, BattleMap.distance(cell, p.cell)):
 						continue
-					var score: float = _hit_score(Combat.spell_damage(enemy, p, spell, map),
+					var score: float = _target_score(enemy, Combat.spell_damage(enemy, p, spell, map),
 						Combat.spell_hit_chance(enemy, p, spell, map), p) \
 						- cells[cell] * 0.01 - _counter_risk(enemy, p, map) - mp_cost
 					if score > best_score:
 						best_score = score
-						best_target = p
-						best_cell = cell
-						best_spell = s
+						best = {"target": p, "cell": cell, "spell": s}
 			elif spell.target == "area":
 				for c in Spells.area_centers(enemy, s, map, all_units):
 					var victims := Spells.area_targets(enemy, s, c, all_units, map)
@@ -101,54 +271,106 @@ static func take_turn(enemy: Unit, battle: Node) -> void:
 						continue
 					var score: float = -cells[cell] * 0.01 - mp_cost
 					for v in victims:
-						score += _hit_score(Combat.spell_damage(enemy, v, spell, map),
+						score += _target_score(enemy, Combat.spell_damage(enemy, v, spell, map),
 							Combat.spell_hit_chance(enemy, v, spell, map), v)
 					if score > best_score:
 						best_score = score
-						best_target = victims[0]
-						best_cell = cell
-						best_spell = s
-						best_center = c
+						best = {"target": victims[0], "cell": cell, "spell": s, "center": c}
 			enemy.cell = home
+	return best
 
-	if best_spell:
-		var spell := Spells.get_spell(best_spell)
-		await enemy.move_along(map.build_path(reach.parents, enemy.cell, best_cell))
-		if spell.target == "area":
-			battle.cursor.cell = best_center
-			await battle.cast_area(enemy, best_center, best_spell)
-		else:
-			battle.cursor.cell = best_target.cell
-			await battle.do_spell_attack(enemy, best_target, best_spell)
-	elif best_target:
-		enemy.equip(enemy.items.find(best_weapon))
-		await enemy.move_along(map.build_path(reach.parents, enemy.cell, best_cell))
-		battle.cursor.cell = best_target.cell
-		await battle.do_combat(enemy, best_target)
+
+static func _execute_attack(enemy: Unit, battle: Node, plan: Dictionary, parents: Dictionary) -> void:
+	var map: BattleMap = battle.map
+	if plan.spell == "":
+		enemy.equip(enemy.items.find(plan.weapon))
+	await enemy.move_along(map.build_path(parents, enemy.cell, plan.cell))
+	if plan.spell == "":
+		battle.cursor.cell = plan.target.cell
+		await battle.do_combat(enemy, plan.target)
+	elif Spells.get_spell(plan.spell).target == "area":
+		battle.cursor.cell = plan.center
+		await battle.cast_area(enemy, plan.center, plan.spell)
 	else:
-		# Advance toward the nearest player (measured by terrain cost). Units that
-		# can't attack follow their nearest ally instead of walking into the enemy.
-		var goals: Array[Unit] = players
-		var offensive_spells := enemy.spells.filter(func(s: String) -> bool: return not Spells.is_support(s))
-		if enemy.weapon.is_empty() and offensive_spells.is_empty():
-			goals = []
-			goals.assign(battle.units_of(enemy.team).filter(func(u: Unit) -> bool: return u != enemy))
-		if goals.is_empty():
-			enemy.has_acted = true
-			return
-		var nearest: Unit = goals[0]
-		for p in goals:
-			if BattleMap.distance(enemy.cell, p.cell) < BattleMap.distance(enemy.cell, nearest.cell):
-				nearest = p
-		var field := map.cost_field(nearest.cell)
-		var dest := enemy.cell
-		for cell in cells:
-			if field.get(cell, INF) < field.get(dest, INF):
-				dest = cell
-		await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
+		battle.cursor.cell = plan.target.cell
+		await battle.do_spell_attack(enemy, plan.target, plan.spell)
 
-	if is_instance_valid(enemy) and enemy.hp > 0:
-		enemy.has_acted = true
+
+# --- Fallback movement -----------------------------------------------------------
+
+## Advance toward the nearest player (measured by terrain cost). Units that can't
+## attack follow their nearest ally instead of walking into the enemy.
+static func _advance(enemy: Unit, battle: Node, reach: Dictionary, players: Array[Unit]) -> void:
+	var goals: Array[Unit] = players
+	var offensive_spells := enemy.spells.filter(func(s: String) -> bool: return not Spells.is_support(s))
+	if enemy.weapon.is_empty() and offensive_spells.is_empty():
+		goals = []
+		goals.assign(battle.units_of(enemy.team).filter(func(u: Unit) -> bool: return u != enemy))
+	if goals.is_empty():
+		return
+	var nearest: Unit = goals[0]
+	for p in goals:
+		if BattleMap.distance(enemy.cell, p.cell) < BattleMap.distance(enemy.cell, nearest.cell):
+			nearest = p
+	await _move_toward(enemy, battle, reach, nearest.cell)
+
+
+## Moves to the reachable cell closest (by terrain cost) to `target`.
+static func _move_toward(enemy: Unit, battle: Node, reach: Dictionary, target: Vector2i) -> void:
+	var map: BattleMap = battle.map
+	var dest := _closest_cell(map.cost_field(target, enemy.move_type), reach.cells, enemy.cell)
+	await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
+
+
+static func _closest_cell(field: Dictionary, cells: Dictionary, start: Vector2i) -> Vector2i:
+	var dest := start
+	for c in cells:
+		if field.get(c, INF) < field.get(dest, INF):
+			dest = c
+	return dest
+
+
+## Where a retreating unit heads this turn, per `retreat_to`: next to the nearest
+## ally that can heal, onto the nearest free healing tile, or away from players.
+static func _retreat_cell(u: Unit, battle: Node, reach: Dictionary) -> Vector2i:
+	var map: BattleMap = battle.map
+	var mode: String = u.ai.retreat_to
+	if mode == "healer_or_tile" or mode == "healer":
+		var healer: Unit = null
+		for ally in battle.units_of(u.team):
+			if ally == u:
+				continue
+			var can_heal: bool = ally.spells.any(func(s: String) -> bool:
+				return Spells.is_support(s) and Spells.can_afford(ally, s))
+			if can_heal and (healer == null
+					or BattleMap.distance(u.cell, ally.cell) < BattleMap.distance(u.cell, healer.cell)):
+				healer = ally
+		if healer:
+			return _closest_cell(map.cost_field(healer.cell, u.move_type), reach.cells, u.cell)
+	if mode == "healer_or_tile" or mode == "tile":
+		if map.terrain_heal(u.cell) > 0.0:
+			return u.cell
+		var tile := Vector2i(-1, -1)
+		for c in map.healing_cells():
+			var occupant: Unit = battle.unit_at(c)
+			if occupant and occupant != u:
+				continue
+			if tile == Vector2i(-1, -1) or BattleMap.distance(u.cell, c) < BattleMap.distance(u.cell, tile):
+				tile = c
+		if tile != Vector2i(-1, -1):
+			return _closest_cell(map.cost_field(tile, u.move_type), reach.cells, u.cell)
+	# Away: the reachable cell farthest from the nearest player.
+	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
+	var best := u.cell
+	var best_dist := -1
+	for c in reach.cells:
+		var nearest := 999
+		for p in players:
+			nearest = mini(nearest, BattleMap.distance(c, p.cell))
+		if nearest > best_dist:
+			best_dist = nearest
+			best = c
+	return best
 
 
 ## Moves to and heals the ally that would gain the most HP. Returns true if it cast.

@@ -3,8 +3,9 @@ extends RefCounted
 ## Spell definitions. Spells cost MP, are cast as an action on the caster's own
 ## phase, and never trigger as counters.
 
-## MP regained by every caster at the start of its own phase.
-const MP_REGEN := 2
+## MP regained by every unit at the start of its own phase. Kept low because
+## current MP is also magic defense: spent MP should stay spent for a while.
+const MP_REGEN := 1
 
 ## target: "ally"  = heal another unit on the caster's team.
 ##         "enemy" = single-target damage; the target may counter.
@@ -20,7 +21,7 @@ const DATA := {
 }
 
 ## Terrain that terraforming spells can transform.
-const TERRAFORMABLE: Array[String] = [".", "F"]
+const TERRAFORMABLE: Array[String] = [".", "F", "S"]
 
 
 static func get_spell(spell_name: String) -> Dictionary:
@@ -31,9 +32,9 @@ static func is_support(spell_name: String) -> bool:
 	return get_spell(spell_name).target == "ally"
 
 
-## HP restored by a healing spell: MAG + power, capped by the target's missing HP.
+## HP restored by a healing spell: INT + power, capped by the target's missing HP.
 static func heal_amount(caster: Unit, spell: Dictionary, target: Unit) -> int:
-	return mini(caster.magic + spell.power, target.max_hp - target.hp)
+	return mini(caster.intelligence + spell.power, target.max_hp - target.hp)
 
 
 static func can_afford(caster: Unit, spell_name: String) -> bool:

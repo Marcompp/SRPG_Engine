@@ -3,49 +3,6 @@ extends Node2D
 
 enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, BUSY, GAME_OVER }
 
-const PLAYER_UNITS := [
-	{"name": "Lord", "cell": Vector2i(1, 4), "lord": true, "items": ["Iron Sword", "Knife", "Potion"], "lv": 1,
-		"spells": ["Earth Spike"],
-		"hp": 18, "str": 5, "mag": 2, "skl": 8, "spd": 9, "lck": 7, "def": 4, "res": 1, "mov": 5, "mp": 8,
-		"growths": {"hp": 80, "str": 45, "mag": 20, "skl": 50, "spd": 40, "lck": 45, "def": 30, "res": 30, "mp": 30}},
-	{"name": "Fighter", "cell": Vector2i(2, 2), "items": ["Iron Axe", "Hatchet"], "lv": 2,
-		"hp": 24, "str": 7, "skl": 4, "spd": 5, "lck": 3, "def": 3, "res": 0, "mov": 5,
-		"growths": {"hp": 80, "str": 60, "skl": 40, "spd": 20, "lck": 45, "def": 25, "res": 15}},
-	{"name": "Knight", "cell": Vector2i(2, 6), "items": ["Iron Lance", "Javelin", "Potion"], "lv": 1,
-		"hp": 22, "str": 7, "skl": 4, "spd": 2, "lck": 2, "def": 9, "res": 1, "mov": 4,
-		"growths": {"hp": 90, "str": 40, "skl": 30, "spd": 30, "lck": 35, "def": 55, "res": 15}},
-	{"name": "Archer", "cell": Vector2i(1, 6), "items": ["Iron Bow"], "lv": 1,
-		"hp": 18, "str": 5, "skl": 7, "spd": 6, "lck": 4, "def": 3, "res": 1, "mov": 5,
-		"growths": {"hp": 60, "str": 40, "skl": 50, "spd": 60, "lck": 50, "def": 15, "res": 25}},
-	{"name": "Cleric", "cell": Vector2i(0, 5), "spells": ["Heal"], "lv": 1,
-		"hp": 16, "str": 1, "mag": 5, "skl": 5, "spd": 7, "lck": 6, "def": 1, "res": 6, "mov": 5, "mp": 12,
-		"growths": {"hp": 50, "str": 10, "mag": 55, "skl": 40, "spd": 45, "lck": 55, "def": 10, "res": 60, "mp": 40}},
-	{"name": "Mage", "cell": Vector2i(0, 3), "spells": ["Fire", "Firestorm"], "lv": 1,
-		"hp": 16, "str": 1, "mag": 6, "skl": 5, "spd": 6, "lck": 3, "def": 2, "res": 4, "mov": 5, "mp": 14,
-		"growths": {"hp": 55, "str": 5, "mag": 60, "skl": 45, "spd": 45, "lck": 30, "def": 15, "res": 40, "mp": 50}},
-	{"name": "Dancer", "cell": Vector2i(0, 7), "dancer": true, "items": ["Potion"], "lv": 1,
-		"hp": 15, "str": 1, "skl": 3, "spd": 10, "lck": 8, "def": 1, "res": 3, "mov": 5,
-		"growths": {"hp": 60, "str": 10, "skl": 30, "spd": 65, "lck": 60, "def": 15, "res": 35}},
-]
-const ENEMY_UNITS := [
-	{"name": "Thief", "cell": Vector2i(14, 1), "items": ["Knife"], "lv": 1,
-		"hp": 16, "str": 3, "skl": 5, "spd": 9, "lck": 2, "def": 1, "res": 1, "mov": 6},
-	{"name": "Brigand", "cell": Vector2i(12, 2), "items": ["Iron Axe", "Hatchet"], "lv": 2,
-		"hp": 20, "str": 5, "skl": 1, "spd": 4, "lck": 0, "def": 3, "res": 0, "mov": 5},
-	{"name": "Soldier", "cell": Vector2i(13, 4), "items": ["Iron Lance", "Javelin"], "lv": 1,
-		"hp": 18, "str": 5, "skl": 3, "spd": 4, "lck": 1, "def": 4, "res": 1, "mov": 5},
-	{"name": "Archer", "cell": Vector2i(14, 5), "items": ["Iron Bow"], "lv": 2,
-		"hp": 17, "str": 5, "skl": 4, "spd": 5, "lck": 1, "def": 2, "res": 1, "mov": 5},
-	{"name": "Brigand", "cell": Vector2i(12, 6), "items": ["Steel Axe"], "lv": 3,
-		"hp": 21, "str": 6, "skl": 2, "spd": 3, "lck": 0, "def": 2, "res": 0, "mov": 5},
-	{"name": "Cleric", "cell": Vector2i(14, 7), "spells": ["Heal"], "lv": 2,
-		"hp": 15, "str": 1, "mag": 4, "skl": 4, "spd": 6, "lck": 4, "def": 1, "res": 5, "mov": 5, "mp": 10},
-	{"name": "Mage", "cell": Vector2i(13, 6), "spells": ["Fire", "Firestorm"], "lv": 2,
-		"hp": 15, "str": 1, "mag": 5, "skl": 4, "spd": 5, "lck": 1, "def": 1, "res": 4, "mov": 5, "mp": 12},
-	{"name": "Mercenary", "cell": Vector2i(13, 8), "items": ["Killing Edge", "Iron Sword"], "lv": 3,
-		"hp": 19, "str": 4, "skl": 6, "spd": 8, "lck": 2, "def": 3, "res": 1, "mov": 5},
-]
-
 @onready var map: BattleMap = $Map
 @onready var units_root: Node2D = $Units
 @onready var cursor: Cursor = $Cursor
@@ -86,14 +43,21 @@ var arrow: Array[Vector2i] = []
 ## Unit shown on the stats screen, and the state to return to when it closes.
 var status_unit: Unit
 var status_return_state := State.IDLE
+## Current turn number (a turn is one player phase plus one enemy phase).
+var turn := 0
+
+
+const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 
 
 func _ready() -> void:
-	for data in PLAYER_UNITS:
+	var level := Levels.get_level(Levels.selected)
+	map.load_layout(level.layout)
+	for data in level.players:
 		units_root.add_child(Unit.create(data.name, Unit.Team.PLAYER, data.cell, data))
-	for data in ENEMY_UNITS:
+	for data in level.enemies:
 		units_root.add_child(Unit.create(data.name, Unit.Team.ENEMY, data.cell, data))
-	cursor.cell = PLAYER_UNITS[0].cell
+	cursor.cell = level.players[0].cell
 	start_player_phase()
 
 
@@ -160,7 +124,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					toggle_mark(u)
 				elif u == null:
 					ui.hide_info()
-					var options: Array[String] = ["End Turn"]
+					var options: Array[String] = ["End Turn", "Level Select"]
 					_open_menu("map", options)
 		State.SELECTED:
 			if dir != Vector2i.ZERO:
@@ -246,6 +210,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		State.GAME_OVER:
 			if accept:
 				get_tree().reload_current_scene()
+			elif cancel:
+				get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
 
 
 func _dir_from(event: InputEvent) -> Vector2i:
@@ -311,7 +277,7 @@ func update_arrow(target: Vector2i) -> void:
 	elif arrow.has(target):
 		arrow = arrow.slice(0, arrow.find(target) + 1)
 	elif not arrow.is_empty() and BattleMap.distance(arrow[-1], target) == 1 \
-			and path_cost(arrow) + map.move_cost(target) <= selected.mov:
+			and path_cost(arrow) + map.move_cost(target, selected.move_type) <= selected.mov:
 		arrow.append(target)
 	else:
 		arrow = map.build_path(reach.parents, selected.cell, target)
@@ -321,7 +287,7 @@ func update_arrow(target: Vector2i) -> void:
 func path_cost(path: Array[Vector2i]) -> int:
 	var total := 0
 	for c in path.slice(1):
-		total += map.move_cost(c)
+		total += map.move_cost(c, selected.move_type)
 	return total
 
 
@@ -342,10 +308,14 @@ func update_hover() -> void:
 	if state != State.IDLE:
 		return
 	hovered = unit_at(cursor.cell)
-	if hovered:
-		show_unit_ranges(hovered, map.get_reachable(hovered, units()))
-	else:
+	if not hovered:
 		map.clear_ranges()
+	elif hovered.team == Unit.Team.ENEMY:
+		# Enemies show where their behavior lets them act (a boss: just its tile).
+		var parents: Dictionary = map.get_reachable(hovered, units()).parents
+		show_unit_ranges(hovered, {"cells": EnemyAI.movement_cells(hovered, self), "parents": parents})
+	else:
+		show_unit_ranges(hovered, map.get_reachable(hovered, units()))
 
 
 ## Z on an enemy adds/removes its threat from the red overlay.
@@ -360,16 +330,7 @@ func toggle_mark(u: Unit) -> void:
 ## Every cell an enemy could attack next phase: where it can move, plus what its
 ## weapons and affordable damage spells reach from there.
 func enemy_threat(e: Unit) -> Dictionary:
-	var cells := {}
-	var ranges := offense_ranges(e, true)
-	if ranges.is_empty():
-		return cells
-	var e_reach := map.get_reachable(e, units())
-	for c in e_reach.cells:
-		cells[c] = true
-	for c in map.get_attack_cells(e_reach.cells, ranges):
-		cells[c] = true
-	return cells
+	return EnemyAI.threat_from(e, self, EnemyAI.movement_cells(e, self))
 
 
 func threat_of(enemies: Array[Unit]) -> Dictionary:
@@ -502,7 +463,11 @@ func _open_menu(context: String, options: Array[String]) -> void:
 func menu_accept() -> void:
 	match menu_context:
 		"map":
-			end_player_phase()
+			match ui.menu_choice():
+				"End Turn":
+					end_player_phase()
+				"Level Select":
+					get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
 		"unit":
 			match ui.menu_choice():
 				"Attack":
@@ -593,7 +558,8 @@ func show_target() -> void:
 		ui.show_heal_forecast(selected, target, active_spell, Spells.heal_amount(selected, spell, target), cursor.cell)
 	elif active_spell:
 		var spell := Spells.get_spell(active_spell)
-		ui.show_forecast(selected, target, Combat.spell_forecast(selected, target, spell, map), cursor.cell, active_spell)
+		ui.show_forecast(selected, target, Combat.spell_forecast(selected, target, spell, map), cursor.cell,
+			active_spell, true)
 	else:
 		ui.show_forecast(selected, target, Combat.forecast(selected, target, map), cursor.cell)
 
@@ -750,7 +716,7 @@ func can_shove(shover: Unit, target: Unit) -> bool:
 	if target.team != shover.team or BattleMap.distance(shover.cell, target.cell) != 1:
 		return false
 	var dest := shove_destination(shover, target)
-	return map.move_cost(dest) >= 0 and unit_at(dest) == null
+	return map.move_cost(dest, target.move_type) >= 0 and unit_at(dest) == null
 
 
 func shove_targets(u: Unit) -> Array[Unit]:
@@ -809,6 +775,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 	# even though its next item is equipped right away.
 	var broke: Array[Unit] = []
 	var dealt: Array[Unit] = []
+	defender.notify_attacked()
 	for pair in Combat.strike_order(attacker, defender):
 		var a: Unit = pair[0]
 		var d: Unit = pair[1]
@@ -830,6 +797,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 	var spell := Spells.get_spell(spell_name)
 	var dealt: Array[Unit] = []
+	target.notify_attacked()
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
 	var result := Combat.spell_strike(caster, target, spell, map)
@@ -851,6 +819,8 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 func cast_area(caster: Unit, center: Vector2i, spell_name: String) -> void:
 	var spell := Spells.get_spell(spell_name)
 	var victims := Spells.area_targets(caster, spell_name, center, units(), map)
+	for v in victims:
+		v.notify_attacked()
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
 	await caster.lunge(center)
@@ -951,7 +921,9 @@ func start_player_phase() -> void:
 		u.has_acted = false
 	for u in units_of(Unit.Team.PLAYER):
 		u.regen_mp(Spells.MP_REGEN)
-	await ui.show_banner("Player Phase", Color("2850b0"))
+	turn += 1
+	await ui.show_banner("Player Phase\nTurn %d" % turn, Color("2850b0"))
+	await heal_on_tiles(Unit.Team.PLAYER)
 	var players := units_of(Unit.Team.PLAYER)
 	if not players.is_empty():
 		cursor.cell = players[0].cell
@@ -960,12 +932,29 @@ func start_player_phase() -> void:
 	refresh_info()
 
 
+## Healing tiles (e.g. Forts) restore a share of max HP to `team`'s units at the
+## start of that team's phase.
+func heal_on_tiles(team: Unit.Team) -> void:
+	var healed := false
+	for u in units_of(team):
+		var rate := map.terrain_heal(u.cell)
+		if rate > 0.0 and u.hp < u.max_hp:
+			var amount := mini(ceili(u.max_hp * rate), u.max_hp - u.hp)
+			u.heal(amount)
+			u.popup("+%d" % amount, Color.PALE_GREEN)
+			healed = true
+	if healed:
+		await get_tree().create_timer(0.5).timeout
+
+
 func end_player_phase() -> void:
 	state = State.BUSY
 	ui.hide_info()
 	await ui.show_banner("Enemy Phase", Color("b02828"))
 	for e in units_of(Unit.Team.ENEMY):
 		e.regen_mp(Spells.MP_REGEN)
+	await heal_on_tiles(Unit.Team.ENEMY)
+	EnemyAI.update_all_wake(self)
 	for e in units_of(Unit.Team.ENEMY):
 		if not is_instance_valid(e) or e.hp <= 0:
 			continue

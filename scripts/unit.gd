@@ -9,6 +9,14 @@ const ENEMY_COLOR := Color("d84a3a")
 const ACTED_COLOR := Color("6a6a6a")
 const HP_COLOR := Color("5ee05e")
 const MP_COLOR := Color("5aa0ff")
+## Small corner mark showing a non-foot movement type at a glance.
+const MOVE_TYPE_BADGES := {
+	"horse": Color("8b5a2b"),
+	"rogue": Color("1f5f2a"),
+	"flying": Color("f0f0ff"),
+	"ship": Color("10204a"),
+	"mermaid": Color("3ad0c0"),
+}
 ## MP bar color when there isn't enough MP for any of the unit's spells.
 const MP_EMPTY_COLOR := Color("8a8a8a")
 
@@ -17,6 +25,19 @@ var team: Team = Team.PLAYER
 var is_lord := false
 ## Can use Dance to let an adjacent ally that already acted act again.
 var is_dancer := false
+## Movement type: a key of BattleMap.MOVE_COSTS ("foot", "horse", "rogue", "flying",
+## "ship", "mermaid"). Decides terrain costs and whether terrain bonuses apply.
+var move_type := "foot"
+## Enemy behavior (see AIProfiles), resolved from the roster's "ai" entry.
+var ai: Dictionary = AIProfiles.resolve({})
+## Whether a sleeping unit's wake condition has fired.
+var ai_awake := false
+## Set when a player targets this unit; read by the "attacked" wake condition.
+var was_attacked := false
+## Whether it's currently retreating to heal.
+var retreating := false
+## Starting cell; the center of a "guard" unit's area.
+var anchor := Vector2i.ZERO
 var level := 1
 var exp_points := 0
 ## Growth rates in percent, keyed like Experience.STATS ("hp", "str", ...).
@@ -24,14 +45,14 @@ var growths := {}
 var max_hp := 10
 var hp := 10
 var strength := 5
-var skill := 5
-var speed := 5
+var dexterity := 5
+var agility := 5
 var luck := 0
 var defense := 2
-var resistance := 0
-var magic := 0
+var intelligence := 0
 var mov := 5
-## Casters only (max_mp > 0); everyone else has no MP bar.
+## Everyone has MP: casters spend it on spells, and current MP is also magic
+## defense (see Combat.magic_defense). Only casters show an MP bar on the map.
 var max_mp := 0
 var mp := 0:
 	set(value):
@@ -68,18 +89,21 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.team = p_team
 	u.is_lord = stats.get("lord", false)
 	u.is_dancer = stats.get("dancer", false)
+	u.move_type = stats.get("move", "foot")
+	assert(BattleMap.MOVE_COSTS.has(u.move_type), "unknown move type: " + u.move_type)
+	u.ai = AIProfiles.resolve(stats.get("ai", {}))
+	u.anchor = p_cell
 	u.level = stats.get("lv", 1)
 	u.growths = stats.get("growths", {})
 	u.max_hp = stats.hp
 	u.hp = stats.hp
 	u.strength = stats.str
-	u.skill = stats.skl
-	u.speed = stats.spd
+	u.dexterity = stats.dex
+	u.agility = stats.agi
 	u.luck = stats.lck
 	u.defense = stats.def
 	u.mov = stats.mov
-	u.resistance = stats.get("res", 0)
-	u.magic = stats.get("mag", 0)
+	u.intelligence = stats.get("int", 0)
 	u.max_mp = stats.get("mp", 0)
 	u.mp = u.max_mp
 	u.spells.assign(stats.get("spells", []))
@@ -93,9 +117,8 @@ static func weapon_reaches(w: Dictionary, dist: int) -> bool:
 	return not w.is_empty() and dist >= w.min_rng and dist <= w.max_rng
 
 
-## Whether the equipped weapon can strike at this distance.
 func is_caster() -> bool:
-	return max_mp > 0
+	return not spells.is_empty()
 
 
 func regen_mp(amount: int) -> void:
@@ -127,6 +150,7 @@ func spell_ranges(support: bool) -> Array[Vector2i]:
 	return result
 
 
+## Whether the equipped weapon can strike at this distance.
 func can_attack_at(dist: int) -> bool:
 	return weapon_reaches(weapon, dist)
 
@@ -204,6 +228,10 @@ func lunge(toward: Vector2i) -> void:
 	await tw.finished
 
 
+func notify_attacked() -> void:
+	was_attacked = true
+
+
 func take_damage(amount: int) -> void:
 	hp = maxi(0, hp - amount)
 	queue_redraw()
@@ -255,6 +283,8 @@ func _draw() -> void:
 	draw_rect(Rect2(2, 1, 12, 11), Color.BLACK, false, 1.0)
 	if is_lord:
 		draw_rect(Rect2(5, 0, 6, 2), Color.GOLD)
+	if MOVE_TYPE_BADGES.has(move_type):
+		draw_rect(Rect2(11, 2, 2, 2), MOVE_TYPE_BADGES[move_type])
 	draw_string(ThemeDB.fallback_font, Vector2(2, 10), unit_name.left(1),
 		HORIZONTAL_ALIGNMENT_CENTER, 12, 9, Color.WHITE)
 	_draw_bar(13, 2, float(hp) / max_hp, HP_COLOR)

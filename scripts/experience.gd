@@ -14,18 +14,17 @@ const EMPTY_LEVEL_REROLLS := 2
 const STATS := {
 	"hp": "max_hp",
 	"str": "strength",
-	"mag": "magic",
-	"skl": "skill",
-	"spd": "speed",
+	"int": "intelligence",
+	"dex": "dexterity",
+	"agi": "agility",
 	"lck": "luck",
 	"def": "defense",
-	"res": "resistance",
 	"mp": "max_mp",
 }
-const STAT_LABELS := {"hp": "HP", "str": "Str", "mag": "Mag", "skl": "Skl", "spd": "Spd", "lck": "Lck",
-	"def": "Def", "res": "Res", "mp": "MP"}
-## Stats only shown/rolled for casters.
-const CASTER_STATS: Array[String] = ["mag", "mp"]
+const STAT_LABELS := {"hp": "HP", "str": "Str", "int": "Int", "dex": "Dex", "agi": "Agi", "lck": "Lck",
+	"def": "Def", "mp": "MP"}
+## Stats only shown/rolled for casters. MP isn't one: it's everyone's magic defense.
+const CASTER_STATS: Array[String] = ["int"]
 
 
 ## EXP a unit earns from one combat against `foe`.

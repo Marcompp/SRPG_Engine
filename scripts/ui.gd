@@ -81,7 +81,8 @@ func _make_panel(label: Label) -> PanelContainer:
 	return panel
 
 
-const FORECAST_ROWS: Array[String] = ["", "", "HP", "Dmg", "Hit", "Crit"]
+## The MP row is only shown for spells, where current MP is the magic defense.
+const FORECAST_ROWS: Array[String] = ["", "", "HP", "MP", "Dmg", "Hit", "Crit"]
 const DIM := Color(0.7, 0.75, 0.95)
 const ADVANTAGE := Color(0.5, 1.0, 0.5)
 const DISADVANTAGE := Color(1.0, 0.5, 0.5)
@@ -189,9 +190,7 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void
 		var lv := "Lv %d" % unit.level
 		if unit.team == Unit.Team.PLAYER:
 			lv += "  EXP %d" % unit.exp_points
-		var hp_line := "HP %d/%d" % [unit.hp, unit.max_hp]
-		if unit.is_caster():
-			hp_line += "  MP %d/%d" % [unit.mp, unit.max_mp]
+		var hp_line := "HP %d/%d  MP %d/%d" % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
 		text = "%s  %s\n%s\n" % [unit.unit_name, lv, hp_line]
 		if not unit.weapon.is_empty() or not unit.is_caster():
 			text += weapon + "\n"
@@ -205,10 +204,13 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i) -> void
 			text += "Spells: %s\n" % ", ".join(unit.spells)
 		if unit.is_dancer:
 			text += "Skill: Dance\n"
-		text += "STR %d  SKL %d  SPD %d  LCK %d\nDEF %d  RES %d  MOV %d\n" % [
-			unit.strength, unit.skill, unit.speed, unit.luck, unit.defense, unit.resistance, unit.mov]
+		text += "STR %d  DEX %d  AGI %d  LCK %d\nDEF %d  MOV %d" % [
+			unit.strength, unit.dexterity, unit.agility, unit.luck, unit.defense, unit.mov]
+		if unit.move_type != "foot":
+			text += " (%s)" % unit.move_type.capitalize()
 		if unit.is_caster():
-			text += "MAG %d\n" % unit.magic
+			text += "  INT %d" % unit.intelligence
+		text += "\n"
 	text += "%s  DEF+%d AVO+%d" % [terrain.name, terrain.def, terrain.avo]
 	_info_label.text = text
 	_place(_info, _away_right(cursor_cell), cursor_cell.y < 4)
@@ -248,9 +250,13 @@ func _refresh_menu() -> void:
 
 
 ## `atk_label` replaces the attacker's weapon name (e.g. with the spell being cast).
-func show_forecast(attacker: Unit, defender: Unit, f: Dictionary, cursor_cell: Vector2i, atk_label := "") -> void:
+## `magic` shows each side's MP, which spells subtract instead of DEF.
+func show_forecast(attacker: Unit, defender: Unit, f: Dictionary, cursor_cell: Vector2i, atk_label := "",
+		magic := false) -> void:
 	_fill_forecast_column(1, attacker, f.atk, true, atk_label)
 	_fill_forecast_column(2, defender, f.def, f.can_counter)
+	for label in _forecast_cells[3]:
+		label.visible = magic
 	_place(_forecast, _away_right(cursor_cell), false)
 
 
@@ -271,9 +277,10 @@ func _fill_forecast_column(col: int, unit: Unit, stats: Dictionary, can_attack: 
 	else:
 		weapon_label.remove_theme_color_override("font_color")
 	cells[2].text = str(unit.hp)
-	cells[3].text = ("%d%s" % [stats.dmg, " x2" if stats.double else ""]) if can_attack else "--"
-	cells[4].text = str(stats.hit) if can_attack else "--"
-	cells[5].text = str(stats.crit) if can_attack else "--"
+	cells[3].text = str(unit.mp)
+	cells[4].text = ("%d%s" % [stats.dmg, " x2" if stats.double else ""]) if can_attack else "--"
+	cells[5].text = str(stats.hit) if can_attack else "--"
+	cells[6].text = str(stats.crit) if can_attack else "--"
 
 
 func show_heal_forecast(caster: Unit, target: Unit, spell_name: String, amount: int, cursor_cell: Vector2i) -> void:
@@ -396,7 +403,7 @@ func show_end(text: String, color: Color) -> void:
 	hide_info()
 	hide_menu()
 	hide_forecast()
-	_banner_label.text = text + "\nPress Z to restart"
+	_banner_label.text = text + "\nZ: restart   X: level select"
 	_banner.color = Color(color, 0.85)
 	_banner.modulate.a = 1.0
 	_banner.visible = true
@@ -463,16 +470,14 @@ func show_status(unit: Unit) -> void:
 	var title := "%s  Lv %d" % [unit.unit_name, unit.level]
 	if unit.team == Unit.Team.PLAYER:
 		title += "  EXP %d" % unit.exp_points
-	title += "\nHP %d/%d" % [unit.hp, unit.max_hp]
-	if unit.is_caster():
-		title += "   MP %d/%d" % [unit.mp, unit.max_mp]
+	title += "\nHP %d/%d   MP %d/%d" % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
 	_status_title.text = title
 
 	var stats := [["STR", unit.strength]]
 	if unit.is_caster():
-		stats.append(["MAG", unit.magic])
-	stats.append_array([["SKL", unit.skill], ["SPD", unit.speed], ["LCK", unit.luck],
-		["DEF", unit.defense], ["RES", unit.resistance], ["MOV", unit.mov]])
+		stats.append(["INT", unit.intelligence])
+	stats.append_array([["DEX", unit.dexterity], ["AGI", unit.agility], ["LCK", unit.luck],
+		["DEF", unit.defense], ["MOV", "%d %s" % [unit.mov, unit.move_type.capitalize()]]])
 	_fill_pair_grid(_status_stats, stats)
 
 	# Combat numbers for the equipped weapon (before terrain and the weapon triangle).

@@ -26,9 +26,9 @@ static func triangle(a: Unit, b: Unit) -> int:
 	return 0
 
 
-## Speed after weapon weight burden (STR offsets weight).
+## Agility after weapon weight burden (STR offsets weight).
 static func attack_speed(u: Unit) -> int:
-	return u.speed - maxi(0, u.weapon.get("wt", 0) - u.strength)
+	return u.agility - maxi(0, u.weapon.get("wt", 0) - u.strength)
 
 
 # Unit-only parts of the formulas (equipped weapon, no target or terrain). These are
@@ -39,7 +39,7 @@ static func base_attack(u: Unit) -> int:
 
 
 static func base_hit(u: Unit) -> int:
-	return u.weapon.hit + u.skill * 2 + int(u.luck * 0.5)
+	return u.weapon.hit + u.dexterity * 2 + int(u.luck * 0.5)
 
 
 static func base_avoid(u: Unit) -> int:
@@ -47,21 +47,21 @@ static func base_avoid(u: Unit) -> int:
 
 
 static func base_crit(u: Unit) -> int:
-	return u.weapon.crit + int(u.skill * 0.5)
+	return u.weapon.crit + int(u.dexterity * 0.5)
 
 
 static func damage(attacker: Unit, defender: Unit, map: BattleMap) -> int:
 	if attacker.weapon.is_empty():
 		return 0
 	var atk: int = base_attack(attacker) + triangle(attacker, defender) * TRIANGLE_DMG
-	return maxi(0, atk - (defender.defense + map.terrain_def(defender.cell)))
+	return maxi(0, atk - (defender.defense + map.unit_terrain_def(defender)))
 
 
 static func hit_chance(attacker: Unit, defender: Unit, map: BattleMap) -> int:
 	if attacker.weapon.is_empty():
 		return 0
 	var hit: int = base_hit(attacker) + triangle(attacker, defender) * TRIANGLE_HIT
-	var avoid: int = base_avoid(defender) + map.terrain_avoid(defender.cell)
+	var avoid: int = base_avoid(defender) + map.unit_terrain_avoid(defender)
 	return clampi(hit - avoid, 0, 100)
 
 
@@ -121,20 +121,25 @@ static func side_stats(attacker: Unit, defender: Unit, map: BattleMap) -> Dictio
 
 
 # --- Magic --------------------------------------------------------------------
-# Spells target RES instead of DEF, ignore the weapon triangle and never double.
+# Spells target magic defense instead of DEF, ignore the weapon triangle and never double.
+
+## Current MP, so a caster that has spent MP is easier to hurt with magic.
+static func magic_defense(u: Unit) -> int:
+	return u.mp
+
 
 static func spell_damage(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> int:
-	return maxi(0, caster.magic + spell.power - (target.resistance + map.terrain_def(target.cell)))
+	return maxi(0, caster.intelligence + spell.power - (magic_defense(target) + map.unit_terrain_def(target)))
 
 
 static func spell_hit_chance(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> int:
-	var hit: int = spell.hit + caster.skill * 2 + int(caster.luck * 0.5)
-	var avoid: int = attack_speed(target) * 2 + target.luck + map.terrain_avoid(target.cell)
+	var hit: int = spell.hit + caster.dexterity * 2 + int(caster.luck * 0.5)
+	var avoid: int = attack_speed(target) * 2 + target.luck + map.unit_terrain_avoid(target)
 	return clampi(hit - avoid, 0, 100)
 
 
 static func spell_crit_chance(caster: Unit, target: Unit, spell: Dictionary) -> int:
-	return clampi(spell.get("crit", 0) + int(caster.skill * 0.5) - target.luck, 0, 100)
+	return clampi(spell.get("crit", 0) + int(caster.dexterity * 0.5) - target.luck, 0, 100)
 
 
 ## Resolves one spell hit, same shape as strike().

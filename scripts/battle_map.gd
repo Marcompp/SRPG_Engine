@@ -5,26 +5,28 @@ extends Node2D
 const TILE := 16
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
-# cost < 0 means impassable.
+# heal: fraction of max HP restored at the start of the occupant's phase (healing tiles).
 const TERRAIN := {
-	".": {"name": "Plain", "cost": 1, "def": 0, "avo": 0, "color": Color("78b04f")},
-	"F": {"name": "Forest", "cost": 2, "def": 1, "avo": 20, "color": Color("4e8a3a")},
-	"M": {"name": "Mountain", "cost": -1, "def": 0, "avo": 0, "color": Color("8a7a5c")},
-	"~": {"name": "River", "cost": -1, "def": 0, "avo": 0, "color": Color("3f7fd0")},
+	".": {"name": "Plain", "def": 0, "avo": 0, "color": Color("78b04f")},
+	"F": {"name": "Forest", "def": 1, "avo": 20, "color": Color("4e8a3a")},
+	"M": {"name": "Mountain", "def": 0, "avo": 0, "color": Color("8a7a5c")},
+	"~": {"name": "River", "def": 0, "avo": 0, "color": Color("3f7fd0")},
+	"W": {"name": "Sea", "def": 0, "avo": 0, "color": Color("2a5fa8")},
+	"S": {"name": "Sand", "def": 0, "avo": 5, "color": Color("d8c78a")},
+	"T": {"name": "Fort", "def": 2, "avo": 20, "heal": 0.2, "color": Color("9c8a6a")},
 }
 
-const LAYOUT: Array[String] = [
-	"....F..~....F..",
-	".FF....~.....F.",
-	"...............",
-	"..MM...~..MM...",
-	"..M....~...M...",
-	"....F..~..F....",
-	"...............",
-	".FF....~...FF..",
-	"..F....~....F..",
-	".......~.......",
-]
+## Movement cost per move type and terrain key; -1 means impassable.
+const MOVE_COSTS := {
+	"foot": {".": 1, "F": 2, "M": -1, "~": -1, "W": -1, "S": 1, "T": 2},
+	"horse": {".": 1, "F": 3, "M": -1, "~": -1, "W": -1, "S": 2, "T": 2},
+	"rogue": {".": 1, "F": 1, "M": -1, "~": -1, "W": -1, "S": 1, "T": 2},
+	"flying": {".": 1, "F": 1, "M": 1, "~": 1, "W": 1, "S": 1, "T": 1},
+	"ship": {".": -1, "F": -1, "M": -1, "~": 1, "W": 1, "S": -1, "T": -1},
+	"mermaid": {".": 2, "F": 3, "M": -1, "~": 1, "W": 1, "S": 2, "T": 2},
+}
+## Move types that get no DEF/AVO from terrain (they fly over it).
+const NO_TERRAIN_BONUS: Array[String] = ["flying"]
 
 const MOVE_COLOR := Color(0.3, 0.5, 1.0, 0.5)
 const ATTACK_COLOR := Color(1.0, 0.25, 0.25, 0.45)
@@ -36,10 +38,10 @@ const MARKED_COLOR := Color(0.9, 0.1, 0.1, 0.3)
 const MARKED_EDGE_COLOR := Color(1.0, 0.35, 0.35, 0.95)
 const ARROW_COLOR := Color(1.0, 0.85, 0.25, 0.95)
 
-var cols := LAYOUT[0].length()
-var rows := LAYOUT.size()
-## Live terrain, starts as LAYOUT and can be changed by spells (see set_terrain).
-var grid: Array[String] = LAYOUT.duplicate()
+var cols := 0
+var rows := 0
+## Live terrain: starts as the level's layout and can be changed by spells (see set_terrain).
+var grid: Array[String] = []
 var move_cells: Array = []
 var attack_cells: Array = []
 var support_cells: Array = []
@@ -65,6 +67,13 @@ static func distance(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
 
 
+func load_layout(layout: Array) -> void:
+	grid.assign(layout)
+	rows = grid.size()
+	cols = grid[0].length()
+	queue_redraw()
+
+
 func in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < cols and cell.y < rows
 
@@ -84,10 +93,11 @@ func set_terrain(cell: Vector2i, key: String) -> void:
 	queue_redraw()
 
 
-func move_cost(cell: Vector2i) -> int:
+## Cost to enter `cell` for a unit of `move_type` (-1 = impassable or off the map).
+func move_cost(cell: Vector2i, move_type := "foot") -> int:
 	if not in_bounds(cell):
 		return -1
-	return terrain_at(cell).cost
+	return MOVE_COSTS[move_type][terrain_key(cell)]
 
 
 func terrain_def(cell: Vector2i) -> int:
@@ -96,6 +106,29 @@ func terrain_def(cell: Vector2i) -> int:
 
 func terrain_avoid(cell: Vector2i) -> int:
 	return terrain_at(cell).avo
+
+
+## Terrain DEF/AVO the unit actually gets where it stands (fliers get none).
+func unit_terrain_def(u: Unit) -> int:
+	return 0 if NO_TERRAIN_BONUS.has(u.move_type) else terrain_def(u.cell)
+
+
+func unit_terrain_avoid(u: Unit) -> int:
+	return 0 if NO_TERRAIN_BONUS.has(u.move_type) else terrain_avoid(u.cell)
+
+
+## Fraction of max HP this cell restores at the start of its occupant's phase.
+func terrain_heal(cell: Vector2i) -> float:
+	return terrain_at(cell).get("heal", 0.0)
+
+
+func healing_cells() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for y in rows:
+		for x in cols:
+			if terrain_heal(Vector2i(x, y)) > 0.0:
+				result.append(Vector2i(x, y))
+	return result
 
 
 ## Dijkstra limited by the unit's MOV. Allies can be passed through but not
@@ -116,7 +149,7 @@ func get_reachable(unit: Unit, units: Array[Unit]) -> Dictionary:
 		frontier.remove_at(best)
 		for d in DIRS:
 			var nxt := cur + d
-			var step := move_cost(nxt)
+			var step := move_cost(nxt, unit.move_type)
 			if step < 0:
 				continue
 			if occupied.has(nxt) and occupied[nxt].team != unit.team:
@@ -163,9 +196,9 @@ func get_attack_cells(move_set: Dictionary, ranges: Array[Vector2i]) -> Array:
 	return result.keys()
 
 
-## Unbounded terrain-cost distance from `target` to every cell (ignores units).
-## Used by the AI to approach targets around obstacles.
-func cost_field(target: Vector2i) -> Dictionary:
+## Unbounded terrain-cost distance from `target` to every cell (ignores units),
+## for a unit of `move_type`. Used by the AI to approach targets around obstacles.
+func cost_field(target: Vector2i, move_type := "foot") -> Dictionary:
 	var costs := {target: 0}
 	var frontier: Array[Vector2i] = [target]
 	while not frontier.is_empty():
@@ -177,7 +210,7 @@ func cost_field(target: Vector2i) -> Dictionary:
 		frontier.remove_at(best)
 		for d in DIRS:
 			var nxt := cur + d
-			var step := move_cost(nxt)
+			var step := move_cost(nxt, move_type)
 			if step < 0:
 				continue
 			var total: int = costs[cur] + step
@@ -272,4 +305,17 @@ func _draw_tile(cell: Vector2i) -> void:
 		"~":
 			draw_line(o + Vector2(3, 5), o + Vector2(8, 5), Color("8fc0f0"))
 			draw_line(o + Vector2(8, 11), o + Vector2(13, 11), Color("8fc0f0"))
+		"W":
+			draw_line(o + Vector2(2, 4), o + Vector2(6, 4), Color("5a8ad0"))
+			draw_line(o + Vector2(9, 9), o + Vector2(14, 9), Color("5a8ad0"))
+			draw_line(o + Vector2(3, 13), o + Vector2(7, 13), Color("5a8ad0"))
+		"S":
+			for dot in [Vector2(3, 4), Vector2(10, 3), Vector2(6, 9), Vector2(12, 12), Vector2(3, 13)]:
+				draw_rect(Rect2(o + dot, Vector2(1, 1)), Color("b8a668"))
+		"T":
+			# Small stone keep with battlements and a door.
+			draw_rect(Rect2(o + Vector2(3, 5), Vector2(10, 9)), Color("b8b0a0"))
+			for bx in [3, 7, 11]:
+				draw_rect(Rect2(o + Vector2(bx, 3), Vector2(2, 2)), Color("b8b0a0"))
+			draw_rect(Rect2(o + Vector2(7, 10), Vector2(2, 4)), Color("5a4630"))
 	draw_rect(Rect2(o, Vector2(TILE, TILE)), Color(0, 0, 0, 0.12), false, 1.0)
