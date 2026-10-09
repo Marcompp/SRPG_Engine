@@ -302,7 +302,8 @@ static func magic_defense(u: Unit) -> int:
 static func spell_damage(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> int:
 	var power: int = spell.power * multiplier(spell, target)
 	var atk: int = caster.combat_int() + power + mods(caster, target, map, caster).atk
-	var dmg := maxi(0, atk - (magic_defense(target) + map.unit_terrain_def(target)))
+	var res: int = magic_defense(target) + map.unit_terrain_def(target) + mods(target, caster, map, caster).res
+	var dmg := maxi(0, atk - res)
 	if resists(target, spell):
 		dmg = floori(dmg / 2.0)
 	return dmg

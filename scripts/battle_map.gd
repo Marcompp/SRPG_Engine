@@ -5,16 +5,11 @@ extends Node2D
 const TILE := 16
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
-## Movement types (a class's "move"):
-##   foot (most units), heavy (armor), horse, rogue (scouts), climb (hills/mountains),
-##   swim (water), mermaid (aquatic), ship (seafaring), flying, spirit,
-##   swim_climb (Berserker, amphibious races) and rogue_swim_climb (amphibious
-##   scouts): hybrids, see HYBRID_MOVES.
-## A unit's race can override its class's move type (see Races).
-const MOVE_TYPES: Array[String] = ["foot", "heavy", "horse", "rogue", "climb", "swim",
-	"mermaid", "ship", "flying", "spirit", "swim_climb", "rogue_swim_climb"]
-## Hybrid move types: on each terrain, the cheapest cost among their parts.
-const HYBRID_MOVES := {"swim_climb": ["swim", "climb"], "rogue_swim_climb": ["rogue", "swim", "climb"]}
+## Movement types (a class's "move"): what the unit is: foot (most units), heavy
+## (armor), horse, mermaid (aquatic), ship (seafaring), flying, spirit. A unit's race
+## can override its class's move type (see Races). Terrain specialties (Swimming,
+## Climbing, Forester) are skills with "terrain_costs" (see Skills, unit_cost()).
+const MOVE_TYPES: Array[String] = ["foot", "heavy", "horse", "mermaid", "ship", "flying", "spirit"]
 ## Move types that get no DEF/AVO from terrain (they pass over it).
 const NO_TERRAIN_BONUS: Array[String] = ["flying", "spirit"]
 const IMPASSABLE := -1.0
@@ -38,21 +33,21 @@ const TERRAIN := {
 	"D": {"name": "Dune", "def": 0, "avo": 15, "color": Color("c9ac62"),
 		"cost": {"*": 1.5, "horse": 3, "mermaid": 2, "ship": 4}},
 	"F": {"name": "Forest", "def": 1, "avo": 20, "color": Color("4e8a3a"),
-		"cost": {"*": 2, "rogue": 1.5, "mermaid": 3, "horse": 4, "ship": 10}},
+		"cost": {"*": 2, "mermaid": 3, "horse": 4, "ship": 10}},
 	"#": {"name": "Thicket", "def": 2, "avo": 30, "color": Color("2f5f2c"),
-		"cost": {"*": 10, "horse": 20, "ship": 20, "rogue": 6}},
+		"cost": {"*": 10, "horse": 20, "ship": 20}},
 	"h": {"name": "Hill", "def": 2, "avo": 20, "color": Color("9aa25a"),
-		"cost": {"*": 4, "climb": 2, "horse": 10, "mermaid": 10, "heavy": 10, "ship": 20}},
+		"cost": {"*": 4, "horse": 10, "mermaid": 10, "heavy": 10, "ship": 20}},
 	"M": {"name": "Mountain", "def": 3, "avo": 30, "color": Color("8a7a5c"),
-		"cost": {"*": 7, "climb": 4, "horse": 15, "mermaid": 15, "heavy": 15, "ship": 20}},
+		"cost": {"*": 7, "horse": 15, "mermaid": 15, "heavy": 15, "ship": 20}},
 	"~": {"name": "River", "def": 0, "avo": 10, "color": Color("3f7fd0"),
-		"cost": {"*": 6, "swim": 2, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
+		"cost": {"*": 6, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
 	"L": {"name": "Lake", "def": 0, "avo": 10, "color": Color("4a8ad8"),
-		"cost": {"*": 6, "swim": 2, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
+		"cost": {"*": 6, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
 	"W": {"name": "Sea", "def": 0, "avo": 10, "color": Color("2a5fa8"),
-		"cost": {"*": 6, "swim": 2, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
+		"cost": {"*": 6, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
 	"v": {"name": "Waterfall", "def": 0, "avo": 30, "color": Color("7ab8f0"),
-		"cost": {"*": 20, "mermaid": 6, "swim": 6, "ship": 8}},
+		"cost": {"*": 20, "mermaid": 6, "ship": 8}},
 	"*": {"name": "Snow", "def": 0, "avo": 5, "color": Color("e6edf3"),
 		"cost": {"*": 1, "horse": 1.5, "mermaid": 2, "ship": 5}},
 	"i": {"name": "Ice", "def": 0, "avo": -20, "color": Color("b6def0"),
@@ -94,13 +89,6 @@ const BRIDGE_LENGTH := 3
 static func cost_for(key: String, move_type: String) -> float:
 	if move_type == "spirit":
 		return 1.0
-	if HYBRID_MOVES.has(move_type):
-		var best := IMPASSABLE
-		for part: String in HYBRID_MOVES[move_type]:
-			var c := cost_for(key, part)
-			if c >= 0 and (best < 0 or c < best):
-				best = c
-		return best
 	var cost: Dictionary = TERRAIN[key].cost
 	if cost.has(move_type):
 		return cost[move_type]
@@ -302,9 +290,14 @@ func healing_cells() -> Array[Vector2i]:
 
 ## Dijkstra limited by the unit's MOV. Allies can be passed through but not
 ## stopped on; enemies block. Returns {"cells": {cell: cost}, "parents": {cell: prev}}.
-## What entering `cell` costs `u`: its move type's cost, or 1 with Pathfinder.
+## What entering `cell` costs `u`: its move type's cost, or less with terrain skills
+## (Swimming, Climbing, Forester), or 1 with Pathfinder.
 func unit_cost(u: Unit, cell: Vector2i) -> float:
 	var cost := move_cost(cell, u.move_type)
+	if in_bounds(cell):
+		var special := Skills.terrain_cost(u, terrain_key(cell))
+		if special >= 0 and (cost < 0 or special < cost):
+			cost = special
 	if cost > 0 and Skills.map_rules(u).has("pathfinder"):
 		return 1.0
 	return cost
@@ -383,7 +376,8 @@ func get_attack_cells(move_set: Dictionary, ranges: Array[Vector2i]) -> Array:
 ## for a unit of `move_type`. Used by the AI to approach targets around obstacles.
 ## `extra` gives costs for cells that are otherwise impassable (the AI uses it to
 ## plan through breakable tiles and doors).
-func cost_field(target: Vector2i, move_type := "foot", extra := {}) -> Dictionary:
+## `mover`: a Unit (its own costs, skills included) or a move type name.
+func cost_field(target: Vector2i, mover: Variant = "foot", extra := {}) -> Dictionary:
 	var costs := {target: 0.0}
 	var frontier: Array[Vector2i] = [target]
 	while not frontier.is_empty():
@@ -395,7 +389,7 @@ func cost_field(target: Vector2i, move_type := "foot", extra := {}) -> Dictionar
 		frontier.remove_at(best)
 		for d in DIRS:
 			var nxt := cur + d
-			var step: float = extra.get(nxt, move_cost(nxt, move_type))
+			var step: float = extra.get(nxt, unit_cost(mover, nxt) if mover is Unit else move_cost(nxt, mover))
 			if step < 0:
 				continue
 			var total: float = costs[cur] + step

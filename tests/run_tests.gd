@@ -139,6 +139,9 @@ func _run_all() -> void:
 		"test_movement_skills",
 		"test_canto",
 		"test_aura_adjacency_and_growth_skills",
+		"test_steal_and_lockpick",
+		"test_range_skills",
+		"test_class_skill_effects",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -1117,36 +1120,36 @@ func test_move_type_costs() -> void:
 	isolate([fighter])
 	var m: BattleMap = b.map
 	# The full terrain spec: MOV cost per move type, in this column order.
-	var types := ["foot", "heavy", "horse", "rogue", "climb", "swim", "mermaid", "ship", "flying", "spirit"]
+	var types := ["foot", "heavy", "horse", "mermaid", "ship", "flying", "spirit"]
 	var x := -1.0
 	var spec := {
-		".": [1, 1, 1, 1, 1, 1, 3, 6, 1, 1],
-		"=": [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 1.5, 5, 1, 1],
-		"H": [1, 1, 1.2, 1, 1, 1, 1, 10, 1, 1],
-		"T": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1, 1],
-		"S": [1, 1, 1.5, 1, 1, 1, 2, 5, 1, 1],
-		"D": [1.5, 1.5, 3, 1.5, 1.5, 1.5, 2, 4, 1, 1],
-		"F": [2, 2, 4, 1.5, 2, 2, 3, 10, 1, 1],
-		"#": [10, 10, 20, 6, 10, 10, 10, 20, 1, 1],
-		"h": [4, 10, 10, 4, 2, 4, 10, 20, 1, 1],
-		"M": [7, 15, 15, 7, 4, 7, 15, 20, 1, 1],
-		"~": [6, 8, 8, 6, 6, 2, 1, 1, 1, 1],
-		"L": [6, 8, 8, 6, 6, 2, 1, 1, 1, 1],
-		"W": [6, 8, 8, 6, 6, 2, 1, 1, 1, 1],
-		"v": [20, 20, 20, 20, 20, 6, 6, 8, 1, 1],
-		"*": [1, 1, 1.5, 1, 1, 1, 2, 5, 1, 1],
-		"i": [1.5, 1, 2, 1.5, 1.5, 1.5, 1, 4, 1, 1],
-		"_": [1, 1, 1.5, 1, 1, 1, 3, 10, 1.5, 1],
-		"c": [1, 1, 1.5, 1, 1, 1, 3, 10, 1.5, 1],
-		"X": [x, x, x, x, x, x, x, x, x, 1],
-		"I": [2, 2, 2, 2, 2, 2, 2, 20, 1, 1],
-		"O": [x, x, x, x, x, x, x, x, 1, 1],
-		"|": [x, x, x, x, x, x, x, x, 1, 1],
-		"x": [x, x, x, x, x, x, x, x, x, 1],
-		"/": [x, x, x, x, x, x, x, x, 1, 1],
-		"Y": [x, x, x, x, x, x, x, x, 1, 1],
-		"+": [x, x, x, x, x, x, x, x, x, 1],
-		"B": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+		".": [1, 1, 1, 3, 6, 1, 1],
+		"=": [0.7, 0.7, 0.7, 1.5, 5, 1, 1],
+		"H": [1, 1, 1.2, 1, 10, 1, 1],
+		"T": [1.5, 1.5, 1.5, 1.5, 1.5, 1, 1],
+		"S": [1, 1, 1.5, 2, 5, 1, 1],
+		"D": [1.5, 1.5, 3, 2, 4, 1, 1],
+		"F": [2, 2, 4, 3, 10, 1, 1],
+		"#": [10, 10, 20, 10, 20, 1, 1],
+		"h": [4, 10, 10, 10, 20, 1, 1],
+		"M": [7, 15, 15, 15, 20, 1, 1],
+		"~": [6, 8, 8, 1, 1, 1, 1],
+		"L": [6, 8, 8, 1, 1, 1, 1],
+		"W": [6, 8, 8, 1, 1, 1, 1],
+		"v": [20, 20, 20, 6, 8, 1, 1],
+		"*": [1, 1, 1.5, 2, 5, 1, 1],
+		"i": [1.5, 1, 2, 1, 4, 1, 1],
+		"_": [1, 1, 1.5, 3, 10, 1.5, 1],
+		"c": [1, 1, 1.5, 3, 10, 1.5, 1],
+		"X": [x, x, x, x, x, x, 1],
+		"I": [2, 2, 2, 2, 20, 1, 1],
+		"O": [x, x, x, x, x, 1, 1],
+		"|": [x, x, x, x, x, 1, 1],
+		"x": [x, x, x, x, x, x, 1],
+		"/": [x, x, x, x, x, 1, 1],
+		"Y": [x, x, x, x, x, 1, 1],
+		"+": [x, x, x, x, x, x, 1],
+		"B": [1, 1, 1, 1, 1, 1, 1],
 	}
 	check_eq(spec.size(), BattleMap.TERRAIN.size(), "every terrain is covered by the spec")
 	for key in spec:
@@ -1243,6 +1246,8 @@ func test_rescue_and_drop_ferry() -> void:
 	await pick("Rescue")
 	check_eq(b.map.area_cells, [lord.cell], "rescue target previewed")
 	await press(KEY_Z)
+	check(b.input.canto_move, "Cavalry has Canto")
+	await press(KEY_X)  # stay put
 	check(fighter.carrying == lord and lord.carried_by == fighter, "Lord is being carried")
 	check(not b.units().has(lord), "carried units are off the map")
 	check(not lord.visible, "and hidden")
@@ -1260,6 +1265,7 @@ func test_rescue_and_drop_ferry() -> void:
 	await pick("Drop")
 	var drop_cell: Vector2i = b.input.target_cells[0]
 	await press(KEY_Z)
+	await press(KEY_X)  # no Canto move
 	check(fighter.carrying == null and lord.carried_by == null, "dropped")
 	check_eq(lord.cell, drop_cell, "Lord set down on the chosen cell")
 	check(b.units().has(lord) and lord.visible, "back on the map")
@@ -1336,29 +1342,31 @@ func test_swim_and_climb_costs() -> void:
 	# Exact costs are in test_move_type_costs; this checks what they mean on a map.
 	var m: BattleMap = b.map
 	var brig := unit_named("Brigand", Unit.Team.ENEMY)
-	check_eq(brig.move_type, "climb", "Brigands climb")
+	check(brig.move_type == "foot" and Skills.has(brig, "Climbing"), "Brigands are foot units that climb")
 	isolate([brig])
 	brig.set_cell(Vector2i(1, 3))  # next to the (2, 3) mountain
-	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(2, 3)), "a MOV 5 climber can scale a mountain (4)")
-	brig.move_type = "foot"
+	check_eq(m.unit_cost(brig, Vector2i(2, 3)), 4.0, "Climbing: mountains cost 4")
+	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(2, 3)), "a MOV 5 climber can scale a mountain")
+	brig.set_class("Axeman")
 	check(not m.get_reachable(brig, b.units()).cells.has(Vector2i(2, 3)), "a MOV 5 foot unit can't (7)")
 	brig.set_cell(Vector2i(6, 0))  # next to the river at (7, 0)
-	brig.move_type = "swim"
-	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(7, 0)), "a swimmer wades into the river (2)")
-	# Berserkers keep the best of both on every terrain.
-	check_eq(Classes.get_data("Berserker").move, "swim_climb", "Berserkers swim and climb")
-	for key in BattleMap.TERRAIN:
-		var swim := BattleMap.cost_for(key, "swim")
-		var climb := BattleMap.cost_for(key, "climb")
-		var best := minf(swim, climb) if swim >= 0 and climb >= 0 else maxf(swim, climb)
-		check(is_equal_approx(BattleMap.cost_for(key, "swim_climb"), best),
-			"swim_climb on '%s': expected %s, got %s" % [key, best, BattleMap.cost_for(key, "swim_climb")])
-	check_eq(BattleMap.cost_for("M", "swim_climb"), 4.0, "climbs mountains like a climber")
-	check_eq(BattleMap.cost_for("~", "swim_climb"), 2.0, "swims rivers like a swimmer")
-	brig.move_type = "swim_climb"
+	brig.set_class("Corsair")
+	check_eq(m.unit_cost(brig, Vector2i(7, 0)), 2.0, "Swimming: rivers cost 2")
+	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(7, 0)), "a swimmer wades into the river")
+	check_eq(m.unit_cost(brig, Vector2i(4, 5)), 2.0, "but forests cost what they cost any foot unit")
+	# Berserkers have both.
+	brig.set_class("Berserker")
 	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(7, 0)), "a Berserker wades into the river")
 	brig.set_cell(Vector2i(1, 3))
 	check(m.get_reachable(brig, b.units()).cells.has(Vector2i(2, 3)), "and scales the mountain")
+	# Scouts: Forester.
+	brig.set_class("Rogue")
+	check_eq(m.unit_cost(brig, Vector2i(4, 5)), 1.5, "Forester: forests cost 1.5")
+	# Terrain skills only lower costs: a horse with Swimming still pays 4 in forests.
+	brig.set_class("Cavalry")
+	brig.learned.assign(["Swimming"])
+	check_eq(m.unit_cost(brig, Vector2i(4, 5)), 4.0, "a swimming horse is still slow in forests")
+	check_eq(m.unit_cost(brig, Vector2i(7, 0)), 2.0, "but swims")
 
 
 func test_inspire_buffs_adjacent_allies() -> void:
@@ -1683,15 +1691,15 @@ func test_race_movement_and_tags() -> void:
 	knight.set_class("Footman")
 	check_eq(knight.mov, base + 1, "+1 MOV in a foot class")
 	knight.set_race("Lizal")
-	check_eq(knight.move_type, "swim_climb", "Lizal on foot swims and climbs")
+	check(Skills.has(knight, "Swimming") and Skills.has(knight, "Climbing"), "Lizal on foot swims and climbs")
 	check_eq(knight.mov, base, "bonus gone with the race")
 	thief.set_race("Lizal")
-	check_eq(thief.move_type, "rogue_swim_climb", "a Lizal scout keeps scout movement too")
-	check(is_equal_approx(BattleMap.cost_for("#", "rogue_swim_climb"), 6.0)
-		and is_equal_approx(BattleMap.cost_for("W", "rogue_swim_climb"), 2.0)
-		and is_equal_approx(BattleMap.cost_for("M", "rogue_swim_climb"), 4.0), "cheapest of the three")
+	check(Skills.has(thief, "Forester") and Skills.has(thief, "Swimming"), "a Lizal scout keeps scout movement too")
+	check(is_equal_approx(b.map.unit_cost(thief, Vector2i(4, 5)), 1.5)
+		and is_equal_approx(b.map.unit_cost(thief, Vector2i(7, 0)), 2.0)
+		and is_equal_approx(b.map.unit_cost(thief, Vector2i(2, 3)), 4.0), "cheapest of the three")
 	knight.set_class("Cavalry")
-	check_eq(knight.move_type, "horse", "a Lizal rider just rides")
+	check(knight.move_type == "horse" and not Skills.has(knight, "Swimming"), "a Lizal rider just rides")
 	fighter.set_race("Harpy")
 	check_eq(fighter.move_type, "flying", "Harpies fly")
 	fighter.set_class("Cavalry")
@@ -2674,7 +2682,7 @@ func test_battle_modifier_skills() -> void:
 	lord.personal_skills.assign(["Wrath"])
 	check_eq(Combat.forecast(lord, brig, b.map).atk.crit, base.atk.crit, "Wrath: nothing at full HP")
 	lord.hp = lord.max_hp / 2
-	check_eq(Combat.forecast(lord, brig, b.map).atk.crit, mini(base.atk.crit + 20, 100), "+20 Crit at half HP")
+	check_eq(Combat.forecast(lord, brig, b.map).atk.crit, mini(base.atk.crit + 30, 100), "+30 Crit at half HP")
 	lord.hp = lord.max_hp
 	lord.personal_skills.assign(["Axebreaker"])
 	var f := Combat.forecast(lord, brig, b.map)
@@ -2885,3 +2893,98 @@ func test_aura_adjacency_and_growth_skills() -> void:
 	check(is_equal_approx(Skills.exp_multiplier(lord), 2.2), "Paragon doubles EXP (and Adaptable stacks)")
 	lord.personal_skills.assign(["Renewal"])
 	check(is_equal_approx(Skills.turn_heal(lord), 0.3), "Renewal: 30% each turn")
+
+
+func test_steal_and_lockpick() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	_spawn_enemy(Vector2i(14, 9))
+	# An idle ally keeps the player phase open after the Lord acts.
+	b.units_root.add_child(Unit.create("Idle", Unit.Team.PLAYER, Vector2i(0, 0), {"class": "Axeman", "items": [],
+		"hp": 20, "str": 5, "dex": 5, "agi": 5, "lck": 5, "def": 5, "mov": 5}))
+	lord.set_class("Rogue")
+	check(Skills.has(lord, "Lockpick") and b.actions.can_open_chest(lord), "Rogues pick locks")
+	brig.items.append(Items.make("Potion"))
+	lord.agility = brig.combat_agi()
+	check(b.actions.steal_targets(lord).is_empty(), "no Steal without more AGI")
+	lord.agility = brig.combat_agi() + 1
+	check_eq(b.actions.stealable_items(brig), [brig.items.size() - 1] as Array[int], "only non-weapons")
+	var exp_before := lord.exp_points
+	await open_menu_in_place(lord)
+	await pick("Steal")
+	check(b.ui._spell_label.text.contains("Potion"), "the forecast lists what it can take")
+	await press(KEY_Z)
+	check_eq(b.input.menu_context, "steal", "then pick the item")
+	await press(KEY_Z)
+	check(lord.items.any(func(it): return it.name == "Potion"), "stolen")
+	check(not brig.items.any(func(it): return it.name == "Potion"), "and gone from the foe")
+	check(lord.has_acted, "stealing ends the turn")
+	check(lord.exp_points != exp_before or lord.level > 1, "and gives EXP")
+
+
+func test_range_skills() -> void:
+	var archer := unit_named("Archer")
+	check_eq(archer.max_range, 2, "an Iron Bow reaches 2")
+	archer.personal_skills.assign(["Bow Range +1"])
+	check_eq(archer.max_range, 3, "Bow Range +1: 3")
+	check(archer.can_attack_at(3) and not archer.can_attack_at(4), "attacks at 3")
+	check(archer.weapon_ranges().has(Vector2i(2, 3)), "and its threat range grows")
+	var lord := unit_named("Lord")
+	lord.personal_skills.assign(["Bow Range +1"])
+	check(not lord.can_attack_at(2), "only bows")
+	var mage := unit_named("Mage")
+	var fire_max: int = Spells.get_spell("Fire").max_rng
+	check(not Spells.reaches("Fire", fire_max + 1, mage), "Fire's normal range")
+	mage.personal_skills.assign(["Spell Range +1"])
+	check(Spells.reaches("Fire", fire_max + 1, mage), "Spell Range +1")
+
+
+func test_class_skill_effects() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	_spawn_enemy(Vector2i(14, 9))
+	# Prayer: adjacent allies heal at the start of the phase.
+	var cleric := Unit.create("Priest", Unit.Team.PLAYER, Vector2i(4, 6), {"class": "Cleric", "items": [],
+		"hp": 16, "str": 1, "dex": 5, "agi": 5, "lck": 5, "def": 1, "mov": 5, "learn": {1: "Prayer"}})
+	b.units_root.add_child(cleric)
+	check(cleric.learned.has("Prayer"), "Prayer learned")
+	lord.hp = 1
+	await b.phases.heal_on_tiles(Unit.Team.PLAYER)
+	check_eq(lord.hp, 1 + ceili(lord.max_hp * 0.1), "Prayer heals the adjacent Lord 10%")
+	# Highlander: +15 Hit on mountains.
+	var base: int = Combat.forecast(brig, lord, b.map).atk.hit
+	brig.personal_skills.assign(["Highlander"])
+	check_eq(Combat.forecast(brig, lord, b.map).atk.hit, base, "not on plains")
+	brig.set_cell(Vector2i(3, 3))  # a mountain
+	lord.set_cell(Vector2i(4, 3))
+	var on_mountain: int = Combat.forecast(brig, lord, b.map).atk.hit
+	brig.personal_skills.clear()
+	check_eq(on_mountain, mini(Combat.forecast(brig, lord, b.map).atk.hit + 15, 100), "+15 Hit on a mountain")
+	# Warding: +5 magic defense.
+	var mage := Unit.create("Witch", Unit.Team.ENEMY, Vector2i(5, 4), {"class": "Mage", "items": [], "spells": ["Fire"],
+		"hp": 16, "str": 1, "int": 8, "dex": 5, "agi": 5, "lck": 5, "def": 1, "mov": 5, "mp": 10})
+	b.units_root.add_child(mage)
+	var fire := Spells.get_spell("Fire")
+	var plain := Combat.spell_damage(mage, lord, fire, b.map)
+	lord.personal_skills.assign(["Warding"])
+	check_eq(Combat.spell_damage(mage, lord, fire, b.map), maxi(plain - 5, 0), "Warding: -5 spell damage")
+	# Footwork: Canto only after Dancing.
+	lord.personal_skills.assign(["Footwork", "Dance"])
+	cleric.set_cell(Vector2i(4, 2))
+	cleric.has_acted = true
+	lord.set_cell(Vector2i(5, 2))
+	lord.has_acted = false
+	await open_menu_in_place(lord)
+	await pick("Dance")
+	await press(KEY_Z)
+	check(b.input.canto_move, "Footwork: it can move after Dancing")
+	await press(KEY_X)
+	lord.has_acted = false
+	await open_menu_in_place(lord)
+	await pick("Wait")
+	check(not b.input.canto_move and lord.has_acted, "but not after other actions")
+	# Races that only take plain foot classes can't be scouts.
+	check(not Races.allows("Stoneborn", "Rogue"), "Stoneborn can't be Rogues")
+	check(Races.allows("Stoneborn", "Footman"), "but can be Footmen")

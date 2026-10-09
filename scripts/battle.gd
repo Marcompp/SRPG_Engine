@@ -150,7 +150,7 @@ func offense_ranges(u: Unit, affordable_only := false) -> Array[Vector2i]:
 	for s in u.spells:
 		if Spells.is_support(s) or (affordable_only and not Spells.can_afford(u, s)):
 			continue
-		var r := Spells.reach_ranges(s)
+		var r := Spells.reach_ranges(s, u)
 		if not offense.has(r):
 			offense.append(r)
 	return offense

@@ -31,15 +31,10 @@ const MOVE_TYPES := {
 	"foot": "On foot: the standard costs for every terrain.",
 	"heavy": "Heavy armor: slow in hills, mountains and water, but sure-footed on ice. Weak to Hammers.",
 	"horse": "Mounted on horseback: fast on open ground, slowed by forests, sand and indoors. Weak to Pikes. Can Rescue allies; can't Shove or be Shoved.",
-	"rogue": "Scout: moves through forests and thickets more easily.",
-	"climb": "Climber: crosses hills and mountains more easily.",
-	"swim": "Swimmer: wades rivers, lakes and the sea, and can get past waterfalls.",
 	"mermaid": "Aquatic: moves freely through water, slowly on land.",
 	"ship": "Seafaring: sails water; land is very slow going. Weak to Woodcutters.",
 	"flying": "Flying: 1 MOV over any terrain except walls (1.5 indoors), but no terrain bonuses. Weak to bows. Can Rescue allies; can't Shove or be Shoved.",
 	"spirit": "Spirit: 1 MOV through anything, walls included, but no terrain bonuses. Takes half damage from weapons that aren't silver.",
-	"swim_climb": "Swimmer and climber: the cheaper of the two on every terrain.",
-	"rogue_swim_climb": "Scout, swimmer and climber: the cheapest of the three on every terrain.",
 }
 
 const WEAPON_NOTES := {

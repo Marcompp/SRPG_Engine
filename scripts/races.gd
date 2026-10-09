@@ -6,8 +6,9 @@ extends RefCounted
 ## tags:       effectiveness tags added to the class's (see Unit.tags, Combat.TAG_TRAITS).
 ## move:       movement type used whatever the class.
 ## winged:     moves as flying, unless the class is mounted.
-## amphibious: in a foot or scout class, also swims and climbs.
-## bonus_mov:  extra MOV in foot and scout classes.
+## amphibious: in a foot class (scouts included), also swims and climbs: it gets the
+##             Swimming and Climbing skills (see Skills.sources).
+## bonus_mov:  extra MOV in foot classes (scouts included).
 ## banned:     classes it can't take: "mounted" or a move type.
 ## only:       move types of the only classes it can take.
 ## carrier:    can Rescue and Shove in any class; can't be Rescued or Shoved.
@@ -47,8 +48,8 @@ const DATA := {
 		"description": "Undead: weak to silver, Fire and Light; resists Dark. Spiritual: always moves and counts as a spirit. Immune to poison."},
 }
 
-## Foot and scout move types (what "foot and scout classes" means above).
-const FOOT_MOVES: Array[String] = ["foot", "rogue", "climb", "swim", "swim_climb"]
+## Classes with terrain skills (scouts, climbers, swimmers) count as foot classes.
+const FOOT_MOVES: Array[String] = ["foot"]
 
 
 static func get_data(race: String) -> Dictionary:
@@ -61,6 +62,9 @@ static func allows(race: String, class_id: String) -> bool:
 	var r := get_data(race)
 	var c := Classes.get_data(class_id)
 	if r.has("only") and not r.only.has(c.move):
+		return false
+	# "Foot classes only" means plain foot: no scouts, climbers or swimmers.
+	if r.has("only") and not Skills.innate_terrain_skills(c).is_empty():
 		return false
 	for ban: String in r.get("banned", []):
 		if (ban == "mounted" and c.get("mounted", false)) or ban == c.move:
@@ -79,8 +83,6 @@ static func move_type(race: String, class_id: String) -> String:
 		return r.move
 	if r.get("winged", false) and not c.get("mounted", false):
 		return "flying"
-	if r.get("amphibious", false) and FOOT_MOVES.has(move):
-		return "rogue_swim_climb" if move == "rogue" else "swim_climb"
 	return move
 
 

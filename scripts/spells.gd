@@ -43,16 +43,21 @@ static func can_afford(caster: Unit, spell_name: String) -> bool:
 	return caster.mp >= get_spell(spell_name).mp
 
 
-static func reaches(spell_name: String, dist: int) -> bool:
+## `caster`'s range skills ("spell" in Skills "range") add to the max range.
+static func reaches(spell_name: String, dist: int, caster: Unit = null) -> bool:
 	var s := get_spell(spell_name)
-	return dist >= s.min_rng and dist <= s.max_rng
+	return dist >= s.min_rng and dist <= s.max_rng + _bonus(caster)
+
+
+static func _bonus(caster: Unit) -> int:
+	return Skills.range_bonus(caster, "spell") if caster else 0
 
 
 ## Furthest distance from the caster a spell can affect (cast range + area radius).
-static func reach_ranges(spell_name: String) -> Vector2i:
+static func reach_ranges(spell_name: String, caster: Unit = null) -> Vector2i:
 	var s := get_spell(spell_name)
 	var radius: int = s.get("radius", 0)
-	return Vector2i(maxi(1, s.min_rng - radius), s.max_rng + radius)
+	return Vector2i(maxi(1, s.min_rng - radius), s.max_rng + _bonus(caster) + radius)
 
 
 ## Valid unit targets for a heal or single-target spell from the caster's current cell.
@@ -71,7 +76,7 @@ static func targets_for(caster: Unit, spell_name: String, units: Array[Unit]) ->
 					continue
 			_:
 				continue
-		if reaches(spell_name, BattleMap.distance(caster.cell, u.cell)):
+		if reaches(spell_name, BattleMap.distance(caster.cell, u.cell), caster):
 			result.append(u)
 	return result
 
@@ -103,10 +108,11 @@ static func area_targets(caster: Unit, spell_name: String, center: Vector2i, uni
 static func area_centers(caster: Unit, spell_name: String, map: BattleMap, units: Array[Unit]) -> Array[Vector2i]:
 	var s := get_spell(spell_name)
 	var result: Array[Vector2i] = []
-	for dx in range(-s.max_rng, s.max_rng + 1):
-		for dy in range(-s.max_rng, s.max_rng + 1):
+	var far: int = s.max_rng + _bonus(caster)
+	for dx in range(-far, far + 1):
+		for dy in range(-far, far + 1):
 			var c := caster.cell + Vector2i(dx, dy)
-			if not map.in_bounds(c) or not reaches(spell_name, absi(dx) + absi(dy)):
+			if not map.in_bounds(c) or not reaches(spell_name, absi(dx) + absi(dy), caster):
 				continue
 			if s.has("terraform"):
 				if not TERRAFORMABLE.has(map.terrain_key(c)):

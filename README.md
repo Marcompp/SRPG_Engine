@@ -32,7 +32,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Chapter | Objective | Also introduces | Recruits |
 |---|---|---|---|
 | 1. Border Village | Rout | Villages to Visit; a Thief that burns them | Lord, Rider, Fighter, Archer, Cleric |
-| 2. Hill Fort | Seize the throne | Chests (Rogues open them freely, others need a Chest Key) | Scout |
+| 2. Hill Fort | Seize the throne | Chests (Lockpick opens them freely, others need a Chest Key) | Scout |
 | 3. The Bandit King | Defeat the boss | Boss on a hilltop fort | Pegasus |
 | 4. The Siege | Defend the town hall 7 turns | Reinforcement waves; losing if an enemy reaches the tile | Guard, Mage |
 | 5. Flight from the Keep | Escape (Lord through the gate) | Escape command; other units can leave early | Dancer |
@@ -89,36 +89,38 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - Map readability: enemy danger zone, per-enemy range view, a movement arrow that follows the cursor's trail, full unit stats screen
 - Configurable enemy behaviors (see below) and Fort tiles (DEF +2, AVO +20, heal 20% max HP at the start of the occupant's phase)
 - Movement types (see below), shown as a small colored badge on each unit
-- Skills (design: [docs/skills.md](docs/skills.md)), defined in `scripts/skills.gd`. A unit has the skills of every source: personal (roster `"skills"`), class, race, learned, its equipped weapon and the non-weapon items it holds (rings). Learned skills come from level-up tables (class or roster `"learn": {level: skill}`) and scrolls, capped at 5: learning a sixth asks which to forget (or not to learn it; an unread scroll isn't used up). Skills can give stat bonuses, unit menu commands (Dance, Inspire), turn-start healing/MP, an EXP multiplier and immunities; racial traits (Human EXP bonus, Troll regeneration, Fairy MP, poison immunity) are race skills. The status screen's Skills page lists them with their source (skills marked hidden never show), and skill-boosted stats show in gold. Combat skills: battle modifiers with conditions (Wrath, Death Blow, Darting Blow, Steady Stance, the Breakers), strike-order rules (Vantage, Desperation, Quick Riposte, Wary Fighter, Dazzle, Close Counter) and procs that roll each strike and pop up their name (Luna, Sol, Lethality, Pavise, Aegis, Miracle). The forecast and the enemy AI include modifiers and rules but not procs. Also: after-combat effects (Lifetaker, Galeforce, Poison Strike, Savage Blow), turn-start healing (Renewal), movement (Pass, Pathfinder, Canto: move again with the MOV left after acting, not after Wait), auras (Charisma, Anathema, Fortify), adjacency conditions (Solo Fighter) and growth/EXP skills (Aptitude, Paragon)
+- Skills (design: [docs/skills.md](docs/skills.md)), defined in `scripts/skills.gd`. A unit has the skills of every source: personal (roster `"skills"`), class, race, learned, its equipped weapon and the non-weapon items it holds (rings). Learned skills come from level-up tables (class or roster `"learn": {level: skill}`) and scrolls, capped at 5: learning a sixth asks which to forget (or not to learn it; an unread scroll isn't used up). Skills can give stat bonuses, unit menu commands (Dance, Inspire), turn-start healing/MP, an EXP multiplier and immunities; racial traits (Human EXP bonus, Troll regeneration, Fairy MP, poison immunity) are race skills. The status screen's Skills page lists them with their source (skills marked hidden never show), and skill-boosted stats show in gold. Combat skills: battle modifiers with conditions (Wrath, Death Blow, Darting Blow, Steady Stance, the Breakers), strike-order rules (Vantage, Desperation, Quick Riposte, Wary Fighter, Dazzle, Close Counter) and procs that roll each strike and pop up their name (Luna, Sol, Lethality, Pavise, Aegis, Miracle). The forecast and the enemy AI include modifiers and rules but not procs. Also: after-combat effects (Lifetaker, Galeforce, Poison Strike, Savage Blow), turn-start healing (Renewal), movement (Pass, Pathfinder, Canto: move again with the MOV left after acting, not after Wait), auras (Charisma, Anathema, Fortify), adjacency conditions (Solo Fighter) and growth/EXP skills (Aptitude, Paragon). Class skills (see Classes): terrain movement (Forester, Climbing, Swimming), Steal (take a non-weapon item from an adjacent foe with lower AGI), Lockpick (chests and doors without a key), Canto on mounted classes, range bonuses (Bow Range +1, Spell Range +1), terrain Hit bonuses (Sea Legs, Ambush, Highlander), Prayer (adjacent allies heal 10% each turn), Footwork (Canto after Dancing), Warding (+5 magic defense)
 - Hidden gender (`Unit.gender`, "male" or "female"): never shown, but rules can check it (e.g. mounts that only take some riders). Set with `"gender"` in a roster entry; units without one get a random gender. Saved with the unit
 - Breakable tiles: **Break** picks a weapon that reaches a breakable tile, then the tile. It always hits for the unit's Attack (STR + Mt), with no counter, crit or EXP, and uses weapon durability. Works at range. Cracked Wall (20 HP) becomes floor, Cracked Fence (10 HP) becomes plain, and a Trunk (15 HP) becomes plain and falls into adjacent river/lake water as a Bridge of up to 3 tiles (away from the attacker if there's water that way, otherwise toward the first side with water). Hovering a breakable tile shows its remaining HP. Tile HP is kept when suspending
-- Doors (20 HP): **Open Door** for an adjacent unit that could open a chest (rogues freely, anyone else uses up a Chest Key); otherwise they must be broken
+- Doors (20 HP): **Open Door** for an adjacent unit that could open a chest (Lockpick: freely, anyone else uses up a Chest Key); otherwise they must be broken
 
 ## Classes
 
 Set with `"class"` in a unit's roster entry (required); defined in `scripts/classes.gd`. Stats stay per unit. Promotion is data only for now (it will happen in a battle prep screen and keep the unit's level).
 
-| Group | Class | Weapons | Move | Notes | Promotes to |
-|---|---|---|---|---|---|
-| Foot | Swordsman | Sword | foot | | Swordsmaster (Sword) |
-| | Footman | Spear | foot | | Hoplite (Spear) |
-| | Axeman | Axe | foot | | Berserker (Axe; swim_climb) |
-| | Archer | Bow | foot | | Marksman (Bow) |
-| Rogue | Rogue | Sword | rogue | | Assassin (Sword, Bow) |
-| | Corsair | Sword | swim | | Swashbuckler (Sword, Axe; swim) |
-| | Brigand | Axe | climb | | Berserker (Axe; swim_climb) |
-| | Poacher | Bow | rogue | | Reaver (Bow, Axe) |
-| Armor | Guard | Spear | foot | | Juggernaut (Spear, Axe, Bow) |
-| | Turret | Bow | foot | | Juggernaut |
-| Mage | Mage | Staff | foot | | Sorcerer (Staff, Sword) |
-| | Cleric | Staff | foot | | Bishop (Staff, Spear) |
-| Horse | Equestrian | Sword | horse | Mounted | Gendarme (Sword, Spear) |
-| | Cavalry | Spear | horse | Mounted | Gendarme |
-| | Nomad | Bow | horse | Mounted | Hussar (Bow, Spear) |
-| Flying | Flier | Spear | flying | Mounted | Whitewing (Spear, Sword) |
-| Ship | Galley | Bow | ship | Board/Unload, holds 2 | |
-| Special | Performer | Sword | foot | Dance | |
-| | Bannerman | Spear | foot | Inspire | |
+Innate skills come with the class (a promoted class lists its own full set); Lv 10 skills are learned for good on reaching level 10 in the class (see Skills). Scouts, climbers and swimmers move as foot units with a terrain skill.
+
+| Group | Class | Weapons | Move | Innate skills | Lv 10 | Promotes to (innate skills) |
+|---|---|---|---|---|---|---|
+| Foot | Swordsman | Sword | foot | | Speed +2 | Swordsmaster (Sword; Crit +20) |
+| | Footman | Spear | foot | | | Hoplite (Spear) |
+| | Axeman | Axe | foot | | Strength +2 | Berserker (Axe; Swimming, Climbing, Wrath) |
+| | Archer | Bow | foot | | Skill +4 | Marksman (Bow; Bow Range +1) |
+| Rogue | Rogue | Sword | foot | Forester, Steal, Lockpick | Evasion | Assassin (Sword, Bow; Forester, Steal, Lockpick, Lethality) |
+| | Corsair | Sword | foot | Swimming | Sea Legs | Swashbuckler (Sword, Axe; Swimming, Pass) |
+| | Brigand | Axe | foot | Climbing | Highlander | Berserker |
+| | Poacher | Bow | foot | Forester | Ambush | Reaver (Bow, Axe; Forester, Pathfinder) |
+| Armor | Guard | Spear | heavy | | Defense +2 | Juggernaut (Spear, Axe, Bow; Warding) |
+| | Turret | Bow | heavy | | | Juggernaut |
+| Mage | Mage | Staff | foot | | Magic +2 | Sorcerer (Staff, Sword; Spell Range +1) |
+| | Cleric | Staff | foot | | Prayer | Bishop (Staff, Spear) |
+| Horse | Equestrian | Sword | horse | Canto | | Gendarme (Sword, Spear; Canto) |
+| | Cavalry | Spear | horse | Canto | | Gendarme |
+| | Nomad | Bow | horse | Canto | | Hussar (Bow, Spear; Canto) |
+| Flying | Flier | Spear | flying | Canto | | Whitewing (Spear, Sword; Canto) |
+| Ship | Galley | Bow | ship | (Board/Unload, holds 2) | | |
+| Special | Performer | Sword | foot | Dance | Footwork | |
+| | Bannerman | Spear | foot | Inspire | | |
 
 Spells are separate from classes: any unit with `"spells"` in its roster entry can cast them.
 
@@ -134,8 +136,8 @@ Set with `"race"` in a unit's roster entry (default Human); defined in `scripts/
 | Elf | fae | | | |
 | Fairy | flying, fae | flying unless mounted | +1 MP regen | |
 | Naga | aquatic, reptile | mermaid | | Mounted classes |
-| Lizal | reptile | foot/scout classes also swim and climb | Poison immune* | |
-| Centaur | horse | horse; +1 MOV in foot/scout classes | Can Rescue and Shove; can't be Rescued or Shoved | Flying classes |
+| Lizal | reptile | foot classes (scouts too) also get Swimming and Climbing | Poison immune* | |
+| Centaur | horse | horse; +1 MOV in foot classes | Can Rescue and Shove; can't be Rescued or Shoved | Flying classes |
 | Minotaur | horse | | | Mounted classes |
 | Harpy | flying | flying unless mounted | | Heavy classes |
 | Ent | wooden | heavy | Can't be Rescued or Shoved | Mounted classes |
@@ -161,31 +163,31 @@ A unit's class sets its movement type. Costs live in `BattleMap.TERRAIN` (– = 
 
 A unit's race can override it (see Races).
 
-Movement types: **foot** (most units), **heavy** (armor), **horse**, **rogue** (scouts), **climb**, **swim**, **mermaid** (aquatic), **ship** (seafaring), **flying**, **spirit**, and the hybrids **swim_climb** (Berserker, amphibious races) and **rogue_swim_climb** (amphibious scouts), which pay the cheapest of their parts' costs on every tile. Fliers and spirits get no terrain DEF/AVO. Fliers pay 1 MOV anywhere a tile doesn't list them, and spirits always pay 1 MOV, even through walls, abysses and fences.
+Movement types: **foot** (most units), **heavy** (armor), **horse**, **mermaid** (aquatic), **ship** (seafaring), **flying**, **spirit**. Terrain specialties are skills that make their own terrain cheaper and nothing else: **Forester** (forest 1.5, thicket 6: scouts), **Climbing** (hill 2, mountain 4: Brigands), **Swimming** (river/lake/sea 2, waterfall 6: Corsairs); Berserkers and amphibious races in foot classes have both Swimming and Climbing. **Pathfinder** makes every enterable tile cost 1. Fliers and spirits get no terrain DEF/AVO. Fliers pay 1 MOV anywhere a tile doesn't list them, and spirits always pay 1 MOV, even through walls, abysses and fences.
 
-| Terrain | DEF | AVO | foot | heavy | horse | rogue | climb | swim | mermaid | ship | flying |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Plain `.` | | | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 6 | 1 |
-| Path `=` | | -20 | 0.7 | 0.7 | 0.7 | 0.7 | 0.7 | 0.7 | 1.5 | 5 | 1 |
-| House `H` | | +15 | 1 | 1 | 1.2 | 1 | 1 | 1 | 1 | 10 | 1 |
-| Fort `T` (heals 20%) | +3 | +25 | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 1 |
-| Sand `S` | | +5 | 1 | 1 | 1.5 | 1 | 1 | 1 | 2 | 5 | 1 |
-| Dune `D` | | +15 | 1.5 | 1.5 | 3 | 1.5 | 1.5 | 1.5 | 2 | 4 | 1 |
-| Forest `F` | +1 | +20 | 2 | 2 | 4 | 1.5 | 2 | 2 | 3 | 10 | 1 |
-| Thicket `#` | +2 | +30 | 10 | 10 | 20 | 6 | 10 | 10 | 10 | 20 | 1 |
-| Hill `h` | +2 | +20 | 4 | 10 | 10 | 4 | 2 | 4 | 10 | 20 | 1 |
-| Mountain `M` | +3 | +30 | 7 | 15 | 15 | 7 | 4 | 7 | 15 | 20 | 1 |
-| River `~` / Lake `L` / Sea `W` | | +10 | 6 | 8 | 8 | 6 | 6 | 2 | 1 | 1 | 1 |
-| Waterfall `v` | | +30 | 20 | 20 | 20 | 20 | 20 | 6 | 6 | 8 | 1 |
-| Snow `*` | | +5 | 1 | 1 | 1.5 | 1 | 1 | 1 | 2 | 5 | 1 |
-| Ice `i` | | -20 | 1.5 | 1 | 2 | 1.5 | 1.5 | 1.5 | 1 | 4 | 1 |
-| Floor `_` / Carpet `c` | | | 1 | 1 | 1.5 | 1 | 1 | 1 | 3 | 10 | 1.5 |
-| Wall `X` | | | – | – | – | – | – | – | – | – | – |
-| Pillar `I` | | +20 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 20 | 1 |
-| Abyss `O` / Fence `\|` | | | – | – | – | – | – | – | – | – | 1 |
-| Cracked Fence `/` (10 HP) / Trunk `Y` (15 HP) | | | – | – | – | – | – | – | – | – | 1 |
-| Cracked Wall `x` / Door `+` (20 HP) | | | – | – | – | – | – | – | – | – | – |
-| Bridge `B` (water units pass under) | | | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| Terrain | DEF | AVO | foot | heavy | horse | mermaid | ship | flying |
+|---|---|---|---|---|---|---|---|---|
+| Plain `.` | | | 1 | 1 | 1 | 3 | 6 | 1 |
+| Path `=` | | -20 | 0.7 | 0.7 | 0.7 | 1.5 | 5 | 1 |
+| House `H` | | +15 | 1 | 1 | 1.2 | 1 | 10 | 1 |
+| Fort `T` (heals 20%) | +3 | +25 | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 1 |
+| Sand `S` | | +5 | 1 | 1 | 1.5 | 2 | 5 | 1 |
+| Dune `D` | | +15 | 1.5 | 1.5 | 3 | 2 | 4 | 1 |
+| Forest `F` | +1 | +20 | 2 | 2 | 4 | 3 | 10 | 1 |
+| Thicket `#` | +2 | +30 | 10 | 10 | 20 | 10 | 20 | 1 |
+| Hill `h` | +2 | +20 | 4 | 10 | 10 | 10 | 20 | 1 |
+| Mountain `M` | +3 | +30 | 7 | 15 | 15 | 15 | 20 | 1 |
+| River `~` / Lake `L` / Sea `W` | | +10 | 6 | 8 | 8 | 1 | 1 | 1 |
+| Waterfall `v` | | +30 | 20 | 20 | 20 | 6 | 8 | 1 |
+| Snow `*` | | +5 | 1 | 1 | 1.5 | 2 | 5 | 1 |
+| Ice `i` | | -20 | 1.5 | 1 | 2 | 1 | 4 | 1 |
+| Floor `_` / Carpet `c` | | | 1 | 1 | 1.5 | 3 | 10 | 1.5 |
+| Wall `X` | | | – | – | – | – | – | – |
+| Pillar `I` | | +20 | 2 | 2 | 2 | 2 | 20 | 1 |
+| Abyss `O` / Fence `\|` | | | – | – | – | – | – | 1 |
+| Cracked Fence `/` (10 HP) / Trunk `Y` (15 HP) | | | – | – | – | – | – | 1 |
+| Cracked Wall `x` / Door `+` (20 HP) | | | – | – | – | – | – | – |
+| Bridge `B` (water units pass under) | | | 1 | 1 | 1 | 1 | 1 | 1 |
 
 ## Enemy behaviors
 

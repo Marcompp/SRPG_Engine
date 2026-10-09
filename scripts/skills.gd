@@ -10,12 +10,17 @@ extends RefCounted
 ## Every skill has a "description" and any of these effects:
 ## stats:      flat bonuses: {"str": 2, "mov": 1} (keys of Experience.STATS, plus "mov";
 ##             not "hp"/"mp").
-## command:    adds a unit menu command: "dance", "inspire".
-## turn_start: at the start of its side's phase: {"heal": fraction of max HP, "mp": MP}.
+## command:    adds a unit menu command: "dance", "inspire", "steal".
+## turn_start: at the start of its side's phase: {"heal": fraction of max HP, "mp": MP,
+##             "heal_allies": fraction of max HP for adjacent allies}.
+## terrain_costs: {terrain key: MOV}: it pays this instead when it's cheaper than its
+##             move type's cost (Swimming, Climbing, Forester).
+## range:      max range bonus by weapon type, or "spell" for every spell: {"bow": 1}.
 ## exp:        multiplier on EXP earned.
 ## immune:     statuses it ignores ("poison": statuses aren't implemented yet).
-## battle:     combat modifiers while fighting: {"atk", "def", "hit", "avo", "crit",
-##             "crit_avo", "as"} (see BATTLE_KEYS). Shown in the forecast.
+## battle:     combat modifiers while fighting: {"atk", "def", "res" (magic defense),
+##             "hit", "avo", "crit", "crit_avo", "as"} (see BATTLE_KEYS). Shown in the
+##             forecast.
 ## rules:      change how a fight goes (see RULES): "vantage" (strike first when
 ##             attacked), "desperation" (follow-up right after the first strike),
 ##             "quick_riposte" (always double when attacked, if able to counter),
@@ -35,7 +40,7 @@ extends RefCounted
 ##             below 1), "damage_near_foe" (so do the foe's allies within 2 of it).
 ## map:        movement rules: "pass" (move through enemies), "pathfinder" (every
 ##             passable tile costs 1 MOV), "canto" (move again with the MOV left after
-##             acting; player units).
+##             acting; player units), "footwork" (Canto, but only after Dancing).
 ## aura:       {"radius", "affects": "allies"/"enemies", "battle": {...}}: battle
 ##             modifiers for other units within `radius` tiles (not the owner).
 ## growths:    growth rate bonuses on level-up: {"all": 10, "str": 5}.
@@ -49,16 +54,19 @@ extends RefCounted
 ##             on either side.
 
 const LEARNED_CAP := 5
-const BATTLE_KEYS: Array[String] = ["atk", "def", "hit", "avo", "crit", "crit_avo", "as"]
+const BATTLE_KEYS: Array[String] = ["atk", "def", "res", "hit", "avo", "crit", "crit_avo", "as"]
 const RULES: Array[String] = ["vantage", "desperation", "quick_riposte", "wary_fighter", "no_counter",
 	"counter_any"]
 const PROC_EFFECTS: Array[String] = ["pierce", "drain", "damage_bonus", "lethal", "reduce", "survive"]
 const CONDITIONS: Array[String] = ["initiating", "defending", "phase", "hp_below", "hp_above", "range",
 	"weapon_type", "foe_weapon_type", "foe_tag", "terrain", "adjacent_ally", "no_adjacent_ally", "killed"]
 const EFFECT_KEYS: Array[String] = ["description", "stats", "command", "turn_start", "exp", "immune", "battle",
-	"rules", "proc", "after_combat", "map", "aura", "growths", "if", "hidden"]
+	"rules", "proc", "after_combat", "map", "aura", "growths", "terrain_costs", "range", "if", "hidden"]
 const AFTER_EFFECTS: Array[String] = ["heal", "refresh", "damage_foe", "damage_near_foe"]
-const MAP_RULES: Array[String] = ["pass", "pathfinder", "canto"]
+const MAP_RULES: Array[String] = ["pass", "pathfinder", "canto", "footwork"]
+## Skills that make terrain cheaper (see terrain_costs): innate to scouts, climbers and
+## swimmers, and what amphibious races get in foot classes.
+const TERRAIN_SKILLS: Array[String] = ["Forester", "Climbing", "Swimming"]
 
 ## The units on the map, for auras and adjacency conditions (set by Battle; unset,
 ## e.g. in unit-only checks, they're ignored).
@@ -69,6 +77,20 @@ const DATA := {
 	"Dance": {"description": "Dance: refresh an adjacent ally that has already acted.", "command": "dance"},
 	"Inspire": {"description": "Inspire: every adjacent ally gets +STR/DEF until your next phase (+1, plus 1 every 5 levels).",
 		"command": "inspire"},
+	"Steal": {"description": "Steal: take an item (not a weapon) from an adjacent foe with lower AGI.", "command": "steal"},
+	"Lockpick": {"description": "Opens chests and doors without a key."},
+	# Terrain movement.
+	"Forester": {"description": "Moves through forests (1.5 MOV) and thickets (6) more easily.",
+		"terrain_costs": {"F": 1.5, "#": 6}},
+	"Climbing": {"description": "Crosses hills (2 MOV) and mountains (4) more easily.", "terrain_costs": {"h": 2, "M": 4}},
+	"Swimming": {"description": "Wades rivers, lakes and the sea (2 MOV) and can get past waterfalls (6).",
+		"terrain_costs": {"~": 2, "L": 2, "W": 2, "v": 6}},
+	"Sea Legs": {"description": "+15 Hit on water.", "battle": {"hit": 15}, "if": {"terrain": ["~", "L", "W", "v"]}},
+	"Ambush": {"description": "+15 Hit in forests and thickets.", "battle": {"hit": 15}, "if": {"terrain": ["F", "#"]}},
+	"Highlander": {"description": "+15 Hit on hills and mountains.", "battle": {"hit": 15}, "if": {"terrain": ["h", "M"]}},
+	"Footwork": {"description": "Can move again after Dancing, with the MOV it has left.", "map": ["footwork"]},
+	"Prayer": {"description": "Adjacent allies recover 10% of max HP at the start of each turn.",
+		"turn_start": {"heal_allies": 0.1}},
 	# Racial traits.
 	"Adaptable": {"description": "Earns 10% more EXP.", "exp": 1.1},
 	"Regeneration": {"description": "Recovers 10% of max HP at the start of each turn.", "turn_start": {"heal": 0.1}},
@@ -79,11 +101,17 @@ const DATA := {
 	"Strength +2": {"description": "+2 STR.", "stats": {"str": 2}},
 	"Magic +2": {"description": "+2 INT.", "stats": {"int": 2}},
 	"Skill +2": {"description": "+2 DEX.", "stats": {"dex": 2}},
+	"Skill +4": {"description": "+4 DEX.", "stats": {"dex": 4}},
 	"Speed +2": {"description": "+2 AGI.", "stats": {"agi": 2}},
 	"Luck +4": {"description": "+4 LCK.", "stats": {"lck": 4}},
 	"Defense +2": {"description": "+2 DEF.", "stats": {"def": 2}},
 	# Combat modifiers.
-	"Wrath": {"description": "+20 Crit at or below half HP.", "battle": {"crit": 20}, "if": {"hp_below": 0.5}},
+	"Wrath": {"description": "+30 Crit at or below half HP.", "battle": {"crit": 30}, "if": {"hp_below": 0.5}},
+	"Crit +20": {"description": "+20 Crit.", "battle": {"crit": 20}},
+	"Evasion": {"description": "+10 Avo.", "battle": {"avo": 10}},
+	"Warding": {"description": "+5 magic defense.", "battle": {"res": 5}},
+	"Bow Range +1": {"description": "+1 max range with bows.", "range": {"bow": 1}},
+	"Spell Range +1": {"description": "+1 max range for spells.", "range": {"spell": 1}},
 	"Death Blow": {"description": "+6 Atk when initiating combat.", "battle": {"atk": 6}, "if": {"initiating": true}},
 	"Darting Blow": {"description": "+5 AS when initiating combat.", "battle": {"as": 5}, "if": {"initiating": true}},
 	"Armored Blow": {"description": "+6 DEF when initiating combat.", "battle": {"def": 6}, "if": {"initiating": true}},
@@ -173,6 +201,8 @@ static func sources(u: Unit) -> Array:
 	add.call(u.personal_skills, "Personal")
 	add.call(Classes.get_data(u.unit_class).get("skills", []), "Class")
 	add.call(Races.get_data(u.race).get("skills", []), "Race")
+	if Races.get_data(u.race).get("amphibious", false) and Classes.get_data(u.unit_class).move == "foot":
+		add.call(["Swimming", "Climbing"], "Race")
 	add.call(u.learned, "Learned")
 	if not u.weapon.is_empty():
 		add.call(u.weapon.get("skills", []), u.weapon.name)
@@ -228,6 +258,41 @@ static func turn_heal(u: Unit) -> float:
 	var total := 0.0
 	for skill in of(u):
 		total += get_data(skill).get("turn_start", {}).get("heal", 0.0)
+	return total
+
+
+## Fraction of max HP `u` gives adjacent allies at the start of their phase (Prayer).
+static func ally_turn_heal(u: Unit) -> float:
+	var total := 0.0
+	for skill in of(u):
+		total += get_data(skill).get("turn_start", {}).get("heal_allies", 0.0)
+	return total
+
+
+## Cheapest MOV cost `u`'s terrain skills give for terrain `key`, or -1 when none apply.
+static func terrain_cost(u: Unit, key: String) -> float:
+	var best := -1.0
+	for skill in of(u):
+		var costs: Dictionary = get_data(skill).get("terrain_costs", {})
+		if costs.has(key) and (best < 0 or costs[key] < best):
+			best = costs[key]
+	return best
+
+
+## Terrain skills a class gives (its scout/climber/swimmer identity).
+static func innate_terrain_skills(class_data: Dictionary) -> Array[String]:
+	var result: Array[String] = []
+	for skill: String in class_data.get("skills", []):
+		if TERRAIN_SKILLS.has(skill):
+			result.append(skill)
+	return result
+
+
+## Max range bonus for weapon type `kind` ("bow"...) or "spell".
+static func range_bonus(u: Unit, kind: String) -> int:
+	var total := 0
+	for skill in of(u):
+		total += get_data(skill).get("range", {}).get(kind, 0)
 	return total
 
 
@@ -451,6 +516,12 @@ static func validate() -> Array[String]:
 					problems.append("%s: unknown aura battle key %s" % [skill, key])
 			if not d.aura.get("affects", "") in ["allies", "enemies"] or not d.aura.has("radius"):
 				problems.append("%s: aura needs radius and affects: allies/enemies" % skill)
+		for key: String in d.get("terrain_costs", {}):
+			if not BattleMap.TERRAIN.has(key):
+				problems.append("%s: unknown terrain %s" % [skill, key])
+		for key: String in d.get("range", {}):
+			if not ["sword", "spear", "axe", "bow", "staff", "spell"].has(key):
+				problems.append("%s: unknown range kind %s" % [skill, key])
 		for key: String in d.get("growths", {}):
 			if not Experience.STATS.has(key) and key != "all":
 				problems.append("%s: unknown growth %s" % [skill, key])

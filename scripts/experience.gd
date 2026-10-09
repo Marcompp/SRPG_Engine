@@ -8,6 +8,7 @@ const KILL_BONUS := 20
 ## Flat EXP for each Dance (as in GBA FE) and each Inspire.
 const DANCE_EXP := 10
 const INSPIRE_EXP := 10
+const STEAL_EXP := 10
 ## Rerolls when a level-up would give no stats at all.
 const EMPTY_LEVEL_REROLLS := 2
 

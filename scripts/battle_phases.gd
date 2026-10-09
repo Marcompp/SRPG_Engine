@@ -41,12 +41,15 @@ func clear_inspire(team: Unit.Team) -> void:
 			u.inspire_bonus = 0
 
 
-## Healing tiles (e.g. Forts) and regenerating races (Trolls) restore a share of
-## max HP to `team`'s units at the start of that team's phase.
+## Healing tiles (e.g. Forts), regeneration (Trolls) and allies' Prayer restore a
+## share of max HP to `team`'s units at the start of that team's phase.
 func heal_on_tiles(team: Unit.Team) -> void:
 	var healed := false
 	for u in battle.units_of(team):
 		var rate: float = battle.map.terrain_heal(u.cell) + Skills.turn_heal(u)
+		for ally in battle.units_of(team):
+			if ally != u and BattleMap.distance(ally.cell, u.cell) == 1:
+				rate += Skills.ally_turn_heal(ally)
 		if rate > 0.0 and u.hp < u.max_hp:
 			var amount := mini(ceili(u.max_hp * rate), u.max_hp - u.hp)
 			u.heal(amount)

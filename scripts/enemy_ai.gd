@@ -260,7 +260,7 @@ static func _best_attack(enemy: Unit, battle: Battle, cells: Dictionary) -> Dict
 			enemy.cell = cell
 			if spell.target == "enemy":
 				for p in players:
-					if not Spells.reaches(s, BattleMap.distance(cell, p.cell)):
+					if not Spells.reaches(s, BattleMap.distance(cell, p.cell), enemy):
 						continue
 					var score: float = _target_score(enemy, Combat.spell_damage(enemy, p, spell, map),
 						Combat.spell_hit_chance(enemy, p, spell, map), p) \
@@ -323,7 +323,7 @@ static func _advance(enemy: Unit, battle: Battle, reach: Dictionary, players: Ar
 ## breaks whatever blocks the way, if that's the way it planned.
 static func _move_toward(enemy: Unit, battle: Battle, reach: Dictionary, target: Vector2i) -> void:
 	var map: BattleMap = battle.map
-	var field := map.cost_field(target, enemy.move_type, _obstacle_costs(enemy, battle))
+	var field := map.cost_field(target, enemy, _obstacle_costs(enemy, battle))
 	var dest := _closest_cell(field, reach.cells, enemy.cell)
 	await enemy.move_along(map.build_path(reach.parents, enemy.cell, dest))
 	await _clear_obstacle(enemy, battle, field)
@@ -421,7 +421,7 @@ static func _retreat_cell(u: Unit, battle: Battle, reach: Dictionary) -> Vector2
 					or BattleMap.distance(u.cell, ally.cell) < BattleMap.distance(u.cell, healer.cell)):
 				healer = ally
 		if healer:
-			return _closest_cell(map.cost_field(healer.cell, u.move_type), reach.cells, u.cell)
+			return _closest_cell(map.cost_field(healer.cell, u), reach.cells, u.cell)
 	if mode == "healer_or_tile" or mode == "tile":
 		if map.terrain_heal(u.cell) > 0.0:
 			return u.cell
@@ -433,7 +433,7 @@ static func _retreat_cell(u: Unit, battle: Battle, reach: Dictionary) -> Vector2
 			if tile == Vector2i(-1, -1) or BattleMap.distance(u.cell, c) < BattleMap.distance(u.cell, tile):
 				tile = c
 		if tile != Vector2i(-1, -1):
-			return _closest_cell(map.cost_field(tile, u.move_type), reach.cells, u.cell)
+			return _closest_cell(map.cost_field(tile, u), reach.cells, u.cell)
 	# Away: the reachable cell farthest from the nearest player.
 	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
 	var best := u.cell
@@ -459,7 +459,7 @@ static func _try_loot(enemy: Unit, battle: Battle, reach: Dictionary) -> bool:
 	var target: Dictionary = {}
 	var obstacles := _obstacle_costs(enemy, battle)
 	for o in targets:
-		var f := map.cost_field(o.cell, enemy.move_type, obstacles)
+		var f := map.cost_field(o.cell, enemy, obstacles)
 		if not f.has(enemy.cell):
 			continue
 		if target.is_empty() or f[enemy.cell] < field[enemy.cell]:
@@ -498,7 +498,7 @@ static func _try_heal(caster: Unit, battle: Battle, reach: Dictionary) -> bool:
 			var cell_found := false
 			var cast_cell := caster.cell
 			for cell in cells:
-				if Spells.reaches(s, BattleMap.distance(cell, ally.cell)) \
+				if Spells.reaches(s, BattleMap.distance(cell, ally.cell), caster) \
 						and (not cell_found or cells[cell] < cells[cast_cell]):
 					cast_cell = cell
 					cell_found = true

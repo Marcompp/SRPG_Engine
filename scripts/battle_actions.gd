@@ -12,7 +12,7 @@ var battle: Battle
 func enemies_in_range(u: Unit, w: Dictionary) -> Array[Unit]:
 	var result: Array[Unit] = []
 	for e in battle.units_of(Unit.Team.ENEMY):
-		if Unit.weapon_reaches(w, BattleMap.distance(u.cell, e.cell)):
+		if u.reaches(w, BattleMap.distance(u.cell, e.cell)):
 			result.append(e)
 	return result
 
@@ -93,9 +93,9 @@ func do_visit(u: Unit) -> void:
 	await get_tree().create_timer(0.7).timeout
 
 
-## Rogue-movement units open chests freely; anyone else needs a Chest Key.
+## Units with Lockpick open chests freely; anyone else needs a Chest Key.
 func can_open_chest(u: Unit) -> bool:
-	return u.move_type == "rogue" or u.items.any(func(it): return it.name == "Chest Key")
+	return Skills.has(u, "Lockpick") or u.items.any(func(it): return it.name == "Chest Key")
 
 
 func do_open(u: Unit) -> void:
@@ -107,9 +107,9 @@ func do_open(u: Unit) -> void:
 	await get_tree().create_timer(0.7).timeout
 
 
-## Rogues open chests and doors freely; anyone else uses up a Chest Key.
+## Lockpick opens chests and doors freely; anyone else uses up a Chest Key.
 func _spend_key(u: Unit) -> void:
-	if u.move_type == "rogue":
+	if Skills.has(u, "Lockpick"):
 		return
 	var key := u.items.find(u.items.filter(func(it): return it.name == "Chest Key")[0])
 	u.items[key].uses -= 1
@@ -143,6 +143,45 @@ func loot(enemy: Unit, object: Dictionary) -> void:
 	await get_tree().create_timer(0.6).timeout
 
 
+# --- Steal ------------------------------------------------------------------------
+
+## Items `target` carries that can be stolen: anything but weapons (as in GBA FE).
+func stealable_items(target: Unit) -> Array[int]:
+	var result: Array[int] = []
+	for i in target.items.size():
+		if not Items.is_weapon(target.items[i]):
+			result.append(i)
+	return result
+
+
+## Adjacent foes `u` can steal from: it needs the Steal skill, room for the item (or
+## the campaign convoy) and more AGI than the foe.
+func steal_targets(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	if not Skills.commands(u).has("steal") or (u.items.size() >= Unit.MAX_ITEMS and not Campaign.active):
+		return result
+	for foe in battle.units():
+		if foe.team != u.team and BattleMap.distance(u.cell, foe.cell) == 1 \
+				and u.combat_agi() > foe.combat_agi() and not stealable_items(foe).is_empty():
+			result.append(foe)
+	return result
+
+
+func do_steal(u: Unit, foe: Unit, index: int) -> void:
+	var item: Dictionary = foe.items[index]
+	foe.items.remove_at(index)
+	await u.lunge(foe.cell)
+	if u.items.size() < Unit.MAX_ITEMS:
+		u.items.append(item)
+		u.popup("Stole " + item.name, Color.GOLD)
+	else:
+		Campaign.convoy.append(item)
+		u.popup(item.name + " to convoy", Color.GOLD)
+	await get_tree().create_timer(0.5).timeout
+	if u.team == Unit.Team.PLAYER and u.level < Experience.LEVEL_CAP:
+		await gain_exp(u, Experience.STEAL_EXP)
+
+
 # --- Breakable tiles and doors (see BattleMap breakable terrain) --------------
 
 ## Damage dealt to a breakable tile: the unit's Attack (STR + weapon might). Always
@@ -155,7 +194,7 @@ func tile_damage(u: Unit) -> int:
 func breakable_cells(u: Unit, w: Dictionary) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	for cell in battle.map.tile_hp:
-		if Unit.weapon_reaches(w, BattleMap.distance(u.cell, cell)):
+		if u.reaches(w, BattleMap.distance(u.cell, cell)):
 			result.append(cell)
 	return result
 

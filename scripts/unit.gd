@@ -136,7 +136,7 @@ var min_range: int:
 		return weapon.get("min_rng", 0)
 var max_range: int:
 	get:
-		return weapon.get("max_rng", 0)
+		return weapon.get("max_rng", 0) + (Skills.range_bonus(self, weapon.type) if not weapon.is_empty() else 0)
 var cell := Vector2i.ZERO
 var has_acted := false:
 	set(value):
@@ -190,6 +190,11 @@ static func weapon_reaches(w: Dictionary, dist: int) -> bool:
 	return not w.is_empty() and dist >= w.min_rng and dist <= w.max_rng
 
 
+## Whether `w` reaches `dist` in this unit's hands (range skills included).
+func reaches(w: Dictionary, dist: int) -> bool:
+	return not w.is_empty() and dist >= w.min_rng and dist <= w.max_rng + Skills.range_bonus(self, w.type)
+
+
 ## Applies a class (also how promotion will change it; the level is kept).
 func set_class(class_id: String) -> void:
 	var data := Classes.get_data(class_id)
@@ -216,6 +221,18 @@ func set_race(new_race: String) -> void:
 
 func race_data() -> Dictionary:
 	return Races.get_data(race)
+
+
+## Key of MOVE_TYPE_BADGES for this unit: its move type, or for foot units its
+## terrain skills ("rogue" scouts, "climb", "swim", "swim_climb"...).
+func badge_key() -> String:
+	if move_type != "foot":
+		return move_type
+	var parts: Array[String] = []
+	for pair in [["Forester", "rogue"], ["Swimming", "swim"], ["Climbing", "climb"]]:
+		if Skills.has(self, pair[0]):
+			parts.append(pair[1])
+	return "_".join(parts) if not parts.is_empty() else "foot"
 
 
 func has_ability(ability: String) -> bool:
@@ -339,7 +356,7 @@ func spell_ranges(support: bool) -> Array[Vector2i]:
 	for s in spells:
 		if Spells.is_support(s) != support:
 			continue
-		var r := Spells.reach_ranges(s)
+		var r := Spells.reach_ranges(s, self)
 		if not result.has(r):
 			result.append(r)
 	return result
@@ -347,7 +364,7 @@ func spell_ranges(support: bool) -> Array[Vector2i]:
 
 ## Whether the equipped weapon can strike at this distance.
 func can_attack_at(dist: int) -> bool:
-	return weapon_reaches(weapon, dist)
+	return reaches(weapon, dist)
 
 
 ## Index of the equipped weapon (the first one the unit can wield) in `items`,
@@ -398,7 +415,7 @@ func use_item(index: int) -> void:
 func weapon_ranges() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	for w in weapons():
-		var r := Vector2i(w.min_rng, w.max_rng)
+		var r := Vector2i(w.min_rng, w.max_rng + Skills.range_bonus(self, w.type))
 		if not result.has(r):
 			result.append(r)
 	return result
@@ -485,8 +502,8 @@ func _draw() -> void:
 	draw_rect(Rect2(2, 1, 12, 11), Color.BLACK, false, 1.0)
 	if is_lord:
 		draw_rect(Rect2(5, 0, 6, 2), Color.GOLD)
-	if MOVE_TYPE_BADGES.has(move_type):
-		draw_rect(Rect2(11, 2, 2, 2), MOVE_TYPE_BADGES[move_type])
+	if MOVE_TYPE_BADGES.has(badge_key()):
+		draw_rect(Rect2(11, 2, 2, 2), MOVE_TYPE_BADGES[badge_key()])
 	if inspire_bonus > 0:
 		draw_rect(Rect2(11, 5, 2, 2), INSPIRED_COLOR)
 	var aboard: Unit = carrying if carrying else (passengers[0] if not passengers.is_empty() else null)

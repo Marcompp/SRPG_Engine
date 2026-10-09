@@ -5,13 +5,16 @@ extends RefCounted
 ##
 ## weapons:     weapon types the class can equip (see Weapons).
 ## move:        one of BattleMap.MOVE_TYPES. Also the class's effectiveness tag
-##              (see Unit.tags); the unit's race may change how it moves.
+##              (see Unit.tags); the unit's race may change how it moves. Scouts,
+##              climbers and swimmers are "foot" with a terrain skill (Forester,
+##              Climbing, Swimming).
 ## mounted:     can Rescue allies; can't Shove, be Shoved or be Rescued.
 ## abilities:   "ship" = allies can Board it; it Unloads them without ending its
 ##              turn. Can't Shove or be Shoved.
-## skills:      skills every unit of the class has (see Skills); lost on promotion.
-## learn:       {level: skill}: skills learned for good on reaching that level in
-##              this class (they count toward Skills.LEARNED_CAP).
+## skills:      innate skills: every unit of the class has them (see Skills). A
+##              promoted class lists its own full set; the old class's are dropped.
+## learn:       {level: skill}: small rewards for sticking with the class, learned for
+##              good on reaching that level in it (they count toward Skills.LEARNED_CAP).
 ## capacity:    passengers a ship can hold.
 ## promoted:    second-tier class.
 ## promotes_to: classes this one can promote into. Promotion will happen in the
@@ -19,46 +22,51 @@ extends RefCounted
 
 const DATA := {
 	# Foot
-	"Swordsman": {"weapons": ["sword"], "move": "foot", "promotes_to": ["Swordsmaster"]},
-	"Swordsmaster": {"weapons": ["sword"], "move": "foot", "promoted": true},
+	"Swordsman": {"weapons": ["sword"], "move": "foot", "learn": {10: "Speed +2"}, "promotes_to": ["Swordsmaster"]},
+	"Swordsmaster": {"weapons": ["sword"], "move": "foot", "skills": ["Crit +20"], "promoted": true},
 	"Footman": {"weapons": ["spear"], "move": "foot", "promotes_to": ["Hoplite"]},
 	"Hoplite": {"weapons": ["spear"], "move": "foot", "promoted": true},
-	"Axeman": {"weapons": ["axe"], "move": "foot", "promotes_to": ["Berserker"]},
-	"Archer": {"weapons": ["bow"], "move": "foot", "promotes_to": ["Marksman"]},
-	"Marksman": {"weapons": ["bow"], "move": "foot", "promoted": true},
+	"Axeman": {"weapons": ["axe"], "move": "foot", "learn": {10: "Strength +2"}, "promotes_to": ["Berserker"]},
+	"Archer": {"weapons": ["bow"], "move": "foot", "learn": {10: "Skill +4"}, "promotes_to": ["Marksman"]},
+	"Marksman": {"weapons": ["bow"], "move": "foot", "skills": ["Bow Range +1"], "promoted": true},
 	# Rogue / scouting
-	"Rogue": {"weapons": ["sword"], "move": "rogue", "promotes_to": ["Assassin"]},
-	"Assassin": {"weapons": ["sword", "bow"], "move": "rogue", "promoted": true},
-	"Corsair": {"weapons": ["sword"], "move": "swim", "promotes_to": ["Swashbuckler"]},
-	"Swashbuckler": {"weapons": ["sword", "axe"], "move": "swim", "promoted": true},
-	"Brigand": {"weapons": ["axe"], "move": "climb", "promotes_to": ["Berserker"]},
-	"Berserker": {"weapons": ["axe"], "move": "swim_climb", "promoted": true},
-	"Poacher": {"weapons": ["bow"], "move": "rogue", "promotes_to": ["Reaver"]},
-	"Reaver": {"weapons": ["bow", "axe"], "move": "rogue", "promoted": true},
+	"Rogue": {"weapons": ["sword"], "move": "foot", "skills": ["Forester", "Steal", "Lockpick"],
+		"learn": {10: "Evasion"}, "promotes_to": ["Assassin"]},
+	"Assassin": {"weapons": ["sword", "bow"], "move": "foot", "skills": ["Forester", "Steal", "Lockpick", "Lethality"],
+		"promoted": true},
+	"Corsair": {"weapons": ["sword"], "move": "foot", "skills": ["Swimming"], "learn": {10: "Sea Legs"},
+		"promotes_to": ["Swashbuckler"]},
+	"Swashbuckler": {"weapons": ["sword", "axe"], "move": "foot", "skills": ["Swimming", "Pass"], "promoted": true},
+	"Brigand": {"weapons": ["axe"], "move": "foot", "skills": ["Climbing"], "learn": {10: "Highlander"},
+		"promotes_to": ["Berserker"]},
+	"Berserker": {"weapons": ["axe"], "move": "foot", "skills": ["Swimming", "Climbing", "Wrath"], "promoted": true},
+	"Poacher": {"weapons": ["bow"], "move": "foot", "skills": ["Forester"], "learn": {10: "Ambush"},
+		"promotes_to": ["Reaver"]},
+	"Reaver": {"weapons": ["bow", "axe"], "move": "foot", "skills": ["Forester", "Pathfinder"], "promoted": true},
 	# Armor
-	"Guard": {"weapons": ["spear"], "move": "heavy", "promotes_to": ["Juggernaut"]},
+	"Guard": {"weapons": ["spear"], "move": "heavy", "learn": {10: "Defense +2"}, "promotes_to": ["Juggernaut"]},
 	"Turret": {"weapons": ["bow"], "move": "heavy", "promotes_to": ["Juggernaut"]},
-	"Juggernaut": {"weapons": ["spear", "axe", "bow"], "move": "heavy", "promoted": true},
+	"Juggernaut": {"weapons": ["spear", "axe", "bow"], "move": "heavy", "skills": ["Warding"], "promoted": true},
 	# Mages
-	"Mage": {"weapons": ["staff"], "move": "foot", "promotes_to": ["Sorcerer"]},
-	"Sorcerer": {"weapons": ["staff", "sword"], "move": "foot", "promoted": true},
-	"Cleric": {"weapons": ["staff"], "move": "foot", "promotes_to": ["Bishop"]},
+	"Mage": {"weapons": ["staff"], "move": "foot", "learn": {10: "Magic +2"}, "promotes_to": ["Sorcerer"]},
+	"Sorcerer": {"weapons": ["staff", "sword"], "move": "foot", "skills": ["Spell Range +1"], "promoted": true},
+	"Cleric": {"weapons": ["staff"], "move": "foot", "learn": {10: "Prayer"}, "promotes_to": ["Bishop"]},
 	"Bishop": {"weapons": ["staff", "spear"], "move": "foot", "promoted": true},
 	# Horse
-	"Equestrian": {"weapons": ["sword"], "move": "horse", "mounted": true, "promotes_to": ["Gendarme"]},
-	"Cavalry": {"weapons": ["spear"], "move": "horse", "mounted": true, "promotes_to": ["Gendarme"]},
-	"Gendarme": {"weapons": ["sword", "spear"], "move": "horse", "mounted": true, "promoted": true},
-	"Nomad": {"weapons": ["bow"], "move": "horse", "mounted": true, "promotes_to": ["Hussar"]},
-	"Hussar": {"weapons": ["bow", "spear"], "move": "horse", "mounted": true, "promoted": true},
+	"Equestrian": {"weapons": ["sword"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Gendarme"]},
+	"Cavalry": {"weapons": ["spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Gendarme"]},
+	"Gendarme": {"weapons": ["sword", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
+	"Nomad": {"weapons": ["bow"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Hussar"]},
+	"Hussar": {"weapons": ["bow", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
 	# Flying
-	"Flier": {"weapons": ["spear"], "move": "flying", "mounted": true, "promotes_to": ["Whitewing"]},
-	"Whitewing": {"weapons": ["spear", "sword"], "move": "flying", "mounted": true, "promoted": true},
+	"Flier": {"weapons": ["spear"], "move": "flying", "mounted": true, "skills": ["Canto"], "promotes_to": ["Whitewing"]},
+	"Whitewing": {"weapons": ["spear", "sword"], "move": "flying", "mounted": true, "skills": ["Canto"], "promoted": true},
 	# Ships
 	"Galley": {"weapons": ["bow"], "move": "ship", "abilities": ["ship"], "capacity": 2},
 	# Spirits (pass through any terrain, even walls, for 1 MOV; no terrain bonuses)
 	"Wraith": {"weapons": ["sword"], "move": "spirit"},
 	# Special
-	"Performer": {"weapons": ["sword"], "move": "foot", "skills": ["Dance"]},
+	"Performer": {"weapons": ["sword"], "move": "foot", "skills": ["Dance"], "learn": {10: "Footwork"}},
 	"Bannerman": {"weapons": ["spear"], "move": "foot", "skills": ["Inspire"]},
 }
 

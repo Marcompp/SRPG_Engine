@@ -39,6 +39,9 @@ var trade_held := Vector2i(-1, -1)
 var area_centers: Array[Vector2i] = []
 ## Cells to pick from while target_mode is one of CELL_MODES.
 var target_cells: Array[Vector2i] = []
+## Steal: the foe picked, and the item indices behind the Steal menu's entries.
+var steal_target: Unit
+var steal_choices: Array[int] = []
 ## Passenger a ship is unloading, and the passengers behind the Unload menu's entries.
 var unload_passenger: Unit
 var passenger_choices: Array[Unit] = []
@@ -50,6 +53,8 @@ var move_budget := 0.0
 var moved_cost := 0.0
 ## True while picking a Canto move: moving (or cancelling) ends the unit's turn.
 var canto_move := false
+## The last targeted action confirmed ("dance", "attack"...), for Footwork.
+var last_action := ""
 ## Planned path for the selected unit; follows the cursor's trail when it can.
 var arrow: Array[Vector2i] = []
 ## Unit shown on the stats screen, and the state to return to when it closes.
@@ -187,7 +192,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				if target_mode == "trade":
 					open_trade(targets[target_index])
 					return
+				if target_mode == "steal":
+					open_steal_menu(targets[target_index])
+					return
 				battle.state = Battle.State.BUSY
+				last_action = target_mode
 				if target_mode == "unload":
 					# Unloading doesn't end the ship's turn, but commits its move.
 					await battle.actions.do_unload(selected, unload_passenger, target_cells[target_index])
@@ -403,7 +412,11 @@ func finish_action(no_canto := false) -> void:
 ## Canto: if the selected unit can still move somewhere with the MOV left, lets
 ## the player pick where (SELECTED, with only movement shown). Returns whether it did.
 func _start_canto() -> bool:
-	if not Skills.map_rules(selected).has("canto") or battle.phases.check_game_over():
+	var rules := Skills.map_rules(selected)
+	var allowed := rules.has("canto") or (rules.has("footwork") and last_action == "dance")
+	last_action = ""
+	# Not once it has left the map (Escape) or been picked up.
+	if not allowed or selected.escaped or selected.carried_by or battle.phases.check_game_over():
 		return false
 	var left := move_budget - moved_cost
 	var canto_reach := battle.map.get_reachable(selected, battle.units(), left)
@@ -530,6 +543,8 @@ func open_unit_menu() -> void:
 		options.append("Dance")
 	if not battle.actions.inspire_targets(selected).is_empty():
 		options.append("Inspire")
+	if not battle.actions.steal_targets(selected).is_empty():
+		options.append("Steal")
 	if not battle.actions.trade_partners(selected).is_empty():
 		options.append("Trade")
 	if not battle.actions.shove_targets(selected).is_empty():
@@ -594,6 +609,18 @@ func open_items_menu() -> void:
 			mark = "  (x)"
 		options.append(weapon_label(item) + mark)
 	_open_menu("items", options)
+
+
+## Which item to take from `foe`.
+func open_steal_menu(foe: Unit) -> void:
+	steal_target = foe
+	steal_choices = battle.actions.stealable_items(foe)
+	var options: Array[String] = []
+	for i in steal_choices:
+		options.append(Items.label(foe.items[i]))
+	battle.map.clear_ranges()
+	battle.cursor.cell = selected.cell
+	_open_menu("steal", options, "Steal from " + foe.unit_name)
 
 
 ## Picks which passenger to unload (skipped when there's only one).
@@ -682,6 +709,8 @@ func menu_accept() -> void:
 					open_unload_menu()
 				"Trade":
 					start_unit_targeting("trade", battle.actions.trade_partners(selected))
+				"Steal":
+					start_unit_targeting("steal", battle.actions.steal_targets(selected))
 				"Shove":
 					start_unit_targeting("shove", battle.actions.shove_targets(selected))
 				"Rescue":
@@ -702,6 +731,8 @@ func menu_accept() -> void:
 			start_spell_targeting(spell_choices[battle.ui.menu_index])
 		"unload":
 			start_unload_targeting(passenger_choices[battle.ui.menu_index])
+		"steal":
+			_act(battle.actions.do_steal.bind(selected, steal_target, steal_choices[battle.ui.menu_index]))
 		"items":
 			var item := selected.items[battle.ui.menu_index]
 			if selected.can_wield(item):
@@ -766,12 +797,14 @@ func menu_cancel() -> void:
 			select(selected)
 		"attack", "magic", "items", "unload", "break":
 			open_unit_menu()
+		"steal":
+			start_unit_targeting("steal", battle.actions.steal_targets(selected))
 
 
 # --- Targeting ----------------------------------------------------------------
 
-## Picks one of `units` for `mode` ("attack", "dance", "trade", "shove", "rescue",
-## "board" or "inspire").
+## Picks one of `units` for `mode` ("attack", "dance", "trade", "steal", "shove",
+## "rescue", "board" or "inspire").
 func start_unit_targeting(mode: String, units: Array[Unit]) -> void:
 	active_spell = ""
 	target_mode = mode
@@ -850,6 +883,11 @@ func show_target() -> void:
 		battle.ui.show_shove_forecast(target, battle.map.terrain_at(dest).name, battle.cursor.cell)
 	elif target_mode == "trade":
 		battle.ui.show_trade_preview(target, battle.cursor.cell)
+	elif target_mode == "steal":
+		var names: Array[String] = []
+		for i in battle.actions.stealable_items(target):
+			names.append(target.items[i].name)
+		battle.ui.show_cell_forecast("Steal from %s\n%s" % [target.unit_name, ", ".join(names)], battle.cursor.cell)
 	elif active_spell and Spells.is_support(active_spell):
 		var spell := Spells.get_spell(active_spell)
 		battle.ui.show_heal_forecast(selected, target, active_spell, Spells.heal_amount(selected, spell, target), battle.cursor.cell)
