@@ -403,14 +403,14 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 	var broke: Array[Unit] = []
 	var dealt: Array[Unit] = []
 	defender.notify_attacked()
-	for pair in Combat.strike_order(attacker, defender):
+	for pair in Combat.strike_order(attacker, defender, battle.map):
 		var a: Unit = pair[0]
 		var d: Unit = pair[1]
 		if a.hp <= 0 or d.hp <= 0:
 			break
 		if a.weapon.is_empty() or broke.has(a):
 			continue
-		var result := Combat.strike(a, d, battle.map)
+		var result := Combat.strike(a, d, battle.map, attacker)
 		await a.lunge(d.cell)
 		_apply_strike(a, d, result, dealt)
 		if result.hit and a.use_weapon():
@@ -431,8 +431,8 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 	await caster.lunge(target.cell)
 	_apply_strike(caster, target, result, dealt)
 	await get_tree().create_timer(0.45).timeout
-	if target.hp > 0 and Combat.can_counter(caster, target):
-		var counter := Combat.strike(target, caster, battle.map)
+	if target.hp > 0 and Combat.can_counter(caster, target, battle.map):
+		var counter := Combat.strike(target, caster, battle.map, caster)
 		await target.lunge(caster.cell)
 		_apply_strike(target, caster, counter, dealt)
 		if counter.hit and target.use_weapon():
@@ -475,6 +475,12 @@ func cast_area(caster: Unit, center: Vector2i, spell_name: String) -> void:
 
 ## Applies one strike's result with popups; records the striker in `dealt` if it did damage.
 func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> void:
+	for proc in result.get("procs", []):
+		if not Skills.is_hidden(proc[1]):
+			proc[0].popup(proc[1] + "!", Color.GOLD, 10.0)
+	if result.get("heal", 0) > 0:
+		a.heal(result.heal)
+		a.popup("+%d" % result.heal, Color.PALE_GREEN)
 	if result.hit:
 		d.take_damage(result.dmg)
 		if result.dmg > 0 and not dealt.has(a):

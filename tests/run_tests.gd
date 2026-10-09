@@ -131,6 +131,10 @@ func _run_all() -> void:
 		"test_skill_sources_and_stats",
 		"test_scroll_learning_and_cap",
 		"test_level_up_learns_skills",
+		"test_skill_data_valid",
+		"test_battle_modifier_skills",
+		"test_strike_order_skills",
+		"test_proc_skills",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -2617,3 +2621,139 @@ func test_level_up_learns_skills() -> void:
 	var u := Unit.create("Vet", Unit.Team.PLAYER, Vector2i.ZERO, data)
 	check_eq(u.learned, ["Celerity", "Luck +4"] as Array[String], "skills up to its level, not beyond")
 	u.free()
+
+
+func test_skill_data_valid() -> void:
+	check_eq(Skills.validate(), [] as Array[String], "skill data problems")
+	# Every skill named anywhere exists.
+	var named: Array = []
+	for c in Classes.DATA.values():
+		named.append_array(c.get("skills", []))
+		named.append_array(c.get("learn", {}).values())
+	for r in Races.DATA.values():
+		named.append_array(r.get("skills", []))
+	for it in Items.CONSUMABLES.values():
+		named.append_array(it.get("skills", []))
+		if it.has("skill"):
+			named.append(it.skill)
+	for w in Weapons.DATA.values():
+		named.append_array(w.get("skills", []))
+	for level in Levels.DATA.values() + Chapters.DATA.values():
+		for data in level.get("players", []) + level.get("enemies", []):
+			named.append_array(data.get("skills", []))
+			named.append_array(data.get("learn", {}).values())
+	for skill in named:
+		check(Skills.DATA.has(skill), "unknown skill %s" % skill)
+
+
+## Lord (Iron Sword) next to a Brigand (Iron Axe), everyone else gone.
+func _duel() -> Array[Unit]:
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([lord, brig])
+	await process_frame
+	lord.set_cell(Vector2i(5, 6))
+	brig.set_cell(Vector2i(6, 6))
+	brig.equip(0)
+	return [lord, brig]
+
+
+func test_battle_modifier_skills() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	var base := Combat.forecast(lord, brig, b.map)
+	var base_counter := Combat.forecast(brig, lord, b.map)
+	lord.personal_skills.assign(["Death Blow"])
+	check_eq(Combat.forecast(lord, brig, b.map).atk.dmg, base.atk.dmg + 6, "Death Blow: +6 Atk when attacking")
+	check_eq(Combat.forecast(brig, lord, b.map).def.dmg, base_counter.def.dmg, "but not when attacked")
+	lord.personal_skills.assign(["Wrath"])
+	check_eq(Combat.forecast(lord, brig, b.map).atk.crit, base.atk.crit, "Wrath: nothing at full HP")
+	lord.hp = lord.max_hp / 2
+	check_eq(Combat.forecast(lord, brig, b.map).atk.crit, mini(base.atk.crit + 20, 100), "+20 Crit at half HP")
+	lord.hp = lord.max_hp
+	lord.personal_skills.assign(["Axebreaker"])
+	var f := Combat.forecast(lord, brig, b.map)
+	check_eq(f.atk.hit, mini(base.atk.hit + 50, 100), "Axebreaker: +50 Hit against axes")
+	check_eq(f.def.hit, maxi(base.def.hit - 50, 0), "and +50 Avo")
+	lord.personal_skills.assign(["Steady Stance"])
+	check_eq(Combat.forecast(brig, lord, b.map).atk.dmg, maxi(base_counter.atk.dmg - 4, 0), "Steady Stance: +4 DEF when attacked")
+	check_eq(Combat.forecast(lord, brig, b.map).def.dmg, base.def.dmg, "but not when attacking")
+
+
+func test_strike_order_skills() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	lord.agility = 20  # the Lord doubles, the Brigand doesn't
+	var L := [lord, brig]
+	var B := [brig, lord]
+	check_eq(Combat.strike_order(lord, brig, b.map), [L, B, L], "normal: attack, counter, follow-up")
+	lord.personal_skills.assign(["Desperation"])
+	check_eq(Combat.strike_order(lord, brig, b.map), [L, B, L], "Desperation needs half HP")
+	lord.hp = 1
+	check_eq(Combat.strike_order(lord, brig, b.map), [L, L, B], "Desperation: follow-up before the counter")
+	lord.personal_skills.assign(["Vantage"])
+	check_eq(Combat.strike_order(brig, lord, b.map), [L, B, L], "Vantage: strikes first when attacked")
+	lord.hp = lord.max_hp
+	lord.personal_skills.assign(["Wary Fighter"])
+	check_eq(Combat.strike_order(lord, brig, b.map), [L, B], "Wary Fighter: nobody doubles")
+	lord.agility = 0
+	lord.personal_skills.assign(["Quick Riposte"])
+	check_eq(Combat.strike_order(brig, lord, b.map), [B, L, L], "Quick Riposte: doubles when attacked at high HP")
+	check(Combat.forecast(brig, lord, b.map).def.double, "and the forecast shows it")
+	lord.personal_skills.assign(["Dazzle"])
+	check(not Combat.can_counter(lord, brig, b.map), "Dazzle: no counter")
+	check_eq(Combat.strike_order(lord, brig, b.map), [L], "so the Lord strikes alone")
+	lord.personal_skills.clear()
+	brig.set_cell(Vector2i(7, 6))
+	brig.equip(brig.items.find(brig.items.filter(func(it): return it.name == "Iron Axe")[0]))
+	brig.items.assign([brig.weapon])  # melee only
+	check(not Combat.can_counter(lord, brig, b.map), "an axe can't counter at range 2")
+	brig.personal_skills.assign(["Close Counter"])
+	check(Combat.can_counter(lord, brig, b.map), "Close Counter: it can")
+
+
+func test_proc_skills() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	lord.dexterity = 100  # 100%+ activation and hit
+	brig.dexterity = 100
+	var plain := Combat.damage(lord, brig, b.map)
+	var def := brig.combat_def()
+	lord.personal_skills.assign(["Luna"])
+	var hit := Combat.strike(lord, brig, b.map)
+	check_eq(hit.procs, [[lord, "Luna"]], "Luna fires")
+	check_eq(hit.dmg / (3 if hit.crit else 1), plain + floori(def * 0.5), "ignoring half the foe's DEF")
+	check_eq(Combat.forecast(lord, brig, b.map).atk.dmg, plain, "procs aren't in the forecast")
+	lord.personal_skills.assign(["Sol"])
+	brig.hp = 99
+	hit = Combat.strike(lord, brig, b.map)
+	check_eq(hit.heal, hit.dmg, "Sol heals the damage dealt")
+	lord.personal_skills.assign(["Lethality"])
+	lord.dexterity = 400
+	hit = Combat.strike(lord, brig, b.map)
+	check(hit.dmg >= brig.hp, "Lethality kills")
+	lord.dexterity = 100
+	lord.personal_skills.clear()
+	brig.personal_skills.assign(["Pavise"])
+	hit = Combat.strike(lord, brig, b.map)
+	var full: int = plain * (3 if hit.crit else 1)
+	check_eq(hit.procs, [[brig, "Pavise"]], "Pavise fires in melee")
+	check_eq(hit.dmg, full - floori(full * 0.5), "halving the damage")
+	brig.personal_skills.assign(["Miracle"])
+	brig.luck = 100
+	brig.hp = 2
+	hit = Combat.strike(lord, brig, b.map)
+	check_eq(hit.dmg, 1, "Miracle leaves 1 HP")
+	brig.hp = 99
+	hit = Combat.strike(lord, brig, b.map)
+	check_eq(hit.procs, [], "Miracle only on a lethal blow")
+	# A whole fight with a proc: popups and healing go through.
+	brig.personal_skills.clear()
+	brig.hp = 99
+	lord.personal_skills.assign(["Sol"])
+	lord.hp = 5
+	await b.actions.do_combat(lord, brig)
+	check(lord.hp > 5 or lord.hp <= 0, "Sol healed the Lord during the fight")

@@ -154,9 +154,9 @@ static func _target_score(attacker: Unit, dmg: int, hit: int, target: Unit) -> f
 ## Expected counter damage if `target` can strike back at the enemy's current cell,
 ## weighted by the enemy's caution.
 static func _counter_risk(enemy: Unit, target: Unit, map: BattleMap) -> float:
-	if not Combat.can_counter(enemy, target):
+	if not Combat.can_counter(enemy, target, map):
 		return 0.0
-	return enemy.ai.caution * Combat.damage(target, enemy, map) * Combat.hit_chance(target, enemy, map)
+	return enemy.ai.caution * Combat.damage(target, enemy, map, enemy) * Combat.hit_chance(target, enemy, map, enemy)
 
 
 # --- Turn ---------------------------------------------------------------------------

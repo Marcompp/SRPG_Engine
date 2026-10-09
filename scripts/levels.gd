@@ -324,8 +324,8 @@ const DATA := {
 	},
 	"ruined_fort": {
 		"name": "Ruined Fort",
-		"description": "Breakable terrain: a cracked wall and fence, a locked door
-(the Scout opens it) and trunks to fell across the river.",
+		"description": "Breakable terrain (a cracked wall and fence, a locked door, trunks
+to fell across the river) and skills: Sol, Pavise, Vantage, a ring, a scroll.",
 		"layout": [
 			"XXXXXXX...~....",
 			"X__T__X...~..F.",
@@ -343,6 +343,7 @@ const DATA := {
 		],
 		"players": [
 			{"name": "Lord", "cell": Vector2i(1, 8), "class": "Swordsman", "lord": true, "items": ["Iron Sword", "Potion"], "lv": 2,
+				"skills": ["Sol"],
 				"hp": 20, "str": 6, "dex": 8, "agi": 9, "lck": 7, "def": 5, "mov": 5, "mp": 4,
 				"growths": {"hp": 80, "str": 45, "dex": 50, "agi": 40, "lck": 45, "def": 30, "mp": 30}},
 			{"name": "Fighter", "cell": Vector2i(2, 8), "class": "Axeman", "items": ["Iron Axe", "Hammer"], "lv": 2,
@@ -360,6 +361,7 @@ const DATA := {
 		],
 		"enemies": [
 			{"name": "Warden", "cell": Vector2i(3, 1), "class": "Guard", "items": ["Iron Spear"], "lv": 4,
+				"skills": ["Pavise", "Vantage"],
 				"hp": 26, "str": 8, "dex": 5, "agi": 3, "lck": 2, "def": 10, "mov": 4, "mp": 0,
 				"ai": {"preset": "boss"}},
 			{"name": "Archer", "cell": Vector2i(13, 3), "class": "Archer", "items": ["Iron Bow"], "lv": 2,
@@ -369,6 +371,7 @@ const DATA := {
 				"hp": 20, "str": 5, "dex": 1, "agi": 4, "lck": 0, "def": 3, "mp": 0, "mov": 5,
 				"ai": {"preset": "sentry"}},
 			{"name": "Brigand", "cell": Vector2i(12, 1), "class": "Brigand", "items": ["Iron Axe", "Hatchet"], "lv": 2,
+				"skills": ["Wrath"],
 				"hp": 20, "str": 5, "dex": 1, "agi": 4, "lck": 0, "def": 3, "mp": 0, "mov": 5,
 				"ai": {"preset": "ambusher"}},
 		],

@@ -448,12 +448,13 @@ func use_weapon() -> bool:
 
 
 ## Floating combat text above the unit.
-func popup(text: String, color: Color) -> void:
+## Floating text over the unit. `raise` lifts it, so two popups at once don't overlap.
+func popup(text: String, color: Color, raise := 0.0) -> void:
 	var label := Label.new()
 	label.text = text
 	label.z_index = 10
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.position = Vector2(-12, -8)
+	label.position = Vector2(-12, -8 - raise)
 	label.size = Vector2(40, 10)
 	label.add_theme_font_size_override("font_size", 8)
 	label.add_theme_color_override("font_color", color)
@@ -461,7 +462,7 @@ func popup(text: String, color: Color) -> void:
 	label.add_theme_constant_override("outline_size", 3)
 	add_child(label)
 	var tw := label.create_tween()
-	tw.tween_property(label, "position:y", -16.0, 0.5)
+	tw.tween_property(label, "position:y", -16.0 - raise, 0.5)
 	tw.parallel().tween_property(label, "modulate:a", 0.0, 0.3).set_delay(0.4)
 	tw.tween_callback(label.queue_free)
 
