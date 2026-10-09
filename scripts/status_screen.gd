@@ -196,7 +196,7 @@ func _render_left() -> void:
 	portrait.position = Vector2(16, 6)
 	portrait.size = Vector2(48, 48)
 	_left.add_child(portrait)
-	var initial := _label(portrait, unit.unit_name.left(1), Vector2.ZERO)
+	var initial := _label(portrait, unit.token_letter(), Vector2.ZERO)
 	initial.add_theme_font_size_override("font_size", 28)
 	initial.size = portrait.size
 	initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

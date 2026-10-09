@@ -21,6 +21,8 @@ const OPTIONS := [
 		"choices": [[true, "On"], [false, "Off"]]},
 	{"key": "level_up_wait", "label": "Level-up window",
 		"choices": [[true, "Wait for Z"], [false, "Auto (2 s)"]]},
+	{"key": "auto_save", "label": "Auto save",
+		"choices": [[true, "Each turn"], [false, "Off"]]},
 ]
 
 static var _values := {}

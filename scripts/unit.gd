@@ -47,6 +47,14 @@ const GENDERS: Array[String] = ["male", "female"]
 ## Hidden: never shown to the player, but rules can check it (e.g. mounts that only
 ## accept some riders). Roster "gender"; generics without one get a random gender.
 var gender: String = GENDERS.pick_random()
+## Generic units (roster "generic": true) get a random name (see Names) and show
+## their class's initial on the map instead of their name's.
+var generic := false
+## Bosses: roster "boss": true, or the "boss" AI preset. Defeating one is a
+## biography moment.
+var is_boss := false
+## Foes this unit has defeated.
+var kills := 0
 ## Notable events in this unit's story, oldest first (roster "bio"); shown on the
 ## status screen's Biography page. Player units only.
 var biography: Array[String] = []
@@ -172,6 +180,10 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	assert(Races.DATA.has(u.race), "unknown race: " + u.race)
 	u.gender = stats.get("gender", u.gender)
 	assert(GENDERS.has(u.gender), "unknown gender: " + u.gender)
+	u.generic = stats.get("generic", false)
+	if u.generic:
+		u.unit_name = Names.random(u.race, u.gender)
+	u.is_boss = stats.get("boss", false) or stats.get("ai", {}).get("preset", "") == "boss"
 	u.biography.assign(stats.get("bio", []))
 	u.personal_skills.assign(stats.get("skills", []))
 	u.learn_table = stats.get("learn", {})
@@ -251,6 +263,11 @@ func badge_key() -> String:
 		if Skills.has(self, pair[0]):
 			parts.append(pair[1])
 	return "_".join(parts) if not parts.is_empty() else "foot"
+
+
+## The letter on the unit's map token (and stats screen portrait).
+func token_letter() -> String:
+	return unit_class.left(1) if generic else unit_name.left(1)
 
 
 func has_ability(ability: String) -> bool:
@@ -532,7 +549,7 @@ func _draw() -> void:
 		var flag := PLAYER_COLOR if aboard.team == Team.PLAYER else ENEMY_COLOR
 		draw_rect(Rect2(3, 2, 3, 3), Color.WHITE)
 		draw_rect(Rect2(3.5, 2.5, 2, 2), flag.lightened(0.3))
-	draw_string(ThemeDB.fallback_font, Vector2(2, 10), unit_name.left(1),
+	draw_string(ThemeDB.fallback_font, Vector2(2, 10), token_letter(),
 		HORIZONTAL_ALIGNMENT_CENTER, 12, 9, Color.WHITE)
 	_draw_bar(13, 2, float(hp) / max_hp, HP_COLOR)
 	if is_caster():

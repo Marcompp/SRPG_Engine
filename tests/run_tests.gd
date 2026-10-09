@@ -145,6 +145,9 @@ func _run_all() -> void:
 		"test_max_hp_weight_and_crit_skills",
 		"test_camera_on_small_and_big_maps",
 		"test_great_valley_phases_run_without_errors",
+		"test_generic_names",
+		"test_kills_and_biography_moments",
+		"test_auto_save",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -2182,7 +2185,8 @@ func test_villages_visit_and_loot() -> void:
 	check_eq(b.map.object_at(Vector2i(5, 0)).state, "visited", "village visited")
 	check_eq(lord.items.size(), items_before + 1, "its reward is added")
 	check_eq(lord.items[-1].name, "Potion", "the village's item")
-	var thief := unit_named("Thief", Unit.Team.ENEMY)
+	# Campaign enemies are generics with random names: find the thief by class.
+	var thief: Unit = b.units_of(Unit.Team.ENEMY).filter(func(u): return u.unit_class == "Rogue")[0]
 	thief.set_cell(Vector2i(11, 2))  # one step from the other village
 	await EnemyAI.take_turn(thief, b)
 	check_eq(b.map.object_at(Vector2i(11, 3)).state, "looted", "the thief burns the other village")
@@ -3075,3 +3079,88 @@ func test_camera_on_small_and_big_maps() -> void:
 func test_great_valley_phases_run_without_errors() -> void:
 	await start_level("great_valley")
 	await test_enemy_phases_run_without_errors()
+
+
+# --- Generic names, kills, biography moments, auto save ----------------------------------
+
+func test_generic_names() -> void:
+	var data := {"class": "Brigand", "items": ["Iron Axe"], "hp": 20, "str": 5, "dex": 1, "agi": 4,
+		"lck": 0, "def": 3, "mov": 5, "generic": true, "gender": "female"}
+	var u := Unit.create("Brigand", Unit.Team.ENEMY, Vector2i.ZERO, data)
+	check(u.generic, "marked generic")
+	check(Names.DEFAULT.female.has(u.unit_name), "a random name for its gender (%s)" % u.unit_name)
+	check_eq(u.token_letter(), "B", "its map token shows the class's initial")
+	u.free()
+	data.erase("generic")
+	u = Unit.create("Brigand", Unit.Team.ENEMY, Vector2i.ZERO, data)
+	check_eq(u.unit_name, "Brigand", "named units keep their roster name")
+	u.free()
+	# Campaign generics; bosses keep their names.
+	await start_chapter(1)
+	var enemies: Array[Unit] = b.units_of(Unit.Team.ENEMY)
+	check(enemies.filter(func(e): return e.generic).size() >= 5, "chapter enemies are generics")
+	check(unit_named("Commander", Unit.Team.ENEMY) != null, "the boss keeps its name")
+	check(unit_named("Commander", Unit.Team.ENEMY).is_boss, "and is a boss")
+
+
+func test_kills_and_biography_moments() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	_spawn_enemy(Vector2i(14, 9))
+	var dealt: Array[Unit] = []
+	var bio := lord.biography.size()
+	# First kill: unit and weapon kill counts, a biography entry.
+	b.actions._apply_strike(lord, brig, {"hit": true, "crit": false, "dmg": 99}, dealt)
+	check_eq(lord.kills, 1, "the kill counts")
+	check_eq(lord.weapon.get("kills", 0), 1, "and so does the weapon's")
+	check(Glossary.item(lord.weapon).contains("Kills: 1"), "shown in the weapon's description")
+	check_eq(lord.biography.size(), bio + 1, "a biography entry")
+	check(lord.biography[-1].begins_with("Felled their first foe, Brigand"), "for the first kill")
+	# A boss, with a critical hit.
+	var boss := _spawn_enemy(Vector2i(6, 6))
+	boss.is_boss = true
+	boss.unit_name = "Warlord"
+	b.actions._apply_strike(lord, boss, {"hit": true, "crit": true, "dmg": 99}, dealt)
+	check(lord.biography[-1].begins_with("Defeated Warlord with a critical hit"), "boss kill noted")
+	# Spells don't count toward the equipped weapon's kills.
+	var foe := _spawn_enemy(Vector2i(6, 6))
+	b.actions._apply_strike(lord, foe, {"hit": true, "crit": false, "dmg": 99, "spell": true}, dealt)
+	check_eq(lord.kills, 3, "spell kills count for the unit")
+	check_eq(lord.weapon.kills, 2, "but not for its weapon")
+	# A close call, once per battle.
+	foe = _spawn_enemy(Vector2i(6, 6))
+	bio = lord.biography.size()
+	lord.hp = lord.max_hp
+	b.actions._apply_strike(foe, lord, {"hit": true, "crit": false, "dmg": lord.max_hp - 1}, dealt)
+	check(lord.biography[-1].begins_with("Barely survived"), "close call noted")
+	lord.hp = lord.max_hp
+	b.actions._apply_strike(foe, lord, {"hit": true, "crit": false, "dmg": lord.max_hp - 1}, dealt)
+	check_eq(lord.biography.size(), bio + 1, "once per battle")
+	# Saved by Miracle.
+	lord.hp = 10
+	b.actions._apply_strike(foe, lord, {"hit": true, "crit": false, "dmg": 9, "procs": [[lord, "Miracle"]]}, dealt)
+	check(lord.biography[-1].contains("thanks to Miracle"), "Miracle saves are noted")
+	# Enemies get no entries.
+	var enemy_bio := foe.biography.size()
+	b.actions._apply_strike(lord, foe, {"hit": true, "crit": false, "dmg": foe.max_hp - 1}, dealt)
+	check_eq(foe.biography.size(), enemy_bio, "enemies have no biography")
+
+
+func test_auto_save() -> void:
+	SaveGame.delete_suspend()
+	await b.phases.start_player_phase()
+	var data := SaveGame.read_suspend()
+	check(not data.is_empty(), "the player phase auto-saves")
+	check_eq(data.get("turn", 0), b.turn, "at the current turn")
+	SaveGame.delete_suspend()
+	Settings.set_value("auto_save", false)
+	await b.phases.start_player_phase()
+	check(SaveGame.read_suspend().is_empty(), "unless turned off")
+	Settings.set_value("auto_save", true)
+	# The quit prompt says what's kept.
+	b.cursor.cell = Vector2i(7, 9)
+	await press(KEY_Z)
+	await pick("Level Select")
+	check(b.ui._menu_title.contains("resume from the start of this turn"), "quit prompt mentions the auto save")
+	SaveGame.delete_suspend()

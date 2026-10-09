@@ -680,7 +680,9 @@ func menu_accept() -> void:
 					_open_menu("restart", options, "Restart this map?")
 				"Level Select":
 					var options: Array[String] = ["Cancel", "Quit"]
-					_open_menu("quit", options, "Quit to the level select?\nProgress on this map is lost.")
+					var note := "You can resume from the start of this turn." if Settings.value("auto_save") \
+						else "Progress on this map is lost."
+					_open_menu("quit", options, "Quit to the level select?\n" + note)
 		"unit":
 			match battle.ui.menu_choice():
 				"Seize":

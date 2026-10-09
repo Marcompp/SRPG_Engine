@@ -30,6 +30,9 @@ func start_player_phase() -> void:
 	if not players.is_empty():
 		battle.cursor.cell = players[0].cell
 	battle.refresh_threat()
+	# Auto save: the turn can be resumed from here (level select > Resume).
+	if Settings.value("auto_save"):
+		SaveGame.write_suspend(battle)
 	battle.state = Battle.State.IDLE
 	battle.input.refresh_info()
 

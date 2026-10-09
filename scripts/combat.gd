@@ -321,7 +321,7 @@ static func spell_crit_chance(caster: Unit, target: Unit, spell: Dictionary, map
 
 ## Resolves one spell hit, same shape as strike().
 static func spell_strike(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> Dictionary:
-	var result := {"hit": false, "crit": false, "dmg": 0, "heal": 0, "procs": []}
+	var result := {"hit": false, "crit": false, "dmg": 0, "heal": 0, "procs": [], "spell": true}
 	if not roll_hit(spell_hit_chance(caster, target, spell, map)):
 		return result
 	result.hit = true

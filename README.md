@@ -10,7 +10,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 |---|---|
 | Units | Sortable table of every unit (Left/Right: sort column, Z: go to unit, D: status) |
 | Objective | Victory/defeat conditions, turn, units left |
-| Options | Game speed, fast-forward speed, danger zone at start, auto-end turn, end turn warning, level-up window (saved to `user://settings.cfg`) |
+| Options | Game speed, fast-forward speed, danger zone at start, auto-end turn, end turn warning, level-up window, auto save (saved to `user://settings.cfg`) |
 | Suspend | Saves the battle to `user://suspend.save` and returns to the level select (deleted when the map ends) |
 | Restart | Restarts the map (asks first) |
 | Level Select | Back to the level select (on the Victory/Defeat screen, X also goes there) |
@@ -42,7 +42,8 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 - **Permadeath:** fallen units leave the army for good. They're kept in `Campaign.fallen` (with chapter and turn) for future mechanics, and "Fell in …" is added to their biography.
 - **Defeat** retries the chapter with the army as it was before it.
 - **Prep screen** before each chapter: Pick Units (the Lord always deploys), Items (unit ↔ convoy), Promote (Lv 15+, class-dependent stat bonus, level kept), Status, Fight!
-- **Biography** logs joining, promotion, seizing and falling.
+- **Biography** logs joining, promotion, seizing and falling, plus moments from play: a unit's first kill, defeating a boss (noting a critical finishing blow), barely surviving a hit (10% HP or less, once per battle) and being saved by Miracle.
+- **Generic enemies** (roster `"generic": true`, all non-boss campaign enemies) get a random name by race and gender (`scripts/names.gd`; races without their own lists use the default ones) and show their class's initial on the map.
 - **Objectives** (`scripts/objectives.gd`) work on any level: `"objective": {"type": "rout" | "boss" | "seize" | "survive" | "defend" | "escape", ...}`, plus `"objects"` (villages, chests) and `"reinforcements"` (enemies arriving on a given turn).
 
 ## Tests
@@ -87,6 +88,8 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - Board/Unload: a unit next to an allied ship with room can Board it (ends the boarder's turn; a Galley holds 2). The ship can Unload passengers onto adjacent cells they can stand on without ending its own turn, and passengers that haven't acted can then move. A sunk ship's passengers are set down on the nearest free cell they can stand on
 - Dance (Performer) refreshes an adjacent ally; Inspire (Bannerman) gives every adjacent ally +STR/DEF until the next player phase: +1, plus 1 more every 5 levels (+5 at Lv 20)
 - Enemy AI that heals, picks weapons and casts spells
+- Kill counts per unit and per weapon (shown in the weapon's description); spell kills count for the unit only
+- Auto save (Options, on by default): the start of every player phase is saved, so the level select can resume from there
 - Maps of any size: a camera (`scripts/battle_camera.gd`) shows a 15x10 window and scrolls, GBA-style, to keep the cursor (or a moving unit) 2 tiles from the screen edge; panels go on the side of the screen away from the cursor. Maps that fit on one screen don't scroll
 - Map readability: enemy danger zone, per-enemy range view, a movement arrow that follows the cursor's trail, full unit stats screen
 - Configurable enemy behaviors (see below) and Fort tiles (DEF +2, AVO +20, heal 20% max HP at the start of the occupant's phase)

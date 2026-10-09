@@ -5,6 +5,8 @@ extends Node
 ## AI, including combat resolution and EXP.
 
 var battle: Battle
+## Player units that already got a close-call biography entry this battle.
+var _close_calls := {}
 
 
 # --- Who can do what ----------------------------------------------------------
@@ -70,7 +72,7 @@ func inspire_targets(u: Unit) -> Array[Unit]:
 
 func do_seize(u: Unit) -> void:
 	u.popup("Seize!", Color.GOLD)
-	u.biography.append("Seized %s." % Levels.get_level(Levels.selected).name.get_slice(": ", 1))
+	u.biography.append("Seized %s." % map_title())
 	battle.objective_done = true
 	await get_tree().create_timer(0.5).timeout
 
@@ -514,9 +516,12 @@ func cast_area(caster: Unit, center: Vector2i, spell_name: String) -> void:
 
 ## Applies one strike's result with popups; records the striker in `dealt` if it did damage.
 func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> void:
+	var saved_by := ""
 	for proc in result.get("procs", []):
 		if not Skills.is_hidden(proc[1]):
 			proc[0].popup(proc[1] + "!", Color.GOLD, 10.0)
+		if proc[0] == d and Skills.get_data(proc[1]).proc.effect == "survive":
+			saved_by = proc[1]
 	if result.get("heal", 0) > 0:
 		a.heal(result.heal)
 		a.popup("+%d" % result.heal, Color.PALE_GREEN)
@@ -526,8 +531,52 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 			dealt.append(a)
 		d.popup(("Crit! %d" if result.crit else "%d") % result.dmg,
 			Color.ORANGE if result.crit else Color.WHITE)
+		if d.hp <= 0:
+			_record_kill(a, d, result)
+		elif saved_by != "":
+			_note(d, "Survived a lethal blow from %s at %s, thanks to %s." % [foe_label(a), map_title(), saved_by])
+		elif result.dmg > 0:
+			_record_close_call(d, a)
 	else:
 		d.popup("Miss", Color.LIGHT_GRAY)
+
+
+## The map's name for biographies: "Border Village" for "Chapter 1: Border Village".
+func map_title() -> String:
+	var title: String = Levels.get_level(Levels.selected).name
+	return title.get_slice(": ", 1) if title.contains(": ") else title
+
+
+## How a biography names a foe: "Garret the Brigand" for generics.
+func foe_label(u: Unit) -> String:
+	return "%s the %s" % [u.unit_name, u.unit_class] if u.generic else u.unit_name
+
+
+## Adds a biography entry for player units (enemies have no Biography page).
+func _note(u: Unit, text: String) -> void:
+	if u.team == Unit.Team.PLAYER:
+		u.biography.append(text)
+
+
+## Kill counts (unit and weapon) and kill biography moments: a boss (noting a
+## critical finishing blow) or a unit's first kill.
+func _record_kill(a: Unit, d: Unit, result: Dictionary) -> void:
+	a.kills += 1
+	if not result.get("spell", false) and not a.weapon.is_empty():
+		a.weapon["kills"] = a.weapon.get("kills", 0) + 1
+	if d.is_boss:
+		_note(a, ("Defeated %s with a critical hit at %s." if result.crit else "Defeated %s at %s.")
+			% [foe_label(d), map_title()])
+	elif a.kills == 1:
+		_note(a, "Felled their first foe, %s, at %s." % [foe_label(d), map_title()])
+
+
+## A player unit left at 10% HP or less (at least 1) by a hit: once per battle.
+func _record_close_call(d: Unit, a: Unit) -> void:
+	if d.team != Unit.Team.PLAYER or _close_calls.has(d) or d.hp > maxi(1, d.max_hp / 10):
+		return
+	_close_calls[d] = true
+	_note(d, "Barely survived %s at %s, with %d HP left." % [foe_label(a), map_title(), d.hp])
 
 
 ## EXP for both sides of a one-on-one exchange, then deaths.

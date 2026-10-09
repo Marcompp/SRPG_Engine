@@ -97,6 +97,8 @@ static func item(it: Dictionary) -> String:
 			text += " " + WEAPON_NOTES[it.name]
 		for skill: String in it.get("skills", []):
 			text += " Equipped: %s (%s)" % [skill, Skills.get_data(skill).description]
+		if it.get("kills", 0) > 0:
+			text += " Kills: %d." % it.kills
 		return text
 	match it.get("kind", ""):
 		"heal":
