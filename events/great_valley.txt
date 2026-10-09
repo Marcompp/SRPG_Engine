@@ -22,7 +22,7 @@ Wyrm: ...Fine. Point me at the General.
 @recruit Wyrm
 @flag wyrm_joined
 
-== battle General ==
+== battle General | unless wyrm_joined ==
 General: You crossed my valley just to die in it?
 
 == battle General | if wyrm_joined ==
@@ -30,3 +30,19 @@ General: Even the dragon turned on me?
 
 == death Ember ==
 Ember: Sorry... I couldn't...
+
+== visit (3, 3) ==
+Villager: You're crossing the valley? Take this. The bridges are watched.
+
+== visit (22, 16) ==
+Villager: The General took our ring for "safekeeping". Here, it's yours if you send him packing.
+
+== area (24, 0)-(29, 4), player ==
+General: Too close! Archers, to the walls!
+
+== victory ==
+Lord: The valley's ours.
+Ember: And not a bridge burned. I'm almost disappointed.
+
+== defeat ==
+@narrate The valley falls silent.

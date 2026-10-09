@@ -12,6 +12,12 @@ extends RefCounted
 ##   == battle Bandit King ==          before any fight involving the Bandit King
 ##   == battle Lord, Bandit King ==    before a fight between these two
 ##   == death Rider ==                 when Rider falls
+##   == area (12, 3)-(14, 5), (20, 1) ==   a unit ends its move on one of these cells
+##                                     ("(x, y)-(x, y)" is a rectangle)
+##   == area (12, 3)-(14, 5), Lord ==  ...only this unit ("player"/"enemy": a side)
+##   == visit (3, 3) ==                the village there is visited (before its reward)
+##   == victory ==                     the map is won, before the end screen
+##   == defeat ==                      the map is lost, before the end screen
 ##   Options after "|": "repeat" (run every time), "if <flag>", "unless <flag>":
 ##   == turn 2 | if bridge_held ==
 ##
@@ -35,7 +41,7 @@ extends RefCounted
 ## that same shape (with "script" written as command arrays) for anything the text
 ## can't express.
 
-const TRIGGERS: Array[String] = ["start", "turn", "talk", "battle", "death"]
+const TRIGGERS: Array[String] = ["start", "turn", "talk", "battle", "death", "area", "visit", "victory", "defeat"]
 const COMMANDS: Array[String] = ["say", "narrate", "move", "spawn", "remove", "recruit", "give", "camera",
 	"wait", "flag", "banner"]
 
@@ -85,9 +91,12 @@ static func _header(text: String, n: int, errors: Array) -> Dictionary:
 		return {}
 	var rest := head.substr(word.length()).strip_edges()
 	var args: Array = []
-	for a in rest.split(","):
-		if a.strip_edges() != "":
-			args.append(a.strip_edges())
+	if word in ["area", "visit"]:
+		args = _cells_and_who(rest)
+	else:
+		for a in rest.split(","):
+			if a.strip_edges() != "":
+				args.append(a.strip_edges())
 	var e := {"trigger": word, "args": args, "repeat": false, "if": [], "unless": [], "script": [], "line": n}
 	match word:
 		"turn":
@@ -109,6 +118,18 @@ static func _header(text: String, n: int, errors: Array) -> Dictionary:
 		"death":
 			if args.size() != 1:
 				errors.append("line %d: \"death\" needs a unit name" % n)
+				return {}
+		"area":
+			if args[0].is_empty():
+				errors.append("line %d: \"area\" needs cells, like \"(3, 4)\" or \"(3, 4)-(6, 5)\"" % n)
+				return {}
+		"visit":
+			if args[0].size() != 1 or args[1] != "":
+				errors.append("line %d: \"visit\" needs one cell, like \"(3, 4)\"" % n)
+				return {}
+		"victory", "defeat":
+			if not args.is_empty():
+				errors.append("line %d: \"%s\" takes no arguments" % [n, word])
 				return {}
 	for option in parts.slice(1):
 		var o := option.strip_edges()
@@ -164,6 +185,24 @@ static func _command(line: String, n: int, errors: Array) -> Array:
 			return ["give", parts[0].strip_edges(), parts[1].strip_edges()]
 	errors.append("line %d: unknown command @%s" % [n, word])
 	return []
+
+
+## For area/visit headers: [cells, who]: every "(x, y)" and "(x, y)-(x, y)" rectangle
+## in `text`, and whatever text is left ("" for anyone, a unit name, "player" or "enemy").
+static func _cells_and_who(text: String) -> Array:
+	var cells: Array = []
+	var re := RegEx.create_from_string("\\(\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)(\\s*-\\s*\\(\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\))?")
+	for m in re.search_all(text):
+		var a := Vector2i(m.get_string(1).to_int(), m.get_string(2).to_int())
+		var b := a
+		if m.get_string(3) != "":
+			b = Vector2i(m.get_string(4).to_int(), m.get_string(5).to_int())
+		for y in range(mini(a.y, b.y), maxi(a.y, b.y) + 1):
+			for x in range(mini(a.x, b.x), maxi(a.x, b.x) + 1):
+				if not cells.has(Vector2i(x, y)):
+					cells.append(Vector2i(x, y))
+	var who := re.sub(text, "", true).replace(",", " ").strip_edges()
+	return [cells, who]
 
 
 ## The "(x, y)" at the end of `text`, or null.

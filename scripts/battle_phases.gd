@@ -84,6 +84,8 @@ func end_player_phase() -> void:
 		if not is_instance_valid(e) or e.hp <= 0 or e.has_acted:
 			continue
 		await EnemyAI.take_turn(e, battle)
+		if is_instance_valid(e) and e.hp > 0:
+			await battle.events.on_area(e)
 		if check_game_over():
 			return
 		# Galeforce: one more turn.
@@ -150,8 +152,14 @@ func check_game_over(turn_over := false) -> bool:
 		var last := Campaign.chapter >= Chapters.ORDER.size() - 1
 		hint = ("Z: continue" if not last else "Z: finish the campaign") if won \
 			else "Z: retry the chapter   X: level select"
-	battle.ui.show_end("Victory!" if won else "Defeat...", Color("2850b0") if won else Color("602020"), hint)
+	_show_end(won, hint)
 	return true
+
+
+## The map's victory/defeat scene (if any), then the end screen.
+func _show_end(won: bool, hint: String) -> void:
+	await battle.events.on_end(battle.battle_result)
+	battle.ui.show_end("Victory!" if won else "Defeat...", Color("2850b0") if won else Color("602020"), hint)
 
 
 # --- Campaign flow (see Campaign) ---------------------------------------------

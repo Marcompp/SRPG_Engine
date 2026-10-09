@@ -80,6 +80,26 @@ func on_death(u: Unit) -> void:
 	await _fire(func(e): return e.trigger == "death" and e.args[0] == u.unit_name)
 
 
+## A unit ended its move on `u.cell`. Returns whether a scene played.
+func on_area(u: Unit) -> bool:
+	var team := "player" if u.team == Unit.Team.PLAYER else "enemy"
+	var test := func(e: Dictionary) -> bool:
+		if e.trigger != "area" or not e.args[0].has(u.cell):
+			return false
+		var who: String = e.args[1]
+		return who == "" or who == u.unit_name or who == team
+	return await _fire(test)
+
+
+func on_visit(cell: Vector2i) -> void:
+	await _fire(func(e): return e.trigger == "visit" and e.args[0][0] == cell)
+
+
+## The map was won ("victory") or lost ("defeat"), before the end screen.
+func on_end(result: String) -> void:
+	await _fire(func(e): return e.trigger == result)
+
+
 func _ready_to_run(i: int) -> bool:
 	var e: Dictionary = events[i]
 	if fired.has(i) and not e.repeat:
@@ -94,14 +114,18 @@ func _ready_to_run(i: int) -> bool:
 
 
 ## Runs every eligible event matching `test`, in file order (`first_only`: just one).
-func _fire(test: Callable, first_only := false) -> void:
+## Returns whether any ran.
+func _fire(test: Callable, first_only := false) -> bool:
+	var ran := false
 	for i in events.size():
 		if test.call(events[i]) and _ready_to_run(i):
 			if not fired.has(i):
 				fired.append(i)
+			ran = true
 			await run(events[i].script)
 			if first_only:
-				return
+				break
+	return ran
 
 
 # --- Running scripts --------------------------------------------------------------------

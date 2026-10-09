@@ -89,7 +89,9 @@ multi-line string per event) or in one text file per chapter.
 - **Format:** the text format, one file per map: `events/<map id>.txt` (e.g.
   `events/ch1.txt`). Data lists are the fallback for anything the text can't
   express: a level's `"events"` entry can hold scripts as lists of commands.
-- **First version:** `start`, `turn`, `talk` (with recruiting), `battle` and `death`.
-  `area`, `visit` and `victory` come next.
+- **Triggers built:** `start`, `turn`, `talk` (with recruiting), `battle`, `death`,
+  `area`, `visit`, `victory`, plus `defeat`. An `area` scene fires when a unit ends
+  its move there (player units: right after moving, and it commits the move;
+  enemies: after their turn).
 - **Speakers:** a unit's name when one matches, otherwise a free label ("Messenger")
   with a generic portrait.

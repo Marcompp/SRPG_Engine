@@ -389,6 +389,12 @@ func move_selected(dest: Vector2i) -> void:
 		else battle.map.build_path(reach.parents, selected.cell, dest)
 	moved_cost = path_cost(path)
 	await selected.move_along(path)
+	# An area event's scene commits the move (it can't be undone after a cutscene).
+	if await battle.events.on_area(selected):
+		move_committed = true
+		if not is_instance_valid(selected) or selected.hp <= 0 or selected.team != Unit.Team.PLAYER:
+			finish_action(true)
+			return
 	if canto_move:
 		canto_move = false
 		finish_action(true)

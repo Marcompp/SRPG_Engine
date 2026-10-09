@@ -88,6 +88,7 @@ func do_escape(u: Unit) -> void:
 
 
 func do_visit(u: Unit) -> void:
+	await battle.events.on_visit(u.cell)
 	var village := battle.map.object_at(u.cell)
 	village.state = "visited"
 	battle.map.queue_redraw()

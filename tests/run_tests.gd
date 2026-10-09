@@ -155,6 +155,7 @@ func _run_all() -> void:
 		"test_event_script_parsing",
 		"test_events_run_on_triggers",
 		"test_great_valley_events",
+		"test_area_visit_and_end_events",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -3446,3 +3447,49 @@ func test_great_valley_events() -> void:
 	await b.events.run_talk(ember, wyrm)
 	check_eq(wyrm.team, Unit.Team.PLAYER, "the Wyrm joins")
 	check(b.events.flags.has("wyrm_joined"), "flag for the General's other quote")
+
+
+func test_area_visit_and_end_events() -> void:
+	var r: Dictionary = EventScript.parse("== area (1, 1)-(2, 2), (5, 5), Lord ==
+== visit (3, 3) ==
+== victory ==
+== defeat ==")
+	check_eq(r.errors, [], "headers parse")
+	check_eq(r.events[0].args[0], [Vector2i(1, 1), Vector2i(2, 1), Vector2i(1, 2), Vector2i(2, 2), Vector2i(5, 5)],
+		"rectangles and single cells")
+	check_eq(r.events[0].args[1], "Lord", "who")
+	check_eq(EventScript.parse("== visit ==").errors.size(), 1, "visit needs a cell")
+	var errors: Array = b.events.load_text("""
+== area (3, 2)-(4, 2), player ==
+@flag reached
+== area (10, 5), enemy ==
+@flag enemy_reached
+== victory ==
+@flag won
+""")
+	check_eq(errors, [], "test events parse")
+	# A player unit ending its move in the area: the scene plays and commits the move.
+	var lord := unit_named("Lord")
+	lord.set_cell(Vector2i(2, 2))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_RIGHT)
+	await press(KEY_Z)
+	check(b.events.flags.has("reached"), "area event on the move")
+	check(b.input.move_committed, "the move can't be undone after the scene")
+	await press(KEY_X)
+	check_eq(lord.cell, Vector2i(3, 2), "X doesn't take the move back")
+	await pick("Wait")
+	# Enemies trigger area events at the end of their turn.
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	brig.set_cell(Vector2i(10, 5))
+	check(await b.events.on_area(brig), "an enemy in the area")
+	check(b.events.flags.has("enemy_reached"), "enemy area event")
+	# Victory: the scene plays before the end screen.
+	for e in b.units_of(Unit.Team.ENEMY):
+		e.hp = 0
+	b.phases.check_game_over()
+	while b.state != b.State.GAME_OVER or not b.events.flags.has("won"):
+		await process_frame
+	check(b.events.flags.has("won"), "victory scene ran")
+	check_eq(b.battle_result, "victory", "and the map is won")
