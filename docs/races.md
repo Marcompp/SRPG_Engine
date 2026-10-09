@@ -66,6 +66,7 @@ Today: mounted units can Rescue but can't Shove; they can't be Shoved or Rescued
 | Stone Body | Always moves as heavy and counts as heavy. Can't be shoved or carried. |
 | Amphibious | In a foot class, gains swim + climb movement (on top of scout movement if the class has it). |
 | Winged | Always moves as flying (unless in a mounted class) and counts as flying. |
+| Fire Breath | Racial attack: a fire-element attack at range 1-2, STR-based, no MP (the Fire Breath skill). |
 | Undead | Weak to silver weapons (x2), Fire and Light; resists Dark. |
 | Spiritual | Always moves as spirit and counts as spirit. |
 | Regen HP | Recovers a little HP every turn. |
@@ -87,6 +88,7 @@ Today: mounted units can Rescue but can't Shove; they can't be Shoved or Rescued
 | Centaur | Equine | Flying classes |
 | Minotaur | Half-Equine | Mounted classes |
 | Harpy | Winged | Heavy classes |
+| Dragon | Winged, Reptile, Fire Breath | – |
 | Ent | Wooden Body | Mounted classes |
 | Stoneborn | Stone Body, Poison immune | Anything but foot or heavy classes |
 | Skeleton | Undead, Poison immune | – |
@@ -109,6 +111,7 @@ Rough direction only, no numbers yet. `++` very high, `+` high, `-` low,
 | Centaur | | | | | | | | | Fairly balanced |
 | Minotaur | + | | + | | | | | | |
 | Harpy | | | | | | + | | - | |
+| Dragon | | | | | | | | | Not decided |
 | Ent | ++ | | | | | -- | | ++ | |
 | Stoneborn | ++ | | | | | -- | | ++ | |
 | Skeleton | - | | | | - | | -- | | |

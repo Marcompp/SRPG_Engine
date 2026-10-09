@@ -385,10 +385,21 @@ func heal(amount: int) -> void:
 	create_tween().tween_property(self, "modulate", Color.WHITE, 0.35)
 
 
+## Spells plus racial attacks (abilities from skills): everything it can cast or use
+## besides weapons.
+func attack_spells() -> Array[String]:
+	var result: Array[String] = []
+	result.assign(spells)
+	for a in Skills.abilities(self):
+		if not result.has(a):
+			result.append(a)
+	return result
+
+
 ## Distinct (min, max) reach across the unit's support (true) or offensive (false) spells.
 func spell_ranges(support: bool) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
-	for s in spells:
+	for s in attack_spells():
 		if Spells.is_support(s) != support:
 			continue
 		var r := Spells.reach_ranges(s, self)

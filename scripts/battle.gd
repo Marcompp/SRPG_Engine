@@ -174,7 +174,7 @@ func nearest_free_cell(u: Unit, from: Vector2i) -> Vector2i:
 ## skipped when `affordable_only` (used for enemy threat, which must be accurate).
 func offense_ranges(u: Unit, affordable_only := false) -> Array[Vector2i]:
 	var offense := u.weapon_ranges()
-	for s in u.spells:
+	for s in u.attack_spells():
 		if Spells.is_support(s) or (affordable_only and not Spells.can_afford(u, s)):
 			continue
 		var r := Spells.reach_ranges(s, u)

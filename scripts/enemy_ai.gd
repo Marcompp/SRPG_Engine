@@ -250,7 +250,7 @@ static func _best_attack(enemy: Unit, battle: Battle, cells: Dictionary) -> Dict
 	if not original.is_empty():
 		enemy.equip(enemy.items.find(original))
 
-	for s in enemy.spells:
+	for s in enemy.attack_spells():
 		if Spells.is_support(s) or not Spells.can_afford(enemy, s):
 			continue
 		var spell := Spells.get_spell(s)
@@ -308,7 +308,7 @@ static func _execute_attack(enemy: Unit, battle: Battle, plan: Dictionary, paren
 ## attack follow their nearest ally instead of walking into the enemy.
 static func _advance(enemy: Unit, battle: Battle, reach: Dictionary, players: Array[Unit]) -> void:
 	var goals: Array[Unit] = players
-	var offensive_spells := enemy.spells.filter(func(s: String) -> bool: return not Spells.is_support(s))
+	var offensive_spells := enemy.attack_spells().filter(func(s: String) -> bool: return not Spells.is_support(s))
 	if enemy.weapon.is_empty() and offensive_spells.is_empty():
 		goals = []
 		goals.assign(battle.units_of(enemy.team).filter(func(u: Unit) -> bool: return u != enemy))

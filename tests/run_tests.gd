@@ -149,6 +149,7 @@ func _run_all() -> void:
 		"test_kills_and_biography_moments",
 		"test_auto_save",
 		"test_turn_rewind",
+		"test_dragon_and_fire_breath",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -3213,3 +3214,54 @@ func test_turn_rewind() -> void:
 	await press(KEY_X)
 	SaveGame.delete_suspend()
 
+
+func test_dragon_and_fire_breath() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	_spawn_enemy(Vector2i(14, 9))
+	b.units_root.add_child(Unit.create("Idle", Unit.Team.PLAYER, Vector2i(0, 0), {"class": "Axeman", "items": [],
+		"hp": 20, "str": 5, "dex": 5, "agi": 5, "lck": 5, "def": 5, "mov": 5}))
+	# The race: flies, counts as a flier and a reptile, breathes fire.
+	lord.spells.clear()  # this Lord knows Earth Spike
+	lord.set_race("Dragon")
+	check_eq(lord.move_type, "flying", "Dragons fly")
+	check(lord.tags.has("flying") and lord.tags.has("reptile"), "flier and reptile tags")
+	check_eq(Skills.abilities(lord), ["Fire Breath"] as Array[String], "Fire Breath")
+	check(not lord.is_caster(), "not a caster (no MP bar, no Magic menu)")
+	# STR + 6 against DEF, fire: a Brigand takes it plainly, a reptile resists it.
+	var breath := Spells.get_spell("Fire Breath")
+	var expected := maxi(0, lord.combat_str() + 6 - brig.combat_def())
+	check_eq(Combat.spell_damage(lord, brig, breath, b.map), expected, "STR + 6 vs DEF")
+	brig.set_race("Lizal")
+	check_eq(Combat.spell_damage(lord, brig, breath, b.map), floori(expected / 2.0), "reptiles resist fire")
+	brig.set_race("Human")
+	# Threat range includes the breath (range 2).
+	lord.items.clear()
+	check(b.offense_ranges(lord).has(Vector2i(1, 2)), "breath reach shows in its ranges")
+	# Used from its own unit menu entry, with a spell-style forecast; no MP spent.
+	var mp := lord.mp
+	await open_menu_in_place(lord)
+	check(not b.ui.menu_options.has("Magic"), "no Magic menu")
+	await pick("Fire Breath")
+	check_eq(b.input.target_mode, "ability", "targeting the breath")
+	await press(KEY_X)
+	check_eq(b.input.menu_context, "unit", "X goes back to the unit menu")
+	await pick("Fire Breath")
+	brig.hp = 99
+	brig.max_hp = 99
+	await press(KEY_Z)
+	check(lord.has_acted, "breathing ends the turn")
+	check_eq(lord.mp, mp, "no MP spent")
+	# The AI breathes too: an unarmed enemy Dragon attacks with it.
+	brig.set_race("Dragon")
+	brig.items.clear()
+	brig.has_acted = false
+	lord.hp = lord.max_hp
+	var hp_before := lord.hp
+	brig.set_cell(Vector2i(7, 6))  # range 2 from the Lord at (5, 6)
+	brig.ai = AIProfiles.resolve({"move": "hold"})
+	lord.agility = 0
+	brig.dexterity = 100
+	await EnemyAI.take_turn(brig, b)
+	check(lord.hp < hp_before, "the enemy Dragon breathed on the Lord")

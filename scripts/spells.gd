@@ -14,12 +14,19 @@ const MP_REGEN := 1
 ##          tags are weak to or resist elements (Combat.TAG_TRAITS).
 ## terraform: terrain key the target cell becomes after the cast (area spells only).
 ##            Such spells may target empty cells, but only ones whose terrain can change.
+## ability:  a racial attack (Fire Breath...): granted by a skill's "abilities", used
+##           from its own unit menu entry rather than the Magic menu, no MP cost.
+## physical: damage is STR + power against DEF, instead of INT + power against
+##           magic defense.
 const DATA := {
 	"Heal": {"mp": 4, "target": "ally", "min_rng": 1, "max_rng": 1, "power": 10, "exp": 11},
 	"Fire": {"mp": 3, "target": "enemy", "element": "fire", "min_rng": 1, "max_rng": 2, "power": 5, "hit": 90},
 	"Firestorm": {"mp": 8, "target": "area", "element": "fire", "min_rng": 1, "max_rng": 3, "radius": 1, "power": 3, "hit": 80},
 	"Earth Spike": {"mp": 5, "target": "area", "element": "earth", "min_rng": 1, "max_rng": 2, "radius": 0, "power": 6, "hit": 85,
 		"terraform": "M"},
+	# Racial attacks.
+	"Fire Breath": {"mp": 0, "target": "enemy", "element": "fire", "min_rng": 1, "max_rng": 2, "power": 6, "hit": 80,
+		"ability": true, "physical": true},
 }
 
 ## Terrain that terraforming spells can transform.

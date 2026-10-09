@@ -17,6 +17,8 @@ extends RefCounted
 ## terrain_costs: {terrain key: MOV}: it pays this instead when it's cheaper than its
 ##             move type's cost (Swimming, Climbing, Forester).
 ## range:      max range bonus by weapon type, or "spell" for every spell: {"bow": 1}.
+## abilities:  racial attacks it can use (Spells entries with "ability"): each gets
+##             its own unit menu entry.
 ## exp:        multiplier on EXP earned.
 ## immune:     statuses it ignores ("poison": statuses aren't implemented yet).
 ## battle:     combat modifiers while fighting: {"atk", "def", "res" (magic defense),
@@ -62,7 +64,7 @@ const PROC_EFFECTS: Array[String] = ["pierce", "drain", "damage_bonus", "lethal"
 const CONDITIONS: Array[String] = ["initiating", "defending", "phase", "hp_below", "hp_above", "range",
 	"weapon_type", "foe_weapon_type", "foe_tag", "terrain", "adjacent_ally", "no_adjacent_ally", "killed"]
 const EFFECT_KEYS: Array[String] = ["description", "stats", "command", "turn_start", "exp", "immune", "battle",
-	"rules", "proc", "after_combat", "map", "aura", "growths", "terrain_costs", "range", "weight_relief", "if",
+	"rules", "proc", "after_combat", "map", "aura", "growths", "terrain_costs", "range", "weight_relief", "abilities", "if",
 	"hidden"]
 const AFTER_EFFECTS: Array[String] = ["heal", "refresh", "damage_foe", "damage_near_foe"]
 const MAP_RULES: Array[String] = ["pass", "pathfinder", "canto", "footwork"]
@@ -95,6 +97,9 @@ const DATA := {
 	"Footwork": {"description": "Can move again after Dancing, with the MOV it has left.", "map": ["footwork"]},
 	"Prayer": {"description": "Adjacent allies recover 10% of max HP at the start of each turn.",
 		"turn_start": {"heal_allies": 0.1}},
+	# Racial attacks (see Spells "ability").
+	"Fire Breath": {"description": "Fire Breath: a fire attack at range 1-2 (STR + 6 against DEF, 80 Hit). No MP.",
+		"abilities": ["Fire Breath"]},
 	# Racial traits.
 	"Adaptable": {"description": "Earns 10% more EXP.", "exp": 1.1},
 	"Regeneration": {"description": "Recovers 10% of max HP at the start of each turn.", "turn_start": {"heal": 0.1}},
@@ -312,6 +317,16 @@ static func weight_relief(u: Unit) -> int:
 	for skill in of(u):
 		total += get_data(skill).get("weight_relief", 0)
 	return total
+
+
+## Racial attacks (Spells names) `u`'s skills grant.
+static func abilities(u: Unit) -> Array[String]:
+	var result: Array[String] = []
+	for skill in of(u):
+		for a: String in get_data(skill).get("abilities", []):
+			if not result.has(a):
+				result.append(a)
+	return result
 
 
 ## Extra MP recovered at the start of its phase.
@@ -540,6 +555,9 @@ static func validate() -> Array[String]:
 		for key: String in d.get("range", {}):
 			if not ["sword", "spear", "axe", "bow", "staff", "spell"].has(key):
 				problems.append("%s: unknown range kind %s" % [skill, key])
+		for a: String in d.get("abilities", []):
+			if not Spells.DATA.has(a) or not Spells.DATA[a].get("ability", false):
+				problems.append("%s: %s isn't an ability in Spells" % [skill, a])
 		for key: String in d.get("growths", {}):
 			if not Experience.STATS.has(key) and key != "all":
 				problems.append("%s: unknown growth %s" % [skill, key])

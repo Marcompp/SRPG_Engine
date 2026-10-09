@@ -406,7 +406,7 @@ func show_cell_forecast(text: String, cursor_cell: Vector2i) -> void:
 static func unit_notes(unit: Unit) -> Array[String]:
 	var lines: Array[String] = []
 	for pair in Skills.visible_sources(unit):
-		if Skills.get_data(pair[0]).has("command"):
+		if Skills.get_data(pair[0]).has("command") or Skills.get_data(pair[0]).has("abilities"):
 			lines.append("Skill: %s" % pair[0])
 	if unit.inspire_bonus > 0:
 		lines.append("Inspired: STR/DEF +%d" % unit.inspire_bonus)

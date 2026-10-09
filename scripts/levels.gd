@@ -324,7 +324,7 @@ const DATA := {
 	},
 	"great_valley": {
 		"name": "Great Valley",
-		"description": "30x20: the view scrolls with the cursor.\nThree bridges; the General holds the far fort.",
+		"description": "30x20: the view scrolls with the cursor.\nTwo Dragons; the General holds the far fort.",
 		"layout": [
 			"WWW...FF......~......hhMMMMMMM",
 			"WW....FFF.....~.....hhMMM.T.MM",
@@ -373,6 +373,9 @@ const DATA := {
 			{"name": "Pegasus", "cell": Vector2i(4, 17), "class": "Flier", "items": ["Iron Spear", "Javelin"], "lv": 3,
 				"hp": 18, "str": 5, "dex": 7, "agi": 10, "lck": 6, "def": 3, "mov": 7, "mp": 6,
 				"growths": {"hp": 60, "str": 35, "dex": 50, "agi": 60, "lck": 50, "def": 15, "mp": 45}},
+			{"name": "Ember", "cell": Vector2i(5, 18), "class": "Axeman", "race": "Dragon", "items": ["Iron Axe"], "lv": 3,
+				"hp": 24, "str": 8, "dex": 5, "agi": 5, "lck": 3, "def": 6, "mov": 5, "mp": 2,
+				"growths": {"hp": 80, "str": 50, "dex": 35, "agi": 30, "lck": 30, "def": 40, "mp": 15}},
 		],
 		"enemies": [
 			{"name": "Brigand", "cell": Vector2i(9, 10), "class": "Brigand", "items": ["Iron Axe"], "lv": 3,
@@ -399,6 +402,9 @@ const DATA := {
 				"ai": {"preset": "sleeper", "wake": {"radius": 6}}},
 			{"name": "Harpy", "cell": Vector2i(25, 18), "class": "Archer", "race": "Harpy", "items": ["Iron Bow"], "lv": 4,
 				"hp": 18, "str": 5, "dex": 6, "agi": 9, "lck": 3, "def": 2, "mov": 6, "mp": 3,
+				"ai": {"preset": "ambusher"}},
+			{"name": "Wyrm", "cell": Vector2i(24, 3), "class": "Footman", "race": "Dragon", "items": ["Iron Spear"], "lv": 5,
+				"hp": 26, "str": 8, "dex": 5, "agi": 5, "lck": 2, "def": 7, "mov": 5, "mp": 2,
 				"ai": {"preset": "ambusher"}},
 			{"name": "General", "cell": Vector2i(26, 1), "class": "Juggernaut", "items": ["Iron Spear", "Iron Axe"], "lv": 8,
 				"hp": 32, "str": 10, "dex": 7, "agi": 4, "lck": 3, "def": 12, "mov": 4, "mp": 2,

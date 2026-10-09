@@ -35,6 +35,8 @@ const DATA := {
 		"description": "Equine: always moves and counts as a horse, +1 MOV in foot and scout classes. Can Rescue and Shove; can't be Rescued or Shoved. Can't fly."},
 	"Minotaur": {"tags": ["horse"], "banned": ["mounted"],
 		"description": "Half-Equine: counts as a horse. Can't ride."},
+	"Dragon": {"tags": ["flying", "reptile"], "winged": true, "skills": ["Fire Breath"],
+		"description": "Winged: flies unless mounted, and counts as a flier. Reptile: weak to Ice, resists Fire. Breathes fire (Fire Breath)."},
 	"Harpy": {"tags": ["flying"], "winged": true, "banned": ["heavy"],
 		"description": "Winged: flies unless mounted, and counts as a flier. Can't wear heavy armor."},
 	"Ent": {"tags": ["wooden"], "move": "heavy", "immovable": true, "banned": ["mounted"],

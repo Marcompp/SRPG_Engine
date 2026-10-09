@@ -146,6 +146,7 @@ Set with `"race"` in a unit's roster entry (default Human); defined in `scripts/
 | Centaur | horse | horse; +1 MOV in foot classes | Can Rescue and Shove; can't be Rescued or Shoved | Flying classes |
 | Minotaur | horse | | | Mounted classes |
 | Harpy | flying | flying unless mounted | | Heavy classes |
+| Dragon | flying, reptile | flying unless mounted | Fire Breath (racial attack: fire, range 1-2, STR + 6 vs DEF, no MP; its own unit menu entry) | |
 | Ent | wooden | heavy | Can't be Rescued or Shoved | Mounted classes |
 | Stoneborn | heavy | heavy | Can't be Rescued or Shoved; poison immune* | All but foot and heavy classes |
 | Skeleton | undead | | Poison immune* | |

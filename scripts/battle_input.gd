@@ -541,6 +541,9 @@ func open_unit_menu() -> void:
 		options.append("Break")
 	if not battle.actions.castable_spells(selected).is_empty():
 		options.append("Magic")
+	for ability in Skills.abilities(selected):
+		if Spells.has_targets(selected, ability, battle.units(), battle.map):
+			options.append(ability)
 	if not battle.actions.dance_targets(selected).is_empty():
 		options.append("Dance")
 	if not battle.actions.inspire_targets(selected).is_empty():
@@ -736,6 +739,9 @@ func menu_accept() -> void:
 					open_items_menu()
 				"Wait":
 					finish_action(true)
+				var choice:
+					if Skills.abilities(selected).has(choice):
+						start_ability_targeting(choice)
 		"attack":
 			selected.equip(weapon_choices[battle.ui.menu_index])
 			start_unit_targeting("attack", battle.actions.enemies_in_range(selected, selected.weapon))
@@ -844,6 +850,17 @@ func start_spell_targeting(spell_name: String) -> void:
 	show_target()
 
 
+## A racial attack (Fire Breath...): targeted like a single-target spell, but X goes
+## back to the unit menu.
+func start_ability_targeting(ability: String) -> void:
+	active_spell = ability
+	target_mode = "ability"
+	targets = Spells.targets_for(selected, ability, battle.units())
+	target_index = 0
+	battle.state = Battle.State.TARGETING
+	show_target()
+
+
 ## Picks one of `cells` for `mode` ("drop", "unload", "break" or "door").
 func start_cell_targeting(mode: String, cells: Array[Vector2i]) -> void:
 	active_spell = ""
@@ -912,7 +929,7 @@ func show_target() -> void:
 	elif active_spell:
 		var spell := Spells.get_spell(active_spell)
 		battle.ui.show_forecast(selected, target, Combat.spell_forecast(selected, target, spell, battle.map), battle.cursor.cell,
-			active_spell, true)
+			active_spell, not spell.get("physical", false))  # MP is magic defense: shown for magic only
 	else:
 		battle.ui.show_forecast(selected, target, Combat.forecast(selected, target, battle.map), battle.cursor.cell)
 
