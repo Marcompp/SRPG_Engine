@@ -104,6 +104,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				elif u == null:
 					battle.ui.hide_info()
 					var options: Array[String] = ["Units", "Objective", "Options", "Suspend", "Restart", "Level Select", "End Turn"]
+					if battle.phases.can_rewind():
+						options.insert(3, "Rewind")
 					_open_menu("map", options)
 		Battle.State.SELECTED:
 			if dir != Vector2i.ZERO:
@@ -611,6 +613,15 @@ func open_items_menu() -> void:
 	_open_menu("items", options)
 
 
+## Map menu > Rewind: pick an earlier turn start (this turn's included), newest first.
+func open_rewind_menu() -> void:
+	var options: Array[String] = []
+	for i in range(battle.turn_history.size() - 1, -1, -1):
+		options.append("Turn %d" % battle.turn_history[i].turn)
+	var uses := "unlimited" if battle.rewinds_left < 0 else "%d left" % battle.rewinds_left
+	_open_menu("rewind", options, "Rewind to the start of (%s):" % uses)
+
+
 ## Which item to take from `foe`.
 func open_steal_menu(foe: Unit) -> void:
 	steal_target = foe
@@ -673,6 +684,8 @@ func menu_accept() -> void:
 				"Options":
 					battle.state = Battle.State.OPTIONS
 					battle.ui.options_screen.open()
+				"Rewind":
+					open_rewind_menu()
 				"Suspend":
 					battle.phases.suspend()
 				"Restart":
@@ -735,6 +748,9 @@ func menu_accept() -> void:
 			start_unload_targeting(passenger_choices[battle.ui.menu_index])
 		"steal":
 			_act(battle.actions.do_steal.bind(selected, steal_target, steal_choices[battle.ui.menu_index]))
+		"rewind":
+			# Newest turn first.
+			battle.phases.rewind_to(battle.turn_history.size() - 1 - battle.ui.menu_index)
 		"items":
 			var item := selected.items[battle.ui.menu_index]
 			if selected.can_wield(item):
@@ -786,7 +802,7 @@ func _use_item(index: int) -> void:
 
 func menu_cancel() -> void:
 	match menu_context:
-		"map", "end_turn", "restart", "quit":
+		"map", "end_turn", "restart", "quit", "rewind":
 			battle.state = Battle.State.IDLE
 			refresh_info()
 		"unit":

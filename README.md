@@ -10,7 +10,8 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 |---|---|
 | Units | Sortable table of every unit (Left/Right: sort column, Z: go to unit, D: status) |
 | Objective | Victory/defeat conditions, turn, units left |
-| Options | Game speed, fast-forward speed, danger zone at start, auto-end turn, end turn warning, level-up window, auto save (saved to `user://settings.cfg`) |
+| Options | Game speed, fast-forward speed, danger zone at start, auto-end turn, end turn warning, level-up window, auto save, turn rewinds (saved to `user://settings.cfg`) |
+| Rewind | Back to the start of any earlier player phase on this map (this turn's included), newest first. Uses per map come from Options (3 by default; 1, 5, unlimited or off); history and uses are kept in suspends |
 | Suspend | Saves the battle to `user://suspend.save` and returns to the level select (deleted when the map ends) |
 | Restart | Restarts the map (asks first) |
 | Level Select | Back to the level select (on the Victory/Defeat screen, X also goes there) |

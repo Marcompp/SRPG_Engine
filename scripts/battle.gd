@@ -27,6 +27,11 @@ var objective_done := false
 var campaign_deaths: Array = []
 ## "victory" or "defeat" once the battle has ended.
 var battle_result := ""
+## Turn rewind: a snapshot (SaveGame.capture without history) from the start of each
+## player phase, oldest first, and the uses left this map (-1: unlimited). The
+## Options setting sets the uses when a map starts.
+var turn_history: Array = []
+var rewinds_left := 0
 
 ## Scrolls the view over maps bigger than the screen (see BattleCamera).
 var camera: BattleCamera
@@ -54,6 +59,7 @@ func _ready() -> void:
 		_start_camera()
 		return
 	danger_on = Settings.value("danger_zone_default")
+	rewinds_left = Settings.value("rewinds")
 	var level := Levels.get_level(Levels.selected)
 	map.load_layout(level.layout)
 	map.load_objects(level.get("objects", []), Objectives.of(level))

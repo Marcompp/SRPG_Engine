@@ -30,6 +30,8 @@ func start_player_phase() -> void:
 	if not players.is_empty():
 		battle.cursor.cell = players[0].cell
 	battle.refresh_threat()
+	# Turn rewind can come back here.
+	battle.turn_history.append(SaveGame.capture(battle, false))
 	# Auto save: the turn can be resumed from here (level select > Resume).
 	if Settings.value("auto_save"):
 		SaveGame.write_suspend(battle)
@@ -179,6 +181,39 @@ func resume_suspended() -> void:
 	# A campaign chapter needs the campaign it belongs to (army, convoy, chapter).
 	Campaign.active = data.get("campaign", false) and Campaign.load_save()
 	SaveGame.restore(battle, data)
+	_resume_player_phase()
+
+
+## Whether the map menu offers Rewind: uses left and an earlier turn start to go to.
+func can_rewind() -> bool:
+	return battle.rewinds_left != 0 and not battle.turn_history.is_empty()
+
+
+## Turn rewind: back to the start of the player phase of turn_history[index]. Later
+## snapshots are dropped and a use is spent. Rebuilds the battle in place.
+func rewind_to(index: int) -> void:
+	var snapshot: Dictionary = battle.turn_history[index]
+	var history := battle.turn_history.slice(0, index + 1)
+	var left := battle.rewinds_left - 1 if battle.rewinds_left > 0 else battle.rewinds_left
+	battle.state = Battle.State.BUSY
+	battle.input.selected = null
+	battle.map.clear_ranges()
+	for child in battle.units_root.get_children():
+		battle.units_root.remove_child(child)
+		child.queue_free()
+	SaveGame.restore(battle, snapshot)
+	battle.turn_history = history
+	battle.rewinds_left = left
+	if Settings.value("auto_save"):
+		SaveGame.write_suspend(battle)
+	var players := battle.units_of(Unit.Team.PLAYER)
+	battle.cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
+	battle.camera.snap(battle.cursor.cell)
+	await battle.ui.show_banner("Rewound to\n" + battle.turn_text(), Color("4a3a8a"))
+	_resume_player_phase()
+
+
+func _resume_player_phase() -> void:
 	var players := battle.units_of(Unit.Team.PLAYER)
 	battle.cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	battle.enemy_phase = false

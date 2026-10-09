@@ -23,6 +23,8 @@ const OPTIONS := [
 		"choices": [[true, "Wait for Z"], [false, "Auto (2 s)"]]},
 	{"key": "auto_save", "label": "Auto save",
 		"choices": [[true, "Each turn"], [false, "Off"]]},
+	{"key": "rewinds", "label": "Turn rewinds",
+		"choices": [[3, "3 per map"], [5, "5 per map"], [1, "1 per map"], [-1, "Unlimited"], [0, "Off"]]},
 ]
 
 static var _values := {}

@@ -38,7 +38,8 @@ static func delete_suspend() -> void:
 # --- Capture / restore ----------------------------------------------------------
 
 ## Everything needed to rebuild the battle at the current point of the player phase.
-static func capture(battle: Battle) -> Dictionary:
+## `with_history`: include the turn rewind snapshots (themselves captured without).
+static func capture(battle: Battle, with_history := true) -> Dictionary:
 	var all: Array[Unit] = battle.all_units()
 	var ids := {}
 	for i in all.size():
@@ -46,7 +47,7 @@ static func capture(battle: Battle) -> Dictionary:
 	var units := []
 	for u in all:
 		units.append(unit_to_dict(u, ids))
-	return {
+	var data := {
 		"version": VERSION,
 		"level": Levels.selected,
 		"campaign": Campaign.active,
@@ -58,7 +59,11 @@ static func capture(battle: Battle) -> Dictionary:
 		"marked": _encode(battle.marked, ids),
 		"campaign_deaths": _encode(battle.campaign_deaths, ids),
 		"units": units,
+		"rewinds_left": battle.rewinds_left,
 	}
+	if with_history:
+		data["history"] = battle.turn_history.duplicate()
+	return data
 
 
 ## Rebuilds the battle from capture() data: terrain, then every unit (two passes, so
@@ -79,6 +84,9 @@ static func restore(battle: Battle, data: Dictionary) -> void:
 		_apply(all[i], data.units[i], all)
 	battle.danger_on = data.danger_on
 	battle.marked.assign(_decode(data.marked, all))
+	battle.rewinds_left = data.get("rewinds_left", battle.rewinds_left)
+	if data.has("history"):
+		battle.turn_history = data.history.duplicate()
 
 
 ## One unit as plain data. References to other units become ids from `ids`

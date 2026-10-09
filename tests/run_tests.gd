@@ -148,6 +148,7 @@ func _run_all() -> void:
 		"test_generic_names",
 		"test_kills_and_biography_moments",
 		"test_auto_save",
+		"test_turn_rewind",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -3164,3 +3165,51 @@ func test_auto_save() -> void:
 	await pick("Level Select")
 	check(b.ui._menu_title.contains("resume from the start of this turn"), "quit prompt mentions the auto save")
 	SaveGame.delete_suspend()
+
+
+func test_turn_rewind() -> void:
+	check_eq(b.turn_history.size(), 1, "a snapshot at the start of turn 1")
+	check_eq(b.rewinds_left, 3, "3 rewinds per map by default")
+	var lord := unit_named("Lord")
+	var start_cell := lord.cell
+	var brigands := func() -> int:
+		return b.units_of(Unit.Team.ENEMY).filter(func(e): return e.unit_name == "Brigand").size()
+	var brigands_before: int = brigands.call()
+	remove_unit(unit_named("Brigand", Unit.Team.ENEMY))
+	await b.phases.end_player_phase()
+	while b.state != b.State.IDLE:
+		await process_frame
+	check_eq(b.turn, 2, "turn 2")
+	check_eq(b.turn_history.size(), 2, "and its snapshot")
+	lord = unit_named("Lord")
+	lord.set_cell(Vector2i(5, 2))
+	lord.hp = 3
+	# Map menu > Rewind > Turn 1.
+	b.cursor.cell = Vector2i(7, 9)
+	await press(KEY_Z)
+	await pick("Rewind")
+	check_eq(b.ui.menu_options, ["Turn 2", "Turn 1"] as Array[String], "newest turn first")
+	await pick("Turn 1")
+	while b.state != b.State.IDLE:
+		await process_frame
+	lord = unit_named("Lord")
+	check_eq(b.turn, 1, "back to turn 1")
+	check_eq(lord.cell, start_cell, "units where they were")
+	check_eq(lord.hp, lord.max_hp, "with their HP")
+	check_eq(brigands.call(), brigands_before, "the fallen are back")
+	check_eq(b.turn_history.size(), 1, "later snapshots dropped")
+	check_eq(b.rewinds_left, 2, "a use spent")
+	check(not lord.has_acted, "the player phase starts over")
+	# History and uses survive suspend/resume.
+	var saved := SaveGame.capture(b)
+	check_eq(saved.history.size(), 1, "history is saved")
+	check_eq(saved.rewinds_left, 2, "so are the uses")
+	# Out of uses (or Off): no Rewind in the map menu.
+	b.rewinds_left = 0
+	await press(KEY_X)
+	b.cursor.cell = Vector2i(7, 9)
+	await press(KEY_Z)
+	check(not b.ui.menu_options.has("Rewind"), "no uses left, no Rewind")
+	await press(KEY_X)
+	SaveGame.delete_suspend()
+
