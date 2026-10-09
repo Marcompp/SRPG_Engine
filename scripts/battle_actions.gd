@@ -500,8 +500,58 @@ func _finish_exchange(attacker: Unit, defender: Unit, dealt: Array[Unit]) -> voi
 		var foe: Unit = pair[1]
 		if u.team == Unit.Team.PLAYER and u.hp > 0 and u.level < Experience.LEVEL_CAP:
 			awards.append([u, Experience.combat_exp(u, foe, dealt.has(u), foe.hp <= 0)])
+	# After-combat skills, also decided before the dead are freed.
+	var after := []
+	for pair in [[attacker, defender], [defender, attacker]]:
+		var u: Unit = pair[0]
+		var foe: Unit = pair[1]
+		if u.hp > 0:
+			for effect in Skills.after_combat(u, foe, battle.map, u == attacker, foe.hp <= 0):
+				after.append([u, foe, foe.cell, effect])
 	var involved: Array[Unit] = [attacker, defender]
 	await _remove_dead_and_award(involved, awards)
+	for entry in after:
+		await _after_combat(entry[0], entry[1], entry[2], entry[3])
+
+
+## Applies one after_combat skill effect (see Skills) for `u`, whose foe stood at
+## `foe_cell`. Untyped units on purpose: either may have died and been freed, and
+## a typed parameter rejects freed objects before the checks below run.
+func _after_combat(u, foe, foe_cell: Vector2i, effect: Dictionary) -> void:
+	if not is_instance_valid(u) or u.hp <= 0:
+		return
+	var shown := not Skills.is_hidden(effect.skill)
+	match effect.effect:
+		"heal":
+			var amount := mini(ceili(u.max_hp * effect.value), u.max_hp - u.hp)
+			if amount <= 0:
+				return
+			u.heal(amount)
+			u.popup("+%d" % amount, Color.PALE_GREEN)
+		"refresh":
+			if u.refreshed:
+				return
+			u.refreshed = true
+			u.refresh_pending = true
+		"damage_foe", "damage_near_foe":
+			var victims: Array[Unit] = []
+			if effect.effect == "damage_foe":
+				if is_instance_valid(foe) and foe.hp > 0:
+					victims.append(foe)
+			else:
+				for o in battle.units():
+					if o.team != u.team and o != foe and BattleMap.distance(o.cell, foe_cell) <= 2:
+						victims.append(o)
+			if victims.is_empty():
+				return
+			for v in victims:
+				var amount := mini(ceili(v.max_hp * effect.value), v.hp - 1)
+				if amount > 0:
+					v.take_damage(amount)
+					v.popup("-%d" % amount, Color.MEDIUM_PURPLE)
+	if shown:
+		u.popup(effect.skill + "!", Color.GOLD, 10.0)
+	await get_tree().create_timer(0.4).timeout
 
 
 func _remove_dead_and_award(involved: Array[Unit], awards: Array) -> void:

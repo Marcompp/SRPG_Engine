@@ -39,6 +39,7 @@ const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 # --- Setup --------------------------------------------------------------------
 
 func _ready() -> void:
+	Skills.field = units  # auras and adjacency conditions look at the units on the map
 	input = _add_part(BattleInput.new(), "Input")
 	actions = _add_part(BattleActions.new(), "Actions")
 	phases = _add_part(BattlePhases.new(), "Phases")
@@ -125,7 +126,7 @@ func unit_at(cell: Vector2i) -> Unit:
 ## enterable within one move, i.e. cost no more than its MOV. Rivers cost foot units
 ## 6, so a MOV 5 foot soldier can't be dropped into one.
 func can_stand_on(u: Unit, cell: Vector2i) -> bool:
-	var cost := map.move_cost(cell, u.move_type)
+	var cost := map.unit_cost(u, cell)
 	return cost >= 0 and cost <= u.mov
 
 

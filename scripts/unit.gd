@@ -78,6 +78,10 @@ var inspire_bonus := 0:
 		queue_redraw()
 ## Enemy behavior (see AIProfiles), resolved from the roster's "ai" entry.
 var ai: Dictionary = AIProfiles.resolve({})
+## Galeforce-style skills: it may act again once this action is done, and it already
+## did this turn (cleared at the start of its side's phase).
+var refresh_pending := false
+var refreshed := false
 ## Whether a sleeping unit's wake condition has fired.
 var ai_awake := false
 ## Set when a player targets this unit; read by the "attacked" wake condition.

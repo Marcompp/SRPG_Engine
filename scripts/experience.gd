@@ -48,7 +48,7 @@ static func roll_level_up(unit: Unit) -> Dictionary:
 				continue
 			if unit.is_capped(key):
 				continue
-			if randi_range(0, 99) < unit.growths.get(key, 0):
+			if randi_range(0, 99) < unit.growths.get(key, 0) + Skills.growth_bonus(unit, key):
 				gains[key] = 1
 		if not gains.is_empty():
 			break

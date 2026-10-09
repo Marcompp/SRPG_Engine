@@ -44,6 +44,12 @@ var unload_passenger: Unit
 var passenger_choices: Array[Unit] = []
 ## Unit (either side) under the cursor while browsing, whose ranges are shown, or null.
 var hovered: Unit
+## MOV the selected unit may spend on this move (its MOV, or what's left for Canto),
+## and what its last move cost.
+var move_budget := 0.0
+var moved_cost := 0.0
+## True while picking a Canto move: moving (or cancelling) ends the unit's turn.
+var canto_move := false
 ## Planned path for the selected unit; follows the cursor's trail when it can.
 var arrow: Array[Vector2i] = []
 ## Unit shown on the stats screen, and the state to return to when it closes.
@@ -100,6 +106,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				update_arrow(battle.cursor.cell)
 			elif accept and reach.cells.has(battle.cursor.cell):
 				move_selected(battle.cursor.cell)
+			elif cancel and canto_move:
+				canto_move = false
+				finish_action(true)
 			elif cancel:
 				battle.map.clear_ranges()
 				battle.cursor.cell = selected.cell
@@ -312,6 +321,8 @@ func select(u: Unit) -> void:
 	selected = u
 	move_committed = false
 	origin_cell = u.cell
+	move_budget = u.mov
+	moved_cost = 0.0
 	reach = battle.map.get_reachable(u, battle.units())
 	show_unit_ranges(u, reach)
 	arrow = [u.cell]
@@ -334,7 +345,7 @@ func update_arrow(target: Vector2i) -> void:
 	elif arrow.has(target):
 		arrow = arrow.slice(0, arrow.find(target) + 1)
 	elif not arrow.is_empty() and BattleMap.distance(arrow[-1], target) == 1 \
-			and path_cost(arrow) + battle.map.move_cost(target, selected.move_type) <= selected.mov:
+			and path_cost(arrow) + battle.map.unit_cost(selected, target) <= move_budget:
 		arrow.append(target)
 	else:
 		arrow = battle.map.build_path(reach.parents, selected.cell, target)
@@ -344,7 +355,7 @@ func update_arrow(target: Vector2i) -> void:
 func path_cost(path: Array[Vector2i]) -> float:
 	var total := 0.0
 	for c in path.slice(1):
-		total += battle.map.move_cost(c, selected.move_type)
+		total += battle.map.unit_cost(selected, c)
 	return total
 
 
@@ -354,14 +365,28 @@ func move_selected(dest: Vector2i) -> void:
 	battle.ui.hide_info()
 	var path := arrow if not arrow.is_empty() and arrow[-1] == dest \
 		else battle.map.build_path(reach.parents, selected.cell, dest)
+	moved_cost = path_cost(path)
 	await selected.move_along(path)
+	if canto_move:
+		canto_move = false
+		finish_action(true)
+		return
 	open_unit_menu()
 
 
-func finish_action() -> void:
+## Ends the selected unit's action. Galeforce-style skills let it act again; Canto
+## lets it move with the MOV it has left, unless `no_canto` (it waited, or that
+## was its Canto move).
+func finish_action(no_canto := false) -> void:
 	if is_instance_valid(selected) and selected.hp > 0:
-		selected.has_acted = true
-		battle.cursor.cell = selected.cell
+		if selected.refresh_pending:
+			selected.refresh_pending = false
+			battle.cursor.cell = selected.cell
+		elif not no_canto and _start_canto():
+			return
+		else:
+			selected.has_acted = true
+			battle.cursor.cell = selected.cell
 	selected = null
 	battle.map.clear_ranges()
 	battle.refresh_threat()
@@ -373,6 +398,30 @@ func finish_action() -> void:
 		return
 	battle.state = Battle.State.IDLE
 	refresh_info()
+
+
+## Canto: if the selected unit can still move somewhere with the MOV left, lets
+## the player pick where (SELECTED, with only movement shown). Returns whether it did.
+func _start_canto() -> bool:
+	if not Skills.map_rules(selected).has("canto") or battle.phases.check_game_over():
+		return false
+	var left := move_budget - moved_cost
+	var canto_reach := battle.map.get_reachable(selected, battle.units(), left)
+	if canto_reach.cells.size() <= 1:
+		return false
+	canto_move = true
+	move_budget = left
+	moved_cost = 0.0
+	reach = canto_reach
+	origin_cell = selected.cell
+	arrow = [selected.cell]
+	battle.map.arrow_path = arrow.duplicate()
+	battle.map.show_ranges(reach.cells.keys(), [])
+	battle.cursor.cell = selected.cell
+	battle.state = Battle.State.SELECTED
+	selected.popup("Canto", Color.LIGHT_SKY_BLUE)
+	refresh_info()
+	return true
 
 
 # --- Map info: unit ranges, marks, stats screen, unit list, objective ---------
@@ -642,7 +691,7 @@ func menu_accept() -> void:
 				"Items":
 					open_items_menu()
 				"Wait":
-					finish_action()
+					finish_action(true)
 		"attack":
 			selected.equip(weapon_choices[battle.ui.menu_index])
 			start_unit_targeting("attack", battle.actions.enemies_in_range(selected, selected.weapon))

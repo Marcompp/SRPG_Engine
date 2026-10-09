@@ -29,11 +29,22 @@ extends RefCounted
 ##             taken by `value`), "survive" (a lethal hit leaves 1 HP). At most one
 ##             attack and one defense proc per strike: the first that rolls, in
 ##             skill order. Weapon strikes only. Not in the forecast; the AI ignores them.
-## if:         conditions for battle, rules and proc effects (all must hold; see
-##             CONDITIONS): "initiating"/"defending": true, "phase": "player"/"enemy",
-##             "hp_below"/"hp_above": fraction of max HP (inclusive), "range": [min,
-##             max], "weapon_type"/"foe_weapon_type"/"foe_tag"/"terrain": a value or
-##             a list of them.
+## after_combat: once a fight it took part in is over, if it's still standing:
+##             {"effect", "value"}: "heal" (`value` of max HP), "refresh" (act again,
+##             once per turn), "damage_foe" (the foe loses `value` of its max HP, never
+##             below 1), "damage_near_foe" (so do the foe's allies within 2 of it).
+## map:        movement rules: "pass" (move through enemies), "pathfinder" (every
+##             passable tile costs 1 MOV), "canto" (move again with the MOV left after
+##             acting; player units).
+## aura:       {"radius", "affects": "allies"/"enemies", "battle": {...}}: battle
+##             modifiers for other units within `radius` tiles (not the owner).
+## growths:    growth rate bonuses on level-up: {"all": 10, "str": 5}.
+## if:         conditions for battle, rules, proc and after_combat effects (all must
+##             hold; see CONDITIONS): "initiating"/"defending": true, "phase":
+##             "player"/"enemy", "hp_below"/"hp_above": fraction of max HP
+##             (inclusive), "range": [min, max], "weapon_type"/"foe_weapon_type"/
+##             "foe_tag"/"terrain": a value or a list of them, "adjacent_ally"/
+##             "no_adjacent_ally": true, "killed": true (after_combat: the foe died).
 ## hidden:     never shown to the player (status screen, info panel, proc popups),
 ##             on either side.
 
@@ -43,9 +54,15 @@ const RULES: Array[String] = ["vantage", "desperation", "quick_riposte", "wary_f
 	"counter_any"]
 const PROC_EFFECTS: Array[String] = ["pierce", "drain", "damage_bonus", "lethal", "reduce", "survive"]
 const CONDITIONS: Array[String] = ["initiating", "defending", "phase", "hp_below", "hp_above", "range",
-	"weapon_type", "foe_weapon_type", "foe_tag", "terrain"]
+	"weapon_type", "foe_weapon_type", "foe_tag", "terrain", "adjacent_ally", "no_adjacent_ally", "killed"]
 const EFFECT_KEYS: Array[String] = ["description", "stats", "command", "turn_start", "exp", "immune", "battle",
-	"rules", "proc", "if", "hidden"]
+	"rules", "proc", "after_combat", "map", "aura", "growths", "if", "hidden"]
+const AFTER_EFFECTS: Array[String] = ["heal", "refresh", "damage_foe", "damage_near_foe"]
+const MAP_RULES: Array[String] = ["pass", "pathfinder", "canto"]
+
+## The units on the map, for auras and adjacency conditions (set by Battle; unset,
+## e.g. in unit-only checks, they're ignored).
+static var field: Callable
 
 const DATA := {
 	# Commands.
@@ -102,6 +119,34 @@ const DATA := {
 		"proc": {"on": "defend", "rate": "dex", "effect": "reduce", "value": 0.5}, "if": {"range": [2, 99]}},
 	"Miracle": {"description": "LCK% chance to survive a lethal blow with 1 HP (needs more than 1 HP).",
 		"proc": {"on": "defend", "rate": "lck", "effect": "survive"}},
+	# After combat.
+	"Lifetaker": {"description": "Recovers 50% of max HP after defeating a foe it attacked.",
+		"after_combat": {"effect": "heal", "value": 0.5}, "if": {"initiating": true, "killed": true}},
+	"Galeforce": {"description": "Can act again after defeating a foe it attacked (once per turn).",
+		"after_combat": {"effect": "refresh"}, "if": {"initiating": true, "killed": true}},
+	"Poison Strike": {"description": "A foe it attacks loses 20% of max HP after combat (never below 1).",
+		"after_combat": {"effect": "damage_foe", "value": 0.2}, "if": {"initiating": true}},
+	"Savage Blow": {"description": "Foes within 2 tiles of the one it attacks lose 20% of max HP (never below 1).",
+		"after_combat": {"effect": "damage_near_foe", "value": 0.2}, "if": {"initiating": true}},
+	# Turn start.
+	"Renewal": {"description": "Recovers 30% of max HP at the start of each turn.", "turn_start": {"heal": 0.3}},
+	# Movement.
+	"Pass": {"description": "Can move through enemies.", "map": ["pass"]},
+	"Pathfinder": {"description": "Every tile it can enter costs 1 MOV.", "map": ["pathfinder"]},
+	"Canto": {"description": "Can move again after acting, with the MOV it has left.", "map": ["canto"]},
+	# Auras.
+	"Charisma": {"description": "Allies within 3 tiles get +10 Hit and Avo.",
+		"aura": {"radius": 3, "affects": "allies", "battle": {"hit": 10, "avo": 10}}},
+	"Anathema": {"description": "Foes within 3 tiles get -10 Avo and Crit avoid.",
+		"aura": {"radius": 3, "affects": "enemies", "battle": {"avo": -10, "crit_avo": -10}}},
+	"Fortify": {"description": "Allies within 1 tile get +2 DEF in combat.",
+		"aura": {"radius": 1, "affects": "allies", "battle": {"def": 2}}},
+	# EXP and growth.
+	"Paragon": {"description": "Earns double EXP.", "exp": 2.0},
+	"Aptitude": {"description": "+20% to every growth rate.", "growths": {"all": 20}},
+	# Adjacency.
+	"Solo Fighter": {"description": "+10 Hit and Avo with no ally next to it.", "battle": {"hit": 10, "avo": 10},
+		"if": {"no_adjacent_ally": true}},
 }
 
 
@@ -202,7 +247,8 @@ static func is_immune(u: Unit, status: String) -> bool:
 
 ## Whether `skill`'s "if" conditions hold for `u` fighting `foe`. `initiating`: `u`
 ## started the fight. Terrain conditions fail without a map.
-static func conditions_met(skill: String, u: Unit, foe: Unit, map: BattleMap, initiating: bool) -> bool:
+static func conditions_met(skill: String, u: Unit, foe: Unit, map: BattleMap, initiating: bool,
+		killed := false) -> bool:
 	var cond: Dictionary = get_data(skill).get("if", {})
 	for key: String in cond:
 		var v: Variant = cond[key]
@@ -240,7 +286,36 @@ static func conditions_met(skill: String, u: Unit, foe: Unit, map: BattleMap, in
 			"terrain":
 				if map == null or not list.has(map.terrain_key(u.cell)):
 					return false
+			"adjacent_ally":
+				if has_adjacent_ally(u) != bool(v):
+					return false
+			"no_adjacent_ally":
+				if has_adjacent_ally(u) == bool(v):
+					return false
+			"killed":
+				if killed != bool(v):
+					return false
 	return true
+
+
+static func field_units() -> Array[Unit]:
+	var result: Array[Unit] = []
+	if field.is_valid():
+		result.assign(field.call())
+	return result
+
+
+static func has_adjacent_ally(u: Unit) -> bool:
+	return field_units().any(func(o: Unit) -> bool:
+		return o != u and o.team == u.team and BattleMap.distance(o.cell, u.cell) == 1)
+
+
+## Largest aura radius in DATA, so aura lookups only check units that close.
+static func _max_aura_radius() -> int:
+	var r := 0
+	for skill: String in DATA:
+		r = maxi(r, DATA[skill].get("aura", {}).get("radius", 0))
+	return r
 
 
 ## Sum of the `battle` modifiers of `u`'s skills that apply against `foe` (every key
@@ -255,6 +330,17 @@ static func battle_mods(u: Unit, foe: Unit, map: BattleMap, initiating: bool) ->
 			continue
 		for key in battle:
 			mods[key] += battle[key]
+	var reach := _max_aura_radius()
+	for o in field_units():
+		var d := BattleMap.distance(o.cell, u.cell)
+		if o == u or d > reach:
+			continue
+		for skill in of(o):
+			var aura: Dictionary = get_data(skill).get("aura", {})
+			if aura.is_empty() or d > aura.radius or (aura.affects == "allies") != (o.team == u.team):
+				continue
+			for key in aura.battle:
+				mods[key] += aura.battle[key]
 	return mods
 
 
@@ -299,6 +385,35 @@ static func proc_rate(u: Unit, skill: String) -> int:
 	return int(value)
 
 
+## `u`'s after_combat effects that apply now: [{"skill", "effect", "value"}].
+static func after_combat(u: Unit, foe: Unit, map: BattleMap, initiating: bool, killed: bool) -> Array:
+	var result := []
+	for skill in of(u):
+		var after: Dictionary = get_data(skill).get("after_combat", {})
+		if not after.is_empty() and conditions_met(skill, u, foe, map, initiating, killed):
+			result.append({"skill": skill, "effect": after.effect, "value": after.get("value", 0.0)})
+	return result
+
+
+## Movement rules (MAP_RULES) from `u`'s skills.
+static func map_rules(u: Unit) -> Array[String]:
+	var result: Array[String] = []
+	for skill in of(u):
+		for r: String in get_data(skill).get("map", []):
+			if not result.has(r):
+				result.append(r)
+	return result
+
+
+## Growth rate bonus for `key` ("str"...), including "all".
+static func growth_bonus(u: Unit, key: String) -> int:
+	var total := 0
+	for skill in of(u):
+		var g: Dictionary = get_data(skill).get("growths", {})
+		total += g.get("all", 0) + g.get(key, 0)
+	return total
+
+
 static func roll_proc(u: Unit, skill: String) -> bool:
 	return randi_range(0, 99) < proc_rate(u, skill)
 
@@ -325,6 +440,20 @@ static func validate() -> Array[String]:
 		for key: String in d.get("if", {}):
 			if not CONDITIONS.has(key):
 				problems.append("%s: unknown condition %s" % [skill, key])
+		for r: String in d.get("map", []):
+			if not MAP_RULES.has(r):
+				problems.append("%s: unknown map rule %s" % [skill, r])
+		if d.has("after_combat") and not AFTER_EFFECTS.has(d.after_combat.get("effect", "")):
+			problems.append("%s: unknown after_combat effect" % skill)
+		if d.has("aura"):
+			for key: String in d.aura.get("battle", {}):
+				if not BATTLE_KEYS.has(key):
+					problems.append("%s: unknown aura battle key %s" % [skill, key])
+			if not d.aura.get("affects", "") in ["allies", "enemies"] or not d.aura.has("radius"):
+				problems.append("%s: aura needs radius and affects: allies/enemies" % skill)
+		for key: String in d.get("growths", {}):
+			if not Experience.STATS.has(key) and key != "all":
+				problems.append("%s: unknown growth %s" % [skill, key])
 		if d.has("proc"):
 			if not PROC_EFFECTS.has(d.proc.get("effect", "")):
 				problems.append("%s: unknown proc effect" % skill)

@@ -18,6 +18,8 @@ func start_player_phase() -> void:
 	for u in battle.units_root.get_children():
 		if u is Unit:
 			u.has_acted = false
+			u.refreshed = false
+			u.refresh_pending = false
 	clear_inspire(Unit.Team.PLAYER)
 	for u in battle.units_of(Unit.Team.PLAYER):
 		u.regen_mp(u.mp_regen())
@@ -72,6 +74,13 @@ func end_player_phase() -> void:
 		await EnemyAI.take_turn(e, battle)
 		if check_game_over():
 			return
+		# Galeforce: one more turn.
+		if is_instance_valid(e) and e.hp > 0 and e.refresh_pending:
+			e.refresh_pending = false
+			e.has_acted = false
+			await EnemyAI.take_turn(e, battle)
+			if check_game_over():
+				return
 	if check_game_over(true):
 		return
 	start_player_phase()

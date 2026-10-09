@@ -302,7 +302,20 @@ func healing_cells() -> Array[Vector2i]:
 
 ## Dijkstra limited by the unit's MOV. Allies can be passed through but not
 ## stopped on; enemies block. Returns {"cells": {cell: cost}, "parents": {cell: prev}}.
-func get_reachable(unit: Unit, units: Array[Unit]) -> Dictionary:
+## What entering `cell` costs `u`: its move type's cost, or 1 with Pathfinder.
+func unit_cost(u: Unit, cell: Vector2i) -> float:
+	var cost := move_cost(cell, u.move_type)
+	if cost > 0 and Skills.map_rules(u).has("pathfinder"):
+		return 1.0
+	return cost
+
+
+## Cells `unit` can reach with `budget` MOV (default: its MOV): {"cells": {cell: cost},
+## "parents": {cell: previous cell}}. Enemies block the way, unless it has Pass.
+func get_reachable(unit: Unit, units: Array[Unit], budget := -1.0) -> Dictionary:
+	if budget < 0:
+		budget = unit.mov
+	var passes := Skills.map_rules(unit).has("pass")
 	var occupied := {}
 	for u in units:
 		occupied[u.cell] = u
@@ -318,14 +331,14 @@ func get_reachable(unit: Unit, units: Array[Unit]) -> Dictionary:
 		frontier.remove_at(best)
 		for d in DIRS:
 			var nxt := cur + d
-			var step := move_cost(nxt, unit.move_type)
+			var step := unit_cost(unit, nxt)
 			if step < 0:
 				continue
-			if occupied.has(nxt) and occupied[nxt].team != unit.team:
+			if occupied.has(nxt) and occupied[nxt].team != unit.team and not passes:
 				continue
 			var total: float = costs[cur] + step
 			# Costs can be fractional (Path 0.7), so allow for float rounding.
-			if total > unit.mov + 0.001 or (costs.has(nxt) and costs[nxt] <= total):
+			if total > budget + 0.001 or (costs.has(nxt) and costs[nxt] <= total):
 				continue
 			costs[nxt] = total
 			parents[nxt] = cur

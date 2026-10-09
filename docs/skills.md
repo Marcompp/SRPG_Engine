@@ -144,9 +144,10 @@ Existing special cases become skills, so there's one system instead of three:
 
 ## Build order
 
-Steps 1 and 2 are done (2: battle modifiers, rules and procs; procs only on weapon
-strikes for now). Conditions `adjacent_ally` / `no_adjacent_ally` wait for auras
-(step 3), which need to see the other units.
+Steps 1-3 are done. Limits for now: procs only on weapon strikes; Canto only for
+player units (the AI doesn't plan around it); auras only carry `battle` modifiers.
+Auras and adjacency conditions see the map's units through `Skills.field`, set by
+the battle scene.
 
 1. Core: `Skills` data and sources (personal, class, race, weapon, item, learned),
    `stats` effects, scrolls, level-learned skills, status screen page, save/load.

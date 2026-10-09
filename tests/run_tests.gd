@@ -135,6 +135,10 @@ func _run_all() -> void:
 		"test_battle_modifier_skills",
 		"test_strike_order_skills",
 		"test_proc_skills",
+		"test_after_combat_skills",
+		"test_movement_skills",
+		"test_canto",
+		"test_aura_adjacency_and_growth_skills",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -2757,3 +2761,127 @@ func test_proc_skills() -> void:
 	lord.hp = 5
 	await b.actions.do_combat(lord, brig)
 	check(lord.hp > 5 or lord.hp <= 0, "Sol healed the Lord during the fight")
+
+
+## A plain enemy Brigand on `cell` (for tests that need more foes than _duel leaves).
+func _spawn_enemy(cell: Vector2i, hp := 20) -> Unit:
+	var u := Unit.create("Brigand", Unit.Team.ENEMY, cell, {"class": "Brigand", "items": ["Iron Axe"],
+		"hp": hp, "str": 5, "dex": 1, "agi": 0, "lck": 0, "def": 3, "mov": 5})
+	b.units_root.add_child(u)
+	return u
+
+
+func test_after_combat_skills() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	_spawn_enemy(Vector2i(14, 9))  # keeps the map from ending
+	lord.dexterity = 100
+	brig.agility = 0
+	brig.luck = 0
+	# Lifetaker: heal half max HP after a kill it started.
+	lord.personal_skills.assign(["Lifetaker"])
+	lord.hp = 3
+	brig.hp = 1
+	await b.actions.do_combat(lord, brig)
+	check_eq(lord.hp, mini(3 + ceili(lord.max_hp * 0.5), lord.max_hp), "Lifetaker heals after the kill")
+	# Galeforce: act again, once per turn.
+	lord.personal_skills.assign(["Galeforce"])
+	b.input.selected = lord
+	await b.actions.do_combat(lord, _spawn_enemy(Vector2i(6, 6), 1))
+	check(lord.refresh_pending, "Galeforce after a kill")
+	b.input.finish_action()
+	check(not lord.has_acted, "the Lord can act again")
+	await b.actions.do_combat(lord, _spawn_enemy(Vector2i(6, 6), 1))
+	check(not lord.refresh_pending, "but only once per turn")
+	# Poison Strike / Savage Blow: non-lethal damage after combat.
+	var target := _spawn_enemy(Vector2i(6, 6), 99)
+	var bystander := _spawn_enemy(Vector2i(7, 7), 2)
+	lord.personal_skills.assign(["Poison Strike", "Savage Blow"])
+	lord.hp = lord.max_hp
+	var before := target.hp
+	await b.actions.do_combat(lord, target)
+	check(target.hp <= before - ceili(99 * 0.2), "Poison Strike takes 20% of max HP after combat")
+	check_eq(bystander.hp, 1, "Savage Blow hits a nearby foe, never below 1")
+
+
+func test_movement_skills() -> void:
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([lord, brig])
+	await process_frame
+	lord.set_cell(Vector2i(5, 6))
+	brig.set_cell(Vector2i(6, 6))
+	check(not b.map.get_reachable(lord, b.units()).parents.has(Vector2i(6, 6)), "enemies block the way")
+	lord.personal_skills.assign(["Pass"])
+	var reach: Dictionary = b.map.get_reachable(lord, b.units())
+	check(reach.parents.has(Vector2i(6, 6)), "Pass: through enemies")
+	check(not reach.cells.has(Vector2i(6, 6)), "but not onto them")
+	# Pathfinder: forests cost 1. (4, 5) is a forest.
+	lord.personal_skills.clear()
+	check_eq(b.map.unit_cost(lord, Vector2i(4, 5)), 2.0, "a forest costs a foot unit 2")
+	lord.personal_skills.assign(["Pathfinder"])
+	check_eq(b.map.unit_cost(lord, Vector2i(4, 5)), 1.0, "Pathfinder: 1")
+	check_eq(b.map.unit_cost(lord, Vector2i(7, 0)), 1.0, "even rivers")
+	check(b.can_stand_on(lord, Vector2i(7, 0)), "so it can be set down there")
+
+
+func test_canto() -> void:
+	var lord := unit_named("Lord")
+	lord.personal_skills.assign(["Canto"])
+	lord.hp = 5
+	lord.set_cell(Vector2i(4, 2))
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_RIGHT)
+	await press(KEY_Z)  # move 1 tile
+	await pick("Items")
+	await pick("Potion  3")
+	check_eq(b.state, b.State.SELECTED, "Canto: after acting, it can move again")
+	check(b.input.canto_move, "a Canto move")
+	check(not lord.has_acted, "not done yet")
+	var left: float = lord.mov - 1
+	check(b.input.reach.cells.values().all(func(c): return c <= left + 0.001), "with the MOV it has left")
+	await press(KEY_RIGHT)
+	await press(KEY_Z)
+	check_eq(lord.cell, Vector2i(6, 2), "it moves")
+	check(lord.has_acted, "and its turn ends")
+	# Waiting doesn't give a Canto move.
+	var fighter := unit_named("Fighter")
+	fighter.personal_skills.assign(["Canto"])
+	b.cursor.cell = fighter.cell
+	await press(KEY_Z)
+	await press(KEY_Z)
+	await pick("Wait")
+	check(fighter.has_acted, "Wait ends the turn")
+	check_eq(b.state, b.State.IDLE, "no Canto after waiting")
+
+
+func test_aura_adjacency_and_growth_skills() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	var base := Combat.forecast(lord, brig, b.map)
+	# Solo Fighter: +10 Hit/Avo with no ally adjacent.
+	lord.personal_skills.assign(["Solo Fighter"])
+	check_eq(Combat.forecast(lord, brig, b.map).atk.hit, mini(base.atk.hit + 10, 100), "alone: +10 Hit")
+	lord.personal_skills.clear()
+	# Charisma: an ally within 3 gives +10 Hit and Avo.
+	var fighter := Unit.create("Ally", Unit.Team.PLAYER, Vector2i(3, 6), {"class": "Axeman", "items": ["Iron Axe"],
+		"hp": 20, "str": 5, "dex": 5, "agi": 5, "lck": 5, "def": 5, "mov": 5, "skills": ["Charisma"]})
+	b.units_root.add_child(fighter)
+	var f := Combat.forecast(lord, brig, b.map)
+	check_eq(f.atk.hit, mini(base.atk.hit + 10, 100), "Charisma: +10 Hit to allies in range")
+	check_eq(f.def.hit, maxi(base.def.hit - 10, 0), "and +10 Avo")
+	fighter.set_cell(Vector2i(0, 0))
+	check_eq(Combat.forecast(lord, brig, b.map).atk.hit, base.atk.hit, "out of range: nothing")
+	# Anathema on an enemy: the Lord nearby loses Avo.
+	brig.personal_skills.assign(["Anathema"])
+	check_eq(Combat.forecast(lord, brig, b.map).def.hit, mini(base.def.hit + 10, 100), "Anathema: foes lose 10 Avo")
+	check_eq(Combat.forecast(lord, brig, b.map).atk.hit, base.atk.hit, "the owner itself isn't affected")
+	# Growths and EXP.
+	lord.personal_skills.assign(["Aptitude", "Paragon"])
+	check_eq(Skills.growth_bonus(lord, "str"), 20, "Aptitude: +20% growths")
+	check(is_equal_approx(Skills.exp_multiplier(lord), 2.2), "Paragon doubles EXP (and Adaptable stacks)")
+	lord.personal_skills.assign(["Renewal"])
+	check(is_equal_approx(Skills.turn_heal(lord), 0.3), "Renewal: 30% each turn")
