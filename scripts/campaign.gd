@@ -136,6 +136,9 @@ static func finish_chapter(battle: Battle) -> void:
 		var i := army.find(army_unit(unit_name))
 		if i >= 0:
 			army[i] = SaveGame.unit_to_dict(u)
+		else:
+			# Recruited during the chapter (see BattleEvents.recruit).
+			army.append(SaveGame.unit_to_dict(u))
 	chapter += 1
 	if not is_complete():
 		add_recruits()

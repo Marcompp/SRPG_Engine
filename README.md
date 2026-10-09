@@ -91,6 +91,7 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - Enemy AI that heals, picks weapons and casts spells
 - Kill counts per unit and per weapon (shown in the weapon's description); spell kills count for the unit only
 - Auto save (Options, on by default): the start of every player phase is saved, so the level select can resume from there
+- Map events: dialogue and cutscenes (design: [docs/events.md](docs/events.md)). Each map can have an `events/<map id>.txt` file written like a screenplay (`Lord: line`, `@move Bandit (10, 4)`, `@recruit Thief`...; full format in `scripts/event_script.gd`). Triggers: map start, the start of a turn's player or enemy phase, Talk (a unit menu command next to the named unit; can recruit), before a fight involving a unit (boss quotes), and a unit's death. Events run once (or `| repeat`), can depend on flags they set (`| if flag`), and are saved with suspends and rewinds. GBA-style dialogue box with two portrait slots (placeholders until there's art): Z advances, hold X to type faster, S skips the scene. Great Valley has sample events (opening, enemy-phase message, recruiting the Wyrm by talking to it with Ember, boss and death quotes)
 - Maps of any size: a camera (`scripts/battle_camera.gd`) shows a 15x10 window and scrolls, GBA-style, to keep the cursor (or a moving unit) 2 tiles from the screen edge; panels go on the side of the screen away from the cursor. Maps that fit on one screen don't scroll
 - Map readability: enemy danger zone, per-enemy range view, a movement arrow that follows the cursor's trail, full unit stats screen
 - Configurable enemy behaviors (see below) and Fort tiles (DEF +2, AVO +20, heal 20% max HP at the start of the occupant's phase)
@@ -223,7 +224,8 @@ Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`,
 - `scenes/level_select.tscn`, `scripts/level_select.gd`: the start screen
 - `scenes/main.tscn`: the battle scene
 - `scripts/levels.gd`: levels (terrain layout + both rosters)
-- `scripts/battle.gd`: the battle scene root: shared state (`state`, `turn`, ...), unit queries and enemy threat. Its parts are child nodes reached as `battle.input`, `battle.actions` and `battle.phases`:
+- `events/`, `scripts/event_script.gd`, `battle_events.gd`, `dialogue_box.gd`: map event scripts, their parser, the battle part that runs them, and the dialogue box
+- `scripts/battle.gd`: the battle scene root: shared state (`state`, `turn`, ...), unit queries and enemy threat. Its parts are child nodes reached as `battle.input`, `battle.actions`, `battle.phases` and `battle.events` (map events, see below):
   - `battle_input.gd`: player input, menus, targeting and forecasts, the trade and info screens
   - `battle_actions.gd`: what units can do and doing it (shove, rescue, ships, break, combat, EXP...), shared by the player and the enemy AI
   - `battle_phases.gd`: player/enemy phases, reinforcements, game over, campaign and suspend flow

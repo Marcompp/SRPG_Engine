@@ -462,6 +462,7 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 # --- Combat -------------------------------------------------------------------
 
 func do_combat(attacker: Unit, defender: Unit) -> void:
+	await battle.events.before_battle(attacker, defender)
 	# A weapon that breaks stays equipped, weakened, for the rest of the fight.
 	var dealt: Array[Unit] = []
 	defender.notify_attacked()
@@ -483,6 +484,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 
 ## Single-target damage spell: one cast (never doubles), then the target may counter once.
 func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
+	await battle.events.before_battle(caster, target)
 	var spell := Spells.get_spell(spell_name)
 	var dealt: Array[Unit] = []
 	target.notify_attacked()
@@ -667,6 +669,7 @@ func _remove_dead_and_award(involved: Array[Unit], awards: Array) -> void:
 		if u.hp <= 0 and u.team == Unit.Team.PLAYER:
 			battle.campaign_deaths.append({"name": u.unit_name, "turn": battle.turn})
 		if u.hp <= 0:
+			await battle.events.on_death(u)
 			var cell := u.cell
 			var carried := u.carrying
 			var aboard := u.passengers.duplicate()

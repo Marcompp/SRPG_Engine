@@ -8,6 +8,8 @@ var menu_index := 0
 var _menu_title := ""
 ## Level-up windows wait for confirm; the test suite turns this off (2 s timeout instead).
 var level_up_waits := true
+## Dialogue box for map events (see BattleEvents).
+var dialogue: DialogueBox
 ## Top-left map cell on screen (from BattleCamera), for placing panels away from the cursor.
 var view_origin := Vector2i.ZERO
 signal level_up_confirmed
@@ -71,6 +73,8 @@ func _ready() -> void:
 	# The unit list goes under the status screen, which can be opened from it.
 	unit_list = UnitListScreen.new()
 	_root.add_child(unit_list)
+	dialogue = DialogueBox.new()
+	_root.add_child(dialogue)
 	status_screen = StatusScreen.new()
 	_root.add_child(status_screen)
 	options_screen = OptionsScreen.new()

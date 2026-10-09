@@ -1,0 +1,32 @@
+# Great Valley: a showcase of map events. Format: scripts/event_script.gd
+# (and docs/events.md).
+
+== start ==
+@narrate The Great Valley, at dawn.
+@camera (26, 1)
+General: They'll come over the bridges. Let them come.
+@camera (2, 18)
+Lord: Three bridges, one river. We cross before nightfall.
+Ember: There's another dragon on their side. Let me talk to it before anyone swings an axe.
+Lord: Then stay close to it. We'll keep the rest busy.
+
+== turn 2, enemy ==
+Messenger: General! They're already at the river!
+General: Hold the fort. The valley does the rest.
+
+== talk Ember, Wyrm ==
+Ember: You don't have to fight for them.
+Wyrm: They pay well.
+Ember: We'll pay better. Fly with us.
+Wyrm: ...Fine. Point me at the General.
+@recruit Wyrm
+@flag wyrm_joined
+
+== battle General ==
+General: You crossed my valley just to die in it?
+
+== battle General | if wyrm_joined ==
+General: Even the dragon turned on me?
+
+== death Ember ==
+Ember: Sorry... I couldn't...

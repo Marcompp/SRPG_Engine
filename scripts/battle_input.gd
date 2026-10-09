@@ -76,7 +76,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var danger := event.is_action_pressed("danger_zone")
 	var info := event.is_action_pressed("unit_info")
 	var next := event.is_action_pressed("next_unit")
-	if dir == Vector2i.ZERO and not accept and not cancel and not danger and not info and not next:
+	var skip := event.is_action_pressed("skip")
+	if dir == Vector2i.ZERO and not accept and not cancel and not danger and not info and not next and not skip:
 		return
 	get_viewport().set_input_as_handled()
 
@@ -140,6 +141,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				open_status(list.selected_unit())
 			elif cancel:
 				close_unit_list()
+		Battle.State.DIALOGUE:
+			if skip:
+				battle.events.skip()
+			elif accept:
+				battle.ui.dialogue.advance()
 		Battle.State.CHOICE:
 			if dir.y != 0:
 				battle.ui.menu_move(dir.y)
@@ -208,7 +214,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					move_committed = true
 					open_unit_menu()
 					return
-				if target_mode == "drop":
+				if target_mode == "talk":
+					await battle.events.run_talk(selected, targets[target_index])
+				elif target_mode == "drop":
 					await battle.actions.do_drop(selected, target_cells[target_index])
 				elif target_mode == "break":
 					await battle.actions.do_break(selected, target_cells[target_index])
@@ -553,6 +561,8 @@ func open_unit_menu() -> void:
 		options.append("Inspire")
 	if not battle.actions.steal_targets(selected).is_empty():
 		options.append("Steal")
+	if not battle.events.talk_targets(selected).is_empty():
+		options.append("Talk")
 	if not battle.actions.trade_partners(selected).is_empty():
 		options.append("Trade")
 	if not battle.actions.shove_targets(selected).is_empty():
@@ -743,6 +753,8 @@ func menu_accept() -> void:
 					start_unit_targeting("trade", battle.actions.trade_partners(selected))
 				"Steal":
 					start_unit_targeting("steal", battle.actions.steal_targets(selected))
+				"Talk":
+					start_unit_targeting("talk", battle.events.talk_targets(selected))
 				"Shove":
 					start_unit_targeting("shove", battle.actions.shove_targets(selected))
 				"Rescue":
@@ -938,6 +950,9 @@ func show_target() -> void:
 		battle.ui.show_shove_forecast(target, battle.map.terrain_at(dest).name, battle.cursor.cell)
 	elif target_mode == "trade":
 		battle.ui.show_trade_preview(target, battle.cursor.cell)
+	elif target_mode == "talk":
+		battle.map.show_area([], [target.cell])
+		battle.ui.show_cell_forecast("Talk to %s" % target.unit_name, battle.cursor.cell)
 	elif target_mode == "steal":
 		var names: Array[String] = []
 		for i in battle.actions.stealable_items(target):

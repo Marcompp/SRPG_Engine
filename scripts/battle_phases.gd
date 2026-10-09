@@ -26,6 +26,9 @@ func start_player_phase() -> void:
 	battle.turn += 1
 	await battle.ui.show_banner("Player Phase\n" + battle.turn_text(), Color("2850b0"))
 	await heal_on_tiles(Unit.Team.PLAYER)
+	await battle.events.on_turn(battle.turn, "player")
+	if check_game_over():
+		return
 	var players := battle.units_of(Unit.Team.PLAYER)
 	if not players.is_empty():
 		battle.cursor.cell = players[0].cell
@@ -74,6 +77,7 @@ func end_player_phase() -> void:
 		e.regen_mp(e.mp_regen())
 	await heal_on_tiles(Unit.Team.ENEMY)
 	await spawn_reinforcements()
+	await battle.events.on_turn(battle.turn, "enemy")
 	EnemyAI.update_all_wake(battle)
 	for e in battle.units_of(Unit.Team.ENEMY):
 		# has_acted: reinforcements that just arrived wait for the next phase.
@@ -180,6 +184,7 @@ func resume_suspended() -> void:
 	var data := SaveGame.read_suspend()
 	# A campaign chapter needs the campaign it belongs to (army, convoy, chapter).
 	Campaign.active = data.get("campaign", false) and Campaign.load_save()
+	battle.events.load_for(data.level)
 	SaveGame.restore(battle, data)
 	_resume_player_phase()
 

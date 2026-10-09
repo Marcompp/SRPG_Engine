@@ -5,7 +5,7 @@ class_name Battle
 ## (BattlePhases). Also answers questions about units on the map and enemy threat.
 
 ## What input is accepted right now: BUSY while anything animates, GAME_OVER at the end.
-enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, UNIT_LIST, OBJECTIVE, OPTIONS, CHOICE, BUSY, GAME_OVER }
+enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, UNIT_LIST, OBJECTIVE, OPTIONS, CHOICE, DIALOGUE, BUSY, GAME_OVER }
 
 @onready var map: BattleMap = $Map
 @onready var units_root: Node2D = $Units
@@ -39,6 +39,7 @@ var camera: BattleCamera
 var input: BattleInput
 var actions: BattleActions
 var phases: BattlePhases
+var events: BattleEvents
 
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 
@@ -50,6 +51,8 @@ func _ready() -> void:
 	input = _add_part(BattleInput.new(), "Input")
 	actions = _add_part(BattleActions.new(), "Actions")
 	phases = _add_part(BattlePhases.new(), "Phases")
+	events = _add_part(BattleEvents.new(), "Events")
+	events.load_for(Levels.selected)
 	camera = BattleCamera.new()
 	camera.name = "Camera"
 	add_child(camera)
@@ -73,6 +76,7 @@ func _ready() -> void:
 	var players := units_of(Unit.Team.PLAYER)
 	cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	_start_camera()
+	await events.on_start()
 	phases.start_player_phase()
 
 
