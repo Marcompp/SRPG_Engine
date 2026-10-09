@@ -47,9 +47,9 @@ static func triangle(a: Unit, b: Unit) -> int:
 	return 0
 
 
-## Agility after weapon weight burden (STR offsets weight).
+## Agility after weapon weight burden (STR and weight skills offset weight).
 static func attack_speed(u: Unit) -> int:
-	return u.combat_agi() - maxi(0, u.weapon.get("wt", 0) - u.combat_str())
+	return u.combat_agi() - maxi(0, u.weapon.get("wt", 0) - Skills.weight_relief(u) - u.combat_str())
 
 
 # Unit-only parts of the formulas (equipped weapon, no target or terrain). These are

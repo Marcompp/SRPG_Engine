@@ -14,14 +14,14 @@ const EMPTY_LEVEL_REROLLS := 2
 
 ## Growth key -> Unit property. Order is the display order on the level-up screen.
 const STATS := {
-	"hp": "max_hp",
+	"hp": "base_max_hp",
 	"str": "strength",
 	"int": "intelligence",
 	"dex": "dexterity",
 	"agi": "agility",
 	"lck": "luck",
 	"def": "defense",
-	"mp": "max_mp",
+	"mp": "base_max_mp",
 }
 const STAT_LABELS := {"hp": "HP", "str": "Str", "int": "Int", "dex": "Dex", "agi": "Agi", "lck": "Lck",
 	"def": "Def", "mp": "MP"}

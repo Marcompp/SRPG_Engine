@@ -142,6 +142,7 @@ func _run_all() -> void:
 		"test_steal_and_lockpick",
 		"test_range_skills",
 		"test_class_skill_effects",
+		"test_max_hp_weight_and_crit_skills",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -2988,3 +2989,43 @@ func test_class_skill_effects() -> void:
 	# Races that only take plain foot classes can't be scouts.
 	check(not Races.allows("Stoneborn", "Rogue"), "Stoneborn can't be Rogues")
 	check(Races.allows("Stoneborn", "Footman"), "but can be Footmen")
+
+
+func test_max_hp_weight_and_crit_skills() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	# Max HP +5 raises max HP on top of the base; losing it caps current HP.
+	var base := lord.max_hp
+	lord.items.append(Items.make("Potion"))
+	lord.learned.assign(["Max HP +5"])
+	check_eq(lord.max_hp, base + 5, "Max HP +5")
+	check_eq(lord.base_max_hp, base, "the base is untouched")
+	lord.hp = lord.max_hp
+	lord.learned.clear()
+	check_eq(lord.hp, base, "HP never above max HP")
+	# Level-ups and saves work on the base value.
+	lord.learned.assign(["Max HP +5"])
+	var copy := SaveGame.unit_from_dict(SaveGame.unit_to_dict(lord))
+	check_eq(copy.max_hp, base + 5, "saved and restored with the bonus on top")
+	check_eq(copy.base_max_hp, base, "and the same base")
+	copy.free()
+	# Brawn: weapons weigh 5 less.
+	brig.items.assign([Items.make("Steel Axe")])
+	brig.equip(0)
+	brig.strength = 0
+	var slow := Combat.attack_speed(brig)
+	brig.personal_skills.assign(["Brawn"])
+	check_eq(Combat.attack_speed(brig), mini(slow + 5, brig.combat_agi()), "Brawn: 5 less weight burden")
+	# Impale: crit against mounted foes.
+	brig.personal_skills.clear()
+	lord.personal_skills.assign(["Impale"])
+	brig.set_class("Cavalry")
+	brig.items.assign([Items.make("Iron Spear")])
+	brig.equip(0)
+	var vs_horse: int = Combat.forecast(lord, brig, b.map).atk.crit
+	lord.personal_skills.clear()
+	check_eq(vs_horse, mini(Combat.forecast(lord, brig, b.map).atk.crit + 25, 100), "Impale: +25 Crit vs horses")
+	# Class data: Bishops pray, Clerics learn Max MP +5.
+	check(Classes.get_data("Bishop").skills.has("Prayer"), "Bishop: Prayer")
+	check_eq(Classes.get_data("Cleric").learn[10], "Max MP +5", "Cleric Lv 10: Max MP +5")

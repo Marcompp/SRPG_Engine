@@ -94,8 +94,17 @@ var level := 1
 var exp_points := 0
 ## Growth rates in percent, keyed like Experience.STATS ("hp", "str", ...).
 var growths := {}
-var max_hp := 10
-var hp := 10
+## Max HP from the roster, level-ups and promotion; `max_hp` adds skill bonuses.
+var base_max_hp := 10
+var max_hp: int:
+	get:
+		return base_max_hp + Skills.stat_bonus(self, "hp")
+	set(value):
+		base_max_hp = value
+## Never above max HP (losing a Max HP skill, e.g. trading a ring away, lowers it).
+var hp := 10:
+	get:
+		return mini(hp, max_hp)
 var strength := 5
 var dexterity := 5
 var agility := 5
@@ -104,7 +113,7 @@ var defense := 2
 var intelligence := 0
 ## Computed properties (getters over other fields) that suspend saves must skip:
 ## they're rebuilt from the fields they read. Add any new computed property here.
-const SAVE_SKIP: Array[String] = ["mov", "weapon", "min_range", "max_range"]
+const SAVE_SKIP: Array[String] = ["mov", "max_hp", "max_mp", "weapon", "min_range", "max_range"]
 ## MOV from the roster and level-ups; `mov` adds the race's bonus (see Races).
 var base_mov := 5
 var mov_bonus := 0
@@ -115,8 +124,15 @@ var mov: int:
 		base_mov = value
 ## Everyone has MP: casters spend it on spells, and current MP is also magic
 ## defense (see Combat.magic_defense). Only casters show an MP bar on the map.
-var max_mp := 0
+var base_max_mp := 0
+var max_mp: int:
+	get:
+		return base_max_mp + Skills.stat_bonus(self, "mp")
+	set(value):
+		base_max_mp = value
 var mp := 0:
+	get:
+		return mini(mp, max_mp)
 	set(value):
 		mp = value
 		queue_redraw()

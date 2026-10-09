@@ -103,17 +103,17 @@ Innate skills come with the class (a promoted class lists its own full set); Lv 
 | Group | Class | Weapons | Move | Innate skills | Lv 10 | Promotes to (innate skills) |
 |---|---|---|---|---|---|---|
 | Foot | Swordsman | Sword | foot | | Speed +2 | Swordsmaster (Sword; Crit +20) |
-| | Footman | Spear | foot | | | Hoplite (Spear) |
+| | Footman | Spear | foot | | Open Ground | Hoplite (Spear; Impale) |
 | | Axeman | Axe | foot | | Strength +2 | Berserker (Axe; Swimming, Climbing, Wrath) |
 | | Archer | Bow | foot | | Skill +4 | Marksman (Bow; Bow Range +1) |
 | Rogue | Rogue | Sword | foot | Forester, Steal, Lockpick | Evasion | Assassin (Sword, Bow; Forester, Steal, Lockpick, Lethality) |
 | | Corsair | Sword | foot | Swimming | Sea Legs | Swashbuckler (Sword, Axe; Swimming, Pass) |
 | | Brigand | Axe | foot | Climbing | Highlander | Berserker |
-| | Poacher | Bow | foot | Forester | Ambush | Reaver (Bow, Axe; Forester, Pathfinder) |
+| | Poacher | Bow | foot | Forester | Ambush | Reaver (Bow, Axe; Forester, Brawn) |
 | Armor | Guard | Spear | heavy | | Defense +2 | Juggernaut (Spear, Axe, Bow; Warding) |
-| | Turret | Bow | heavy | | | Juggernaut |
+| | Turret | Bow | heavy | | Max HP +5 | Juggernaut |
 | Mage | Mage | Staff | foot | | Magic +2 | Sorcerer (Staff, Sword; Spell Range +1) |
-| | Cleric | Staff | foot | | Prayer | Bishop (Staff, Spear) |
+| | Cleric | Staff | foot | | Max MP +5 | Bishop (Staff, Spear; Prayer) |
 | Horse | Equestrian | Sword | horse | Canto | | Gendarme (Sword, Spear; Canto) |
 | | Cavalry | Spear | horse | Canto | | Gendarme |
 | | Nomad | Bow | horse | Canto | | Hussar (Bow, Spear; Canto) |

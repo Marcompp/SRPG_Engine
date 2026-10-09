@@ -150,8 +150,7 @@ low-impact skills that reinforce the class identity (learned at Lv 10 as small
 rewards for sticking with the class); innate skills are the class's identity and a
 promoted class lists its own full set; class skills end up on enemies, so they must
 not change damage or attack speed depending on who attacks, nor add damage procs
-(Lethality on Assassin is the accepted exception). Still open: Footman/Hoplite,
-Turret, Bishop, the cavalry line's Lv 10 and promoted skills, personal skills and
+(Lethality on Assassin is the accepted exception). Still open: the cavalry line's Lv 10 and promoted skills, personal skills and
 loot. Limits for now: procs only on weapon strikes; Canto only for
 player units (the AI doesn't plan around it); auras only carry `battle` modifiers.
 Auras and adjacency conditions see the map's units through `Skills.field`, set by

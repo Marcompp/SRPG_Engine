@@ -24,8 +24,8 @@ const DATA := {
 	# Foot
 	"Swordsman": {"weapons": ["sword"], "move": "foot", "learn": {10: "Speed +2"}, "promotes_to": ["Swordsmaster"]},
 	"Swordsmaster": {"weapons": ["sword"], "move": "foot", "skills": ["Crit +20"], "promoted": true},
-	"Footman": {"weapons": ["spear"], "move": "foot", "promotes_to": ["Hoplite"]},
-	"Hoplite": {"weapons": ["spear"], "move": "foot", "promoted": true},
+	"Footman": {"weapons": ["spear"], "move": "foot", "learn": {10: "Open Ground"}, "promotes_to": ["Hoplite"]},
+	"Hoplite": {"weapons": ["spear"], "move": "foot", "skills": ["Impale"], "promoted": true},
 	"Axeman": {"weapons": ["axe"], "move": "foot", "learn": {10: "Strength +2"}, "promotes_to": ["Berserker"]},
 	"Archer": {"weapons": ["bow"], "move": "foot", "learn": {10: "Skill +4"}, "promotes_to": ["Marksman"]},
 	"Marksman": {"weapons": ["bow"], "move": "foot", "skills": ["Bow Range +1"], "promoted": true},
@@ -42,16 +42,16 @@ const DATA := {
 	"Berserker": {"weapons": ["axe"], "move": "foot", "skills": ["Swimming", "Climbing", "Wrath"], "promoted": true},
 	"Poacher": {"weapons": ["bow"], "move": "foot", "skills": ["Forester"], "learn": {10: "Ambush"},
 		"promotes_to": ["Reaver"]},
-	"Reaver": {"weapons": ["bow", "axe"], "move": "foot", "skills": ["Forester", "Pathfinder"], "promoted": true},
+	"Reaver": {"weapons": ["bow", "axe"], "move": "foot", "skills": ["Forester", "Brawn"], "promoted": true},
 	# Armor
 	"Guard": {"weapons": ["spear"], "move": "heavy", "learn": {10: "Defense +2"}, "promotes_to": ["Juggernaut"]},
-	"Turret": {"weapons": ["bow"], "move": "heavy", "promotes_to": ["Juggernaut"]},
+	"Turret": {"weapons": ["bow"], "move": "heavy", "learn": {10: "Max HP +5"}, "promotes_to": ["Juggernaut"]},
 	"Juggernaut": {"weapons": ["spear", "axe", "bow"], "move": "heavy", "skills": ["Warding"], "promoted": true},
 	# Mages
 	"Mage": {"weapons": ["staff"], "move": "foot", "learn": {10: "Magic +2"}, "promotes_to": ["Sorcerer"]},
 	"Sorcerer": {"weapons": ["staff", "sword"], "move": "foot", "skills": ["Spell Range +1"], "promoted": true},
-	"Cleric": {"weapons": ["staff"], "move": "foot", "learn": {10: "Prayer"}, "promotes_to": ["Bishop"]},
-	"Bishop": {"weapons": ["staff", "spear"], "move": "foot", "promoted": true},
+	"Cleric": {"weapons": ["staff"], "move": "foot", "learn": {10: "Max MP +5"}, "promotes_to": ["Bishop"]},
+	"Bishop": {"weapons": ["staff", "spear"], "move": "foot", "skills": ["Prayer"], "promoted": true},
 	# Horse
 	"Equestrian": {"weapons": ["sword"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Gendarme"]},
 	"Cavalry": {"weapons": ["spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Gendarme"]},

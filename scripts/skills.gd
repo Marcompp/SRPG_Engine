@@ -9,7 +9,8 @@ extends RefCounted
 ##
 ## Every skill has a "description" and any of these effects:
 ## stats:      flat bonuses: {"str": 2, "mov": 1} (keys of Experience.STATS, plus "mov";
-##             not "hp"/"mp").
+##             "hp"/"mp" raise max HP/MP).
+## weight_relief: its weapons count as this much lighter (see Combat.attack_speed).
 ## command:    adds a unit menu command: "dance", "inspire", "steal".
 ## turn_start: at the start of its side's phase: {"heal": fraction of max HP, "mp": MP,
 ##             "heal_allies": fraction of max HP for adjacent allies}.
@@ -61,7 +62,8 @@ const PROC_EFFECTS: Array[String] = ["pierce", "drain", "damage_bonus", "lethal"
 const CONDITIONS: Array[String] = ["initiating", "defending", "phase", "hp_below", "hp_above", "range",
 	"weapon_type", "foe_weapon_type", "foe_tag", "terrain", "adjacent_ally", "no_adjacent_ally", "killed"]
 const EFFECT_KEYS: Array[String] = ["description", "stats", "command", "turn_start", "exp", "immune", "battle",
-	"rules", "proc", "after_combat", "map", "aura", "growths", "terrain_costs", "range", "if", "hidden"]
+	"rules", "proc", "after_combat", "map", "aura", "growths", "terrain_costs", "range", "weight_relief", "if",
+	"hidden"]
 const AFTER_EFFECTS: Array[String] = ["heal", "refresh", "damage_foe", "damage_near_foe"]
 const MAP_RULES: Array[String] = ["pass", "pathfinder", "canto", "footwork"]
 ## Skills that make terrain cheaper (see terrain_costs): innate to scouts, climbers and
@@ -88,6 +90,8 @@ const DATA := {
 	"Sea Legs": {"description": "+15 Hit on water.", "battle": {"hit": 15}, "if": {"terrain": ["~", "L", "W", "v"]}},
 	"Ambush": {"description": "+15 Hit in forests and thickets.", "battle": {"hit": 15}, "if": {"terrain": ["F", "#"]}},
 	"Highlander": {"description": "+15 Hit on hills and mountains.", "battle": {"hit": 15}, "if": {"terrain": ["h", "M"]}},
+	"Open Ground": {"description": "+10 Avo on open terrain (plains, paths, sand, snow, floors, bridges).",
+		"battle": {"avo": 10}, "if": {"terrain": [".", "=", "S", "*", "_", "c", "B"]}},
 	"Footwork": {"description": "Can move again after Dancing, with the MOV it has left.", "map": ["footwork"]},
 	"Prayer": {"description": "Adjacent allies recover 10% of max HP at the start of each turn.",
 		"turn_start": {"heal_allies": 0.1}},
@@ -102,12 +106,17 @@ const DATA := {
 	"Magic +2": {"description": "+2 INT.", "stats": {"int": 2}},
 	"Skill +2": {"description": "+2 DEX.", "stats": {"dex": 2}},
 	"Skill +4": {"description": "+4 DEX.", "stats": {"dex": 4}},
+	"Max HP +5": {"description": "+5 max HP.", "stats": {"hp": 5}},
+	"Max MP +5": {"description": "+5 max MP.", "stats": {"mp": 5}},
+	"Brawn": {"description": "Weapons weigh 5 less for it.", "weight_relief": 5},
 	"Speed +2": {"description": "+2 AGI.", "stats": {"agi": 2}},
 	"Luck +4": {"description": "+4 LCK.", "stats": {"lck": 4}},
 	"Defense +2": {"description": "+2 DEF.", "stats": {"def": 2}},
 	# Combat modifiers.
 	"Wrath": {"description": "+30 Crit at or below half HP.", "battle": {"crit": 30}, "if": {"hp_below": 0.5}},
 	"Crit +20": {"description": "+20 Crit.", "battle": {"crit": 20}},
+	"Impale": {"description": "+25 Crit against mounted foes (horses and fliers).", "battle": {"crit": 25},
+		"if": {"foe_tag": ["horse", "flying"]}},
 	"Evasion": {"description": "+10 Avo.", "battle": {"avo": 10}},
 	"Warding": {"description": "+5 magic defense.", "battle": {"res": 5}},
 	"Bow Range +1": {"description": "+1 max range with bows.", "range": {"bow": 1}},
@@ -199,9 +208,11 @@ static func sources(u: Unit) -> Array:
 				seen[skill] = true
 				result.append([skill, source])
 	add.call(u.personal_skills, "Personal")
-	add.call(Classes.get_data(u.unit_class).get("skills", []), "Class")
+	if Classes.DATA.has(u.unit_class):  # unset while a unit is being built
+		add.call(Classes.get_data(u.unit_class).get("skills", []), "Class")
 	add.call(Races.get_data(u.race).get("skills", []), "Race")
-	if Races.get_data(u.race).get("amphibious", false) and Classes.get_data(u.unit_class).move == "foot":
+	if Races.get_data(u.race).get("amphibious", false) and Classes.DATA.has(u.unit_class) \
+			and Classes.get_data(u.unit_class).move == "foot":
 		add.call(["Swimming", "Climbing"], "Race")
 	add.call(u.learned, "Learned")
 	if not u.weapon.is_empty():
@@ -293,6 +304,13 @@ static func range_bonus(u: Unit, kind: String) -> int:
 	var total := 0
 	for skill in of(u):
 		total += get_data(skill).get("range", {}).get(kind, 0)
+	return total
+
+
+static func weight_relief(u: Unit) -> int:
+	var total := 0
+	for skill in of(u):
+		total += get_data(skill).get("weight_relief", 0)
 	return total
 
 
