@@ -275,10 +275,10 @@ func _render() -> void:
 			var d := Campaign.army_unit(current_unit)
 			lines.append(current_unit)
 			for i in d.items.size():
-				lines.append(_row(i, "%s %d" % [d.items[i].name, d.items[i].uses], column == 0))
+				lines.append(_row(i, Items.label(d.items[i], " "), column == 0))
 			side.append("Convoy")
 			for i in Campaign.convoy.size():
-				side.append(_row(i, "%s %d" % [Campaign.convoy[i].name, Campaign.convoy[i].uses], column == 1))
+				side.append(_row(i, Items.label(Campaign.convoy[i], " "), column == 1))
 			if Campaign.convoy.is_empty():
 				side.append("   (empty)")
 		"promote_unit":

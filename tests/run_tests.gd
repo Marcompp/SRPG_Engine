@@ -127,6 +127,10 @@ func _run_all() -> void:
 		"test_doors_open_or_break",
 		"test_tile_hp_survives_suspend",
 		"test_enemies_break_and_open_obstacles",
+		"test_hidden_gender",
+		"test_skill_sources_and_stats",
+		"test_scroll_learning_and_cap",
+		"test_level_up_learns_skills",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -2511,3 +2515,105 @@ func test_enemies_break_and_open_obstacles() -> void:
 	check_eq(b.map.terrain_key(Vector2i(3, 4)), "_", "and opens it")
 	check(not brig.items.any(func(it): return it.name == "Chest Key"), "using up its key")
 	check_eq(b.map.tile_hp.get(Vector2i(6, 2)), 20, "the wall is left alone")
+
+
+func test_hidden_gender() -> void:
+	var data := {"class": "Brigand", "items": ["Iron Axe"], "hp": 20, "str": 5, "dex": 1, "agi": 4,
+		"lck": 0, "def": 3, "mov": 5}
+	# Generics get a random gender.
+	var seen := {}
+	for i in 40:
+		var u := Unit.create("Brigand", Unit.Team.ENEMY, Vector2i.ZERO, data)
+		check(Unit.GENDERS.has(u.gender), "a valid gender (%s)" % u.gender)
+		seen[u.gender] = true
+		u.free()
+	check_eq(seen.size(), Unit.GENDERS.size(), "both genders show up among generics")
+	# A roster "gender" fixes it.
+	data["gender"] = "female"
+	for i in 10:
+		var u := Unit.create("Rider", Unit.Team.PLAYER, Vector2i.ZERO, data)
+		check_eq(u.gender, "female", "roster gender is kept")
+		u.free()
+	# It's saved with the unit, so suspends and the campaign army keep it.
+	var lord := unit_named("Lord")
+	lord.gender = "female"
+	var copy := SaveGame.unit_from_dict(SaveGame.unit_to_dict(lord))
+	check_eq(copy.gender, "female", "gender survives saving")
+	copy.free()
+
+
+# --- Skills -----------------------------------------------------------------------
+
+func test_skill_sources_and_stats() -> void:
+	var lord := unit_named("Lord")
+	var base_str := lord.combat_str()
+	var base_lck := lord.combat_lck()
+	var base_mov := lord.mov
+	check(Skills.has(lord, "Adaptable"), "Humans get their racial skill")
+	check(Skills.has(unit_named("Dancer"), "Dance"), "Performers get Dance from their class")
+	lord.personal_skills.assign(["Luck +4"])
+	lord.learned.assign(["Celerity"])
+	lord.items.append(Items.make("Power Ring"))
+	lord.items[0]["skills"] = ["Skill +2"]  # the equipped Iron Sword
+	var expected := [["Luck +4", "Personal"], ["Adaptable", "Race"], ["Celerity", "Learned"],
+		["Skill +2", "Iron Sword"], ["Strength +2", "Power Ring"]]
+	check_eq(Skills.sources(lord), expected, "every source, in order")
+	check_eq(lord.combat_str(), base_str + 2, "held ring: +2 STR")
+	check_eq(lord.combat_lck(), base_lck + 4, "personal: +4 LCK")
+	check_eq(lord.mov, base_mov + 1, "learned Celerity: +1 MOV")
+	check_eq(lord.combat_dex(), lord.dexterity + 2, "equipped weapon: +2 DEX")
+	lord.equip(1)  # the Knife: the sword's skill only works while equipped
+	check_eq(lord.combat_dex(), lord.dexterity, "unequipped weapon skills stop")
+	lord.items.pop_back()
+	check_eq(lord.combat_str(), base_str, "dropping the ring removes its skill")
+	# Racial traits now come from skills.
+	check_eq(Skills.exp_multiplier(lord), 1.1, "Adaptable: +10% EXP")
+	lord.set_race("Troll")
+	check_eq(Skills.turn_heal(lord), 0.1, "Trolls regenerate")
+	check(Skills.is_immune(lord, "poison"), "and are immune to poison")
+
+
+func test_scroll_learning_and_cap() -> void:
+	var lord := unit_named("Lord")
+	lord.learned.assign(["Luck +4", "Skill +2", "Speed +2", "Defense +2", "Magic +2"])
+	lord.items.assign([Items.make("Iron Sword"), Items.make("Vigor Scroll"), Items.make("Celerity Scroll")])
+	lord.equip(0)
+	# Full: it asks which to forget; "Don't learn" (or X) keeps the scroll and the turn.
+	await open_menu_in_place(lord)
+	await pick("Items")
+	await pick("Vigor Scroll  1")
+	check_eq(b.state, b.State.CHOICE, "learning a sixth skill asks first")
+	check_eq(b.ui.menu_options[-1], "Don't learn", "with an option not to")
+	await press(KEY_X)
+	check_eq(lord.learned.size(), 5, "nothing learned")
+	check(lord.items.any(func(it): return it.name == "Vigor Scroll"), "the scroll is kept")
+	check(not lord.has_acted, "and the turn isn't used")
+	check_eq(b.input.menu_context, "items", "back in the items menu")
+	# Forget the first one instead.
+	await pick("Vigor Scroll  1")
+	await press(KEY_Z)
+	check(not lord.learned.has("Luck +4"), "the picked skill is forgotten")
+	check_eq(lord.learned[-1], "Strength +2", "the new one learned")
+	check(not lord.items.any(func(it): return it.name == "Vigor Scroll"), "the scroll is used up")
+	check(lord.has_acted, "reading it ends the turn")
+	# A skill it already has can't be learned again.
+	check(not Items.can_use(lord, Items.make("Vigor Scroll")), "no scroll for a skill it has")
+	# Enemies that are full don't learn.
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	brig.learned.assign(["Luck +4", "Skill +2", "Speed +2", "Defense +2", "Magic +2"])
+	check(not await b.actions.learn_skill(brig, "Celerity"), "a full enemy doesn't learn")
+
+
+func test_level_up_learns_skills() -> void:
+	var lord := unit_named("Lord")
+	lord.learn_table = {2: "Celerity"}
+	lord.exp_points = 0
+	await b.actions.gain_exp(lord, 100)
+	check_eq(lord.level, 2, "level up")
+	check(lord.learned.has("Celerity"), "learns its level-2 skill")
+	# Units created above level 1 already know what their tables taught.
+	var data := {"class": "Swordsman", "items": ["Iron Sword"], "lv": 6, "hp": 20, "str": 5, "dex": 5,
+		"agi": 5, "lck": 5, "def": 5, "mov": 5, "learn": {3: "Celerity", 5: "Luck +4", 7: "Speed +2"}}
+	var u := Unit.create("Vet", Unit.Team.PLAYER, Vector2i.ZERO, data)
+	check_eq(u.learned, ["Celerity", "Luck +4"] as Array[String], "skills up to its level, not beyond")
+	u.free()

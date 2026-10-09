@@ -236,11 +236,11 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i, tile_hp
 		for line in unit_notes(unit):
 			text += line + "\n"
 		text += "STR %d  DEX %d  AGI %d  LCK %d\nDEF %d  MOV %d" % [
-			unit.combat_str(), unit.dexterity, unit.agility, unit.luck, unit.combat_def(), unit.mov]
+			unit.combat_str(), unit.combat_dex(), unit.combat_agi(), unit.combat_lck(), unit.combat_def(), unit.mov]
 		if unit.move_type != "foot":
 			text += " (%s)" % unit.move_type.capitalize()
 		if unit.is_caster():
-			text += "  INT %d" % unit.intelligence
+			text += "  INT %d" % unit.combat_int()
 		text += "\n"
 	# Show the bonus the unit on the tile actually gets (fliers and spirits get none).
 	if tile_hp >= 0:
@@ -394,12 +394,12 @@ func show_cell_forecast(text: String, cursor_cell: Vector2i) -> void:
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
-## Extra lines for the info panel and stats screen: abilities, buffs, cargo.
+## Extra lines for the info panel and stats screen: command skills, buffs, cargo.
 static func unit_notes(unit: Unit) -> Array[String]:
 	var lines: Array[String] = []
-	for ability in unit.abilities:
-		if ability != "ship":
-			lines.append("Skill: %s" % ability.capitalize())
+	for pair in Skills.visible_sources(unit):
+		if Skills.get_data(pair[0]).has("command"):
+			lines.append("Skill: %s" % pair[0])
 	if unit.inspire_bonus > 0:
 		lines.append("Inspired: STR/DEF +%d" % unit.inspire_bonus)
 	if unit.carrying:
@@ -415,7 +415,7 @@ static func unit_notes(unit: Unit) -> Array[String]:
 
 static func item_label(unit: Unit, index: int) -> String:
 	var item := unit.items[index]
-	return "%s %d%s" % [item.name, item.uses, " E" if index == unit.equipped_index() else ""]
+	return Items.label(item, " ") + (" E" if index == unit.equipped_index() else "")
 
 
 ## Partner's inventory while choosing who to trade with.

@@ -5,7 +5,7 @@ class_name Battle
 ## (BattlePhases). Also answers questions about units on the map and enemy threat.
 
 ## What input is accepted right now: BUSY while anything animates, GAME_OVER at the end.
-enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, UNIT_LIST, OBJECTIVE, OPTIONS, BUSY, GAME_OVER }
+enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, UNIT_LIST, OBJECTIVE, OPTIONS, CHOICE, BUSY, GAME_OVER }
 
 @onready var map: BattleMap = $Map
 @onready var units_root: Node2D = $Units

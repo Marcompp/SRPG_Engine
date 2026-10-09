@@ -100,13 +100,23 @@ static func item(it: Dictionary) -> String:
 			text += " Silver: spirits don't resist it, and the undead are weak to it."
 		if WEAPON_NOTES.has(it.name):
 			text += " " + WEAPON_NOTES[it.name]
+		for skill: String in it.get("skills", []):
+			text += " Equipped: %s (%s)" % [skill, Skills.get_data(skill).description]
 		return text
 	match it.get("kind", ""):
 		"heal":
 			return "%s: restores %d HP to the user and ends its turn. Uses %d." % [it.name, it.heal, it.uses]
 		"mp":
 			return "%s: restores %d MP to the user and ends its turn. Uses %d." % [it.name, it.mp, it.uses]
-	return "%s. Uses %d." % [it.name, it.get("uses", 0)]
+		"scroll":
+			return "%s: teaches %s (%s) for good. Ends the user's turn." % [it.name, it.skill,
+				Skills.get_data(it.skill).description]
+	var text: String = it.name + "."
+	for skill: String in it.get("skills", []):
+		text += " Held: %s (%s)" % [skill, Skills.get_data(skill).description]
+	if it.has("uses"):
+		text += " Uses %d." % it.uses
+	return text
 
 
 static func spell(spell_name: String) -> String:

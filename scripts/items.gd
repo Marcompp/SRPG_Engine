@@ -4,12 +4,20 @@ extends RefCounted
 ## Weapons are the entries with "mt"; everything else here is a consumable.
 
 ## kind "heal": restores `heal` HP to the user. kind "mp": restores `mp` MP.
+## kind "scroll": teaches `skill` for good (see Skills; a full unit picks one to forget).
 ## Using an item ends the unit's turn.
+## Any item (or weapon) can list "skills": held items grant them while in the
+## inventory, weapons only while equipped. Items without "uses" never run out.
 const CONSUMABLES := {
 	"Potion": {"kind": "heal", "heal": 15, "uses": 3},
 	"Ether": {"kind": "mp", "mp": 15, "uses": 3},
 	# Opens a chest (one use per chest). Rogue-movement units open chests without one.
 	"Chest Key": {"kind": "key", "uses": 1},
+	"Celerity Scroll": {"kind": "scroll", "skill": "Celerity", "uses": 1},
+	"Vigor Scroll": {"kind": "scroll", "skill": "Strength +2", "uses": 1},
+	# Held items with skills.
+	"Power Ring": {"kind": "ring", "skills": ["Strength +2"]},
+	"Speed Ring": {"kind": "ring", "skills": ["Speed +2"]},
 }
 
 
@@ -33,4 +41,11 @@ static func can_use(user: Unit, item: Dictionary) -> bool:
 			return user.hp < user.max_hp
 		"mp":
 			return user.mp < user.max_mp
+		"scroll":
+			return not Skills.has(user, item.skill)
 	return false
+
+
+## "Name  uses" for menus, or just the name for items that never run out.
+static func label(item: Dictionary, sep := "  ") -> String:
+	return "%s%s%d" % [item.name, sep, item.uses] if item.has("uses") else item.name

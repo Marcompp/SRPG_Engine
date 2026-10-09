@@ -7,11 +7,11 @@ extends RefCounted
 ## move:        one of BattleMap.MOVE_TYPES. Also the class's effectiveness tag
 ##              (see Unit.tags); the unit's race may change how it moves.
 ## mounted:     can Rescue allies; can't Shove, be Shoved or be Rescued.
-## abilities:   "dance"   = refresh an adjacent ally that already acted.
-##              "inspire" = buff every adjacent ally's STR and DEF until the next
-##                          player phase; the bonus grows with the user's level.
-##              "ship"    = allies can Board it; it Unloads them without ending its
-##                          turn. Can't Shove or be Shoved.
+## abilities:   "ship" = allies can Board it; it Unloads them without ending its
+##              turn. Can't Shove or be Shoved.
+## skills:      skills every unit of the class has (see Skills); lost on promotion.
+## learn:       {level: skill}: skills learned for good on reaching that level in
+##              this class (they count toward Skills.LEARNED_CAP).
 ## capacity:    passengers a ship can hold.
 ## promoted:    second-tier class.
 ## promotes_to: classes this one can promote into. Promotion will happen in the
@@ -58,8 +58,8 @@ const DATA := {
 	# Spirits (pass through any terrain, even walls, for 1 MOV; no terrain bonuses)
 	"Wraith": {"weapons": ["sword"], "move": "spirit"},
 	# Special
-	"Performer": {"weapons": ["sword"], "move": "foot", "abilities": ["dance"]},
-	"Bannerman": {"weapons": ["spear"], "move": "foot", "abilities": ["inspire"]},
+	"Performer": {"weapons": ["sword"], "move": "foot", "skills": ["Dance"]},
+	"Bannerman": {"weapons": ["spear"], "move": "foot", "skills": ["Inspire"]},
 }
 
 

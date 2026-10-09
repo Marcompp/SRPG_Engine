@@ -55,11 +55,11 @@ static func base_attack(u: Unit) -> int:
 
 
 static func base_hit(u: Unit) -> int:
-	return u.weapon.hit + u.combat_dex() * 2 + int(u.luck * 0.5)
+	return u.weapon.hit + u.combat_dex() * 2 + int(u.combat_lck() * 0.5)
 
 
 static func base_avoid(u: Unit) -> int:
-	return attack_speed(u) * 2 + u.luck
+	return attack_speed(u) * 2 + u.combat_lck()
 
 
 static func base_crit(u: Unit) -> int:
@@ -138,7 +138,7 @@ static func hit_chance(attacker: Unit, defender: Unit, map: BattleMap) -> int:
 static func crit_chance(attacker: Unit, defender: Unit) -> int:
 	if attacker.weapon.is_empty():
 		return 0
-	return clampi(base_crit(attacker) - defender.luck, 0, 100)
+	return clampi(base_crit(attacker) - defender.combat_lck(), 0, 100)
 
 
 static func doubles(a: Unit, b: Unit) -> bool:
@@ -202,20 +202,20 @@ static func magic_defense(u: Unit) -> int:
 
 static func spell_damage(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> int:
 	var power: int = spell.power * multiplier(spell, target)
-	var dmg := maxi(0, caster.intelligence + power - (magic_defense(target) + map.unit_terrain_def(target)))
+	var dmg := maxi(0, caster.combat_int() + power - (magic_defense(target) + map.unit_terrain_def(target)))
 	if resists(target, spell):
 		dmg = floori(dmg / 2.0)
 	return dmg
 
 
 static func spell_hit_chance(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> int:
-	var hit: int = spell.hit + caster.combat_dex() * 2 + int(caster.luck * 0.5)
-	var avoid: int = attack_speed(target) * 2 + target.luck + map.unit_terrain_avoid(target)
+	var hit: int = spell.hit + caster.combat_dex() * 2 + int(caster.combat_lck() * 0.5)
+	var avoid: int = attack_speed(target) * 2 + target.combat_lck() + map.unit_terrain_avoid(target)
 	return clampi(hit - avoid, 0, 100)
 
 
 static func spell_crit_chance(caster: Unit, target: Unit, spell: Dictionary) -> int:
-	return clampi(spell.get("crit", 0) + int(caster.combat_dex() * 0.5) - target.luck, 0, 100)
+	return clampi(spell.get("crit", 0) + int(caster.combat_dex() * 0.5) - target.combat_lck(), 0, 100)
 
 
 ## Resolves one spell hit, same shape as strike().

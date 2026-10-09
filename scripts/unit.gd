@@ -42,6 +42,11 @@ var move_type := "foot"
 var tags: Array[String] = []
 ## Race: a key of Races.DATA (roster "race", default "Human").
 var race := "Human"
+## Possible values of `gender`.
+const GENDERS: Array[String] = ["male", "female"]
+## Hidden: never shown to the player, but rules can check it (e.g. mounts that only
+## accept some riders). Roster "gender"; generics without one get a random gender.
+var gender: String = GENDERS.pick_random()
 ## Notable events in this unit's story, oldest first (roster "bio"); shown on the
 ## status screen's Biography page. Player units only.
 var biography: Array[String] = []
@@ -49,8 +54,14 @@ var biography: Array[String] = []
 var mounted := false
 ## Weapon types the unit can equip (see Weapons). Others can still be carried.
 var weapon_types: Array[String] = []
-## Class abilities: "dance", "inspire", "ship" (see Classes).
+## Class abilities: "ship" (see Classes). Other special commands are skills.
 var abilities: Array[String] = []
+## Personal skills (roster "skills"); see Skills for every other source.
+var personal_skills: Array[String] = []
+## Personal level-up skills (roster "learn": {level: skill}), on top of the class's.
+var learn_table := {}
+## Skills learned from level-ups and scrolls, kept for good (at most Skills.LEARNED_CAP).
+var learned: Array[String] = []
 ## Rescue (Thracia 776 style): the ally this unit is carrying, or null. A carried
 ## unit is off the map (hidden, excluded from Battle.units()) until dropped.
 var carrying: Unit
@@ -95,7 +106,7 @@ var base_mov := 5
 var mov_bonus := 0
 var mov: int:
 	get:
-		return base_mov + mov_bonus
+		return base_mov + mov_bonus + Skills.stat_bonus(self, "mov")
 	set(value):
 		base_mov = value
 ## Everyone has MP: casters spend it on spells, and current MP is also magic
@@ -137,7 +148,11 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.is_lord = stats.get("lord", false)
 	u.race = stats.get("race", "Human")
 	assert(Races.DATA.has(u.race), "unknown race: " + u.race)
+	u.gender = stats.get("gender", u.gender)
+	assert(GENDERS.has(u.gender), "unknown gender: " + u.gender)
 	u.biography.assign(stats.get("bio", []))
+	u.personal_skills.assign(stats.get("skills", []))
+	u.learn_table = stats.get("learn", {})
 	u.set_class(stats["class"])
 	u.ai = AIProfiles.resolve(stats.get("ai", {}))
 	u.anchor = p_cell
@@ -157,6 +172,12 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.spells.assign(stats.get("spells", []))
 	for item_name in stats.get("items", []).slice(0, MAX_ITEMS):
 		u.items.append(Items.make(item_name))
+	# Starting above level 1: it already knows what its learn tables teach by now.
+	for lv in range(1, u.level + 1):
+		for skill in u.skills_learned_at(lv):
+			if not u.learned.has(skill) and not Skills.has(u, skill):
+				u.learned.append(skill)
+	u.learned.assign(u.learned.slice(-Skills.LEARNED_CAP))
 	u.set_cell(p_cell)
 	return u
 
@@ -195,6 +216,15 @@ func race_data() -> Dictionary:
 
 func has_ability(ability: String) -> bool:
 	return abilities.has(ability)
+
+
+## Skills its class's and its own learn tables teach at `lv`.
+func skills_learned_at(lv: int) -> Array[String]:
+	var result: Array[String] = []
+	for table: Dictionary in [Classes.get_data(unit_class).get("learn", {}), learn_table]:
+		if table.has(lv) and not result.has(table[lv]):
+			result.append(table[lv])
+	return result
 
 
 ## Cap for a stat (keys as in Experience.STATS), from the unit's class.
@@ -244,31 +274,42 @@ func can_wield(item: Dictionary) -> bool:
 	return Items.is_weapon(item) and weapon_types.has(item.type)
 
 
-## STR and DEF as used in combat, including an Inspire bonus.
+## Stats as used in combat: skill bonuses (Skills "stats"), plus an Inspire bonus
+## for STR and DEF.
 func combat_str() -> int:
-	return strength + inspire_bonus
+	return strength + Skills.stat_bonus(self, "str") + inspire_bonus
 
 
 func combat_def() -> int:
-	return defense + inspire_bonus
+	return defense + Skills.stat_bonus(self, "def") + inspire_bonus
 
 
-## DEX and AGI as used in combat: halved while carrying someone (FE5's rescue penalty).
+func combat_int() -> int:
+	return intelligence + Skills.stat_bonus(self, "int")
+
+
+func combat_lck() -> int:
+	return luck + Skills.stat_bonus(self, "lck")
+
+
+## DEX and AGI are halved while carrying someone (FE5's rescue penalty).
 func combat_dex() -> int:
-	return floori(dexterity / 2.0) if carrying else dexterity
+	var dex := dexterity + Skills.stat_bonus(self, "dex")
+	return floori(dex / 2.0) if carrying else dex
 
 
 func combat_agi() -> int:
-	return floori(agility / 2.0) if carrying else agility
+	var agi := agility + Skills.stat_bonus(self, "agi")
+	return floori(agi / 2.0) if carrying else agi
 
 
 func is_caster() -> bool:
 	return not spells.is_empty()
 
 
-## MP recovered at the start of the unit's phase (some races recover more).
+## MP recovered at the start of the unit's phase (Mana Flow and the like add more).
 func mp_regen() -> int:
-	return Spells.MP_REGEN + race_data().get("mp_regen", 0)
+	return Spells.MP_REGEN + Skills.turn_mp(self)
 
 
 func regen_mp(amount: int) -> void:

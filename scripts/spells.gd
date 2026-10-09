@@ -36,7 +36,7 @@ static func is_support(spell_name: String) -> bool:
 
 ## HP restored by a healing spell: INT + power, capped by the target's missing HP.
 static func heal_amount(caster: Unit, spell: Dictionary, target: Unit) -> int:
-	return mini(caster.intelligence + spell.power, target.max_hp - target.hp)
+	return mini(caster.combat_int() + spell.power, target.max_hp - target.hp)
 
 
 static func can_afford(caster: Unit, spell_name: String) -> bool:

@@ -46,7 +46,7 @@ func trade_partners(u: Unit) -> Array[Unit]:
 ## Adjacent allies who have already acted this phase.
 func dance_targets(u: Unit) -> Array[Unit]:
 	var result: Array[Unit] = []
-	if not u.has_ability("dance"):
+	if not Skills.commands(u).has("dance"):
 		return result
 	for ally in battle.units_of(u.team):
 		if ally != u and ally.has_acted and BattleMap.distance(u.cell, ally.cell) == 1:
@@ -58,7 +58,7 @@ func dance_targets(u: Unit) -> Array[Unit]:
 ## the user's level) until the start of its side's next phase. Ends the user's turn.
 func inspire_targets(u: Unit) -> Array[Unit]:
 	var result: Array[Unit] = []
-	if not u.has_ability("inspire"):
+	if not Skills.commands(u).has("inspire"):
 		return result
 	for ally in battle.units_of(u.team):
 		if ally != u and BattleMap.distance(u.cell, ally.cell) == 1:
@@ -527,7 +527,7 @@ func _remove_dead_and_award(involved: Array[Unit], awards: Array) -> void:
 
 
 func gain_exp(u: Unit, amount: int) -> void:
-	amount = roundi(amount * u.race_data().get("exp_mult", 1.0))
+	amount = roundi(amount * Skills.exp_multiplier(u))
 	u.popup("+%d EXP" % amount, Color.AQUAMARINE)
 	await get_tree().create_timer(0.5).timeout
 	u.exp_points += amount
@@ -539,5 +539,32 @@ func gain_exp(u: Unit, amount: int) -> void:
 			before[key] = u.get(Experience.STATS[key])
 		Experience.apply_level_up(u, gains)
 		await battle.ui.show_level_up(u, before, gains)
+		for skill in u.skills_learned_at(u.level):
+			await learn_skill(u, skill)
 	if u.level >= Experience.LEVEL_CAP:
 		u.exp_points = 0
+
+
+## Teaches `u` a skill for good (Unit.learned). With Skills.LEARNED_CAP already
+## learned, a player unit picks one to forget, or not to learn the new one; an
+## enemy doesn't learn it. Returns whether it was learned.
+func learn_skill(u: Unit, skill: String) -> bool:
+	if Skills.has(u, skill):
+		return false
+	if u.learned.size() >= Skills.LEARNED_CAP:
+		if u.team != Unit.Team.PLAYER:
+			return false
+		var options: Array[String] = []
+		options.assign(u.learned)
+		options.append("Don't learn")
+		var index: int = await battle.input.choose(options, "%s: learn %s? Forget:" % [u.unit_name, skill])
+		if index >= u.learned.size():
+			return false
+		u.popup("Forgot " + u.learned[index], Color.LIGHT_GRAY)
+		u.learned.remove_at(index)
+		await get_tree().create_timer(0.4).timeout
+	u.learned.append(skill)
+	if not Skills.is_hidden(skill):
+		u.popup("Learned " + skill, Color.GOLD)
+		await get_tree().create_timer(0.6).timeout
+	return true

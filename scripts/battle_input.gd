@@ -8,6 +8,9 @@ extends Node
 ## Targeting modes that pick a cell (target_cells) rather than a unit (targets).
 const CELL_MODES: Array[String] = ["drop", "unload", "break", "door"]
 
+## Emitted with the picked index when a `choose` prompt is answered.
+signal choice_made(index: int)
+
 var battle: Battle
 
 var selected: Unit
@@ -118,6 +121,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				open_status(list.selected_unit())
 			elif cancel:
 				close_unit_list()
+		Battle.State.CHOICE:
+			if dir.y != 0:
+				battle.ui.menu_move(dir.y)
+			elif accept or cancel:
+				battle.ui.hide_menu()
+				choice_made.emit(battle.ui.menu_index if accept else battle.ui.menu_options.size() - 1)
 		Battle.State.OPTIONS:
 			if dir.y != 0:
 				battle.ui.options_screen.move(dir.y)
@@ -445,7 +454,7 @@ func open_objective() -> void:
 # --- Menus --------------------------------------------------------------------
 
 func weapon_label(w: Dictionary) -> String:
-	return "%s  %d" % [w.name, w.uses]
+	return Items.label(w)
 
 
 func open_unit_menu() -> void:
@@ -649,11 +658,36 @@ func menu_accept() -> void:
 			if selected.can_wield(item):
 				selected.equip(battle.ui.menu_index)
 				open_items_menu()
+			elif item.get("kind", "") == "scroll" and Items.can_use(selected, item):
+				_read_scroll(battle.ui.menu_index)
 			elif Items.can_use(selected, item):
 				_act(_use_item.bind(battle.ui.menu_index))
 			else:
 				selected.popup("Can't use", Color.LIGHT_GRAY)
 				open_items_menu()
+
+
+## A scroll is used up (and ends the turn) only if the skill was learned.
+func _read_scroll(index: int) -> void:
+	battle.state = Battle.State.BUSY
+	var scroll := selected.items[index]
+	if await battle.actions.learn_skill(selected, scroll.skill):
+		selected.items.erase(scroll)
+		await get_tree().create_timer(0.3).timeout
+		finish_action()
+	else:
+		open_items_menu()
+
+
+## Asks the player to pick one of `options` mid-action (e.g. which skill to forget)
+## and returns its index. Cancel picks the last option, so make that the safe one.
+func choose(options: Array[String], title: String) -> int:
+	var previous := battle.state
+	battle.state = Battle.State.CHOICE
+	battle.ui.show_menu(options, battle.cursor.cell, title)
+	var index: int = await choice_made
+	battle.state = previous
+	return index
 
 
 ## Runs an action that ends the selected unit's turn.

@@ -44,7 +44,7 @@ func clear_inspire(team: Unit.Team) -> void:
 func heal_on_tiles(team: Unit.Team) -> void:
 	var healed := false
 	for u in battle.units_of(team):
-		var rate: float = battle.map.terrain_heal(u.cell) + u.race_data().get("hp_regen", 0.0)
+		var rate: float = battle.map.terrain_heal(u.cell) + Skills.turn_heal(u)
 		if rate > 0.0 and u.hp < u.max_hp:
 			var amount := mini(ceili(u.max_hp * rate), u.max_hp - u.hp)
 			u.heal(amount)

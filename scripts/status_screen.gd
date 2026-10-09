@@ -14,6 +14,8 @@ const BAR_BG := Color(0.05, 0.07, 0.22)
 const BAR_FILL := Color(0.55, 0.75, 1.0)
 const HP_FILL := Color("5ee05e")
 const MP_FILL := Color("5aa0ff")
+## Stats raised by skills.
+const BOOSTED := Color(1.0, 0.85, 0.4)
 const PAGES: Array[String] = ["Stats", "Items", "Skills", "Bio"]
 const STAT_ROWS := [["str", "STR"], ["int", "INT"], ["dex", "DEX"], ["agi", "AGI"],
 	["lck", "LCK"], ["def", "DEF"]]
@@ -172,7 +174,7 @@ func _render() -> void:
 		"Items":
 			_render_items()
 		"Skills":
-			_label(_page, "No skills yet.", Vector2(0, 2), DIM)
+			_render_skills()
 		"Bio":
 			_render_bio()
 	for i in _tabs.size():
@@ -227,18 +229,24 @@ func _render_stats() -> void:
 	for i in STAT_ROWS.size():
 		var key: String = STAT_ROWS[i][0]
 		var row_y := i * 13.0
-		var value: int = unit.get(Experience.STATS[key])
+		var bonus := Skills.stat_bonus(unit, key)
+		var value: int = unit.get(Experience.STATS[key]) + bonus
 		var capped := unit.is_capped(key)
 		_label(_page, STAT_ROWS[i][1], Vector2(0, row_y), DIM)
-		var value_label := _label(_page, str(value), Vector2(30, row_y), CAPPED if capped else Color.WHITE)
-		_entry(value_label, Glossary.stat(key, unit))
+		var color := CAPPED if capped else (BOOSTED if bonus > 0 else Color.WHITE)
+		var value_label := _label(_page, str(value), Vector2(30, row_y), color)
+		var text := Glossary.stat(key, unit)
+		if bonus != 0:
+			text += " Skills: %+d." % bonus
+		_entry(value_label, text)
 		var fill := _bar(_page, Vector2(50, row_y + 5), 90, float(value) / unit.stat_cap(key), CAPPED if capped else BAR_FILL)
 		if capped:
 			_glow.append(value_label)
 			_glow.append(fill)
 	var y := STAT_ROWS.size() * 13.0
 	_label(_page, "MOV", Vector2(0, y), DIM)
-	_entry(_label(_page, "%d  %s" % [unit.mov, unit.move_type.capitalize()], Vector2(30, y)),
+	var mov_color := BOOSTED if Skills.stat_bonus(unit, "mov") > 0 else Color.WHITE
+	_entry(_label(_page, "%d  %s" % [unit.mov, unit.move_type.capitalize()], Vector2(30, y), mov_color),
 		Glossary.STATS.mov + " " + Glossary.MOVE_TYPES.get(unit.move_type, ""))
 	if unit.carrying:
 		_label(_page, "Carrying %s (DEX/AGI halved)" % unit.carrying.unit_name, Vector2(0, y + 14), DIM)
@@ -254,7 +262,7 @@ func _render_items() -> void:
 		if i == equipped:
 			_label(_page, "E", Vector2(0, y), Color(1.0, 0.85, 0.25))
 		_entry(_label(_page, it.name, Vector2(10, y)), Glossary.item(it))
-		_label(_page, str(it.uses), Vector2(120, y))
+		_label(_page, str(it.get("uses", "")), Vector2(120, y))
 
 	# Combat numbers for the equipped weapon (before terrain and the weapon triangle).
 	var armed := not unit.weapon.is_empty()
@@ -283,6 +291,19 @@ func _render_items() -> void:
 			var y := 93.0 + i * 10.0
 			_entry(_label(_page, s, Vector2(10, y)), Glossary.spell(s))
 			_label(_page, "%dMP" % spell.mp, Vector2(120, y))
+
+
+## Every visible skill with where it comes from; learned skills count toward the cap.
+func _render_skills() -> void:
+	var shown := Skills.visible_sources(unit)
+	if shown.is_empty():
+		_label(_page, "No skills.", Vector2(0, 2), DIM)
+	for i in shown.size():
+		var skill: String = shown[i][0]
+		var y := i * 10.0
+		_entry(_label(_page, skill, Vector2(0, y)), "%s: %s" % [skill, Skills.get_data(skill).description])
+		_label(_page, shown[i][1], Vector2(90, y), DIM)
+	_label(_page, "Learned %d/%d" % [unit.learned.size(), Skills.LEARNED_CAP], Vector2(0, 118), DIM)
 
 
 func _render_bio() -> void:
