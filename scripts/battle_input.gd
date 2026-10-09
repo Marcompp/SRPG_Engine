@@ -63,6 +63,11 @@ var arrow: Array[Vector2i] = []
 ## Unit shown on the stats screen, and the state to return to when it closes.
 var status_unit: Unit
 var status_return_state := Battle.State.IDLE
+## Check Map (FORMATION): the deploy cells units can be swapped between, and the
+## unit picked up to move, or null.
+var formation := false
+var formation_cells: Array = []
+var held: Unit
 
 
 # --- Input --------------------------------------------------------------------
@@ -82,7 +87,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 	# Map-view shortcuts, available while browsing or choosing where to move.
-	if battle.state == Battle.State.IDLE or battle.state == Battle.State.SELECTED:
+	if battle.state in [Battle.State.IDLE, Battle.State.SELECTED, Battle.State.FORMATION]:
 		if danger:
 			battle.danger_on = not battle.danger_on
 			battle.refresh_threat()
@@ -111,6 +116,17 @@ func _unhandled_input(event: InputEvent) -> void:
 					if battle.phases.can_rewind():
 						options.insert(3, "Rewind")
 					_open_menu("map", options)
+		Battle.State.FORMATION:
+			if next:
+				jump_to_next_unit()
+			elif dir != Vector2i.ZERO:
+				move_cursor(dir)
+			elif accept:
+				formation_accept()
+			elif cancel and held:
+				drop_held()
+			elif cancel:
+				leave_formation()
 		Battle.State.SELECTED:
 			if dir != Vector2i.ZERO:
 				move_cursor(dir)
@@ -159,13 +175,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				battle.ui.options_screen.change(dir.x)
 			elif accept or cancel:
 				battle.ui.options_screen.close()
-				battle.state = Battle.State.IDLE
-				refresh_info()
+				browse()
 		Battle.State.OBJECTIVE:
 			if accept or cancel:
 				battle.ui.hide_objective()
-				battle.state = Battle.State.IDLE
-				refresh_info()
+				browse()
 		Battle.State.STATUS:
 			# Browsing: Up/Down = unit, Left/Right = page, D = detail mode, X = close.
 			# Detail mode: arrows move the highlight, D or X go back to browsing.
@@ -458,9 +472,15 @@ func _start_canto() -> bool:
 
 # --- Map info: unit ranges, marks, stats screen, unit list, objective ---------
 
+## Back to looking around the map: the player phase, or Check Map before the battle.
+func browse() -> void:
+	battle.state = Battle.State.FORMATION if formation else Battle.State.IDLE
+	refresh_info()
+
+
 ## While browsing, shows the move/attack ranges of whichever unit is under the cursor.
 func update_hover() -> void:
-	if battle.state != Battle.State.IDLE:
+	if battle.state != Battle.State.IDLE and battle.state != Battle.State.FORMATION:
 		return
 	hovered = battle.unit_at(battle.cursor.cell)
 	if not hovered:
@@ -511,8 +531,7 @@ func open_unit_list() -> void:
 
 func close_unit_list() -> void:
 	battle.ui.unit_list.close()
-	battle.state = Battle.State.IDLE
-	refresh_info()
+	browse()
 
 
 ## Map menu > Objective: win/lose conditions (levels can override the text with
@@ -729,6 +748,20 @@ func menu_accept() -> void:
 					var note := "You can resume from the start of this turn." if Settings.value("auto_save") \
 						else "Progress on this map is lost."
 					_open_menu("quit", options, "Quit to the level select?\n" + note)
+		"formation":
+			match battle.ui.menu_choice():
+				"Fight!":
+					end_formation()
+					battle.begin()
+				"Units":
+					open_unit_list()
+				"Objective":
+					open_objective()
+				"Options":
+					battle.state = Battle.State.OPTIONS
+					battle.ui.options_screen.open()
+				"Back to Prep":
+					leave_formation()
 		"unit":
 			match battle.ui.menu_choice():
 				"Seize":
@@ -844,9 +877,8 @@ func _use_item(index: int) -> void:
 
 func menu_cancel() -> void:
 	match menu_context:
-		"map", "end_turn", "restart", "quit", "rewind":
-			battle.state = Battle.State.IDLE
-			refresh_info()
+		"map", "end_turn", "restart", "quit", "rewind", "formation":
+			browse()
 		"unit":
 			if move_committed:
 				# Trading commits the move, as in GBA FE (and so does unloading a ship).
@@ -1084,3 +1116,82 @@ func trade_cancel() -> void:
 
 func _refresh_trade() -> void:
 	battle.ui.show_trade(selected, trade_partner, trade_cursor, trade_held)
+
+
+# --- Check Map (formation) ------------------------------------------------------
+
+## The prep screen's Check Map: look around the chapter's map before it starts and
+## swap units between the deploy cells. Fight! starts the battle from here.
+func start_formation(cells: Array) -> void:
+	formation = true
+	formation_cells = cells
+	var shown := {}
+	for c in cells:
+		shown[c] = true
+	battle.map.deploy_cells = shown
+	battle.state = Battle.State.BUSY
+	await battle.ui.show_banner("Check Map", Color("2850b0"))
+	browse()
+
+
+## Z: pick up a unit, put it down on a deploy cell (swapping with whoever is
+## there), mark an enemy, or open the menu on an empty tile.
+func formation_accept() -> void:
+	var cell := battle.cursor.cell
+	var u := battle.unit_at(cell)
+	if held:
+		if u == held:
+			drop_held()
+		elif can_place(held, cell) and (u == null or can_place(u, held.cell)):
+			swap_start_cells(held, cell)
+			drop_held()
+		return
+	if u and u.team == Unit.Team.PLAYER:
+		held = u
+		battle.map.held_cell = u.cell
+	elif u:
+		toggle_mark(u)
+	else:
+		battle.ui.hide_info()
+		var options: Array[String] = ["Fight!", "Units", "Objective", "Options", "Back to Prep"]
+		_open_menu("formation", options)
+
+
+func drop_held() -> void:
+	held = null
+	battle.map.held_cell = Vector2i(-1, -1)
+	refresh_info()
+
+
+## Whether `u` may start on `cell`: a deploy cell it can stand on.
+func can_place(u: Unit, cell: Vector2i) -> bool:
+	return formation_cells.has(cell) and battle.map.unit_cost(u, cell) >= 0
+
+
+## Moves `u` to `cell`; a unit already there takes u's old cell. Saved to
+## Campaign.placement so the battle (and a later Check Map) keeps the layout.
+func swap_start_cells(u: Unit, cell: Vector2i) -> void:
+	var other := battle.unit_at(cell)
+	if other:
+		other.set_cell(u.cell)
+	u.set_cell(cell)
+	for p in battle.units_of(Unit.Team.PLAYER):
+		Campaign.placement[p.unit_name] = p.cell
+	battle.refresh_threat()
+
+
+func end_formation() -> void:
+	held = null
+	formation = false
+	Campaign.checking_map = false
+	battle.map.deploy_cells = {}
+	battle.map.held_cell = Vector2i(-1, -1)
+	battle.map.clear_ranges()
+	battle.ui.hide_info()
+
+
+## X (nothing picked up) or Back to Prep: return to the prep screen; the
+## placement is kept.
+func leave_formation() -> void:
+	end_formation()
+	get_tree().change_scene_to_file(BattlePhases.PREP_SCENE)

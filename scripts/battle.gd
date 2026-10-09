@@ -5,7 +5,8 @@ class_name Battle
 ## (BattlePhases). Also answers questions about units on the map and enemy threat.
 
 ## What input is accepted right now: BUSY while anything animates, GAME_OVER at the end.
-enum State { IDLE, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, UNIT_LIST, OBJECTIVE, OPTIONS, CHOICE, DIALOGUE, BUSY, GAME_OVER }
+## FORMATION: the prep screen's Check Map, before the battle starts (see BattleInput).
+enum State { IDLE, FORMATION, SELECTED, MENU, TARGETING, AREA_TARGET, TRADE, STATUS, UNIT_LIST, OBJECTIVE, OPTIONS, CHOICE, DIALOGUE, BUSY, GAME_OVER }
 
 @onready var map: BattleMap = $Map
 @onready var units_root: Node2D = $Units
@@ -76,6 +77,14 @@ func _ready() -> void:
 	var players := units_of(Unit.Team.PLAYER)
 	cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	_start_camera()
+	if Campaign.active and Campaign.checking_map and level.has("deploy"):
+		input.start_formation(level.deploy)
+		return
+	await begin()
+
+
+## Starts the battle: map start events, then the first player phase.
+func begin() -> void:
 	await events.on_start()
 	phases.start_player_phase()
 
@@ -101,21 +110,30 @@ func _add_part(part: Node, part_name: String) -> Node:
 	return part
 
 
-## Campaign chapter: the units picked in the prep screen, on the chapter's deploy
-## cells in order (the Lord first).
+## Campaign chapter: the units picked in the prep screen on the chapter's deploy
+## cells. Units placed with Check Map (Campaign.placement) keep their cell; the rest
+## take the free cells in order (so by default the Lord gets the first).
 func deploy_army(level: Dictionary) -> void:
 	var cells: Array = level.deploy
 	var names: Array = Campaign.deployed if not Campaign.deployed.is_empty() else Campaign.default_deployment()
-	var i := 0
+	var cell_of := {}
+	for unit_name in names:
+		var placed: Variant = Campaign.placement.get(unit_name)
+		if placed != null and cells.has(placed) and not cell_of.values().has(placed):
+			cell_of[unit_name] = placed
+	var free := cells.filter(func(c): return not cell_of.values().has(c))
 	for unit_name in names:
 		var data := Campaign.army_unit(unit_name)
-		if data.is_empty() or i >= cells.size():
+		if data.is_empty():
 			continue
+		if not cell_of.has(unit_name):
+			if free.is_empty():
+				continue
+			cell_of[unit_name] = free.pop_front()
 		var u := SaveGame.unit_from_dict(data)
 		u.team = Unit.Team.PLAYER
-		u.set_cell(cells[i])
+		u.set_cell(cell_of[unit_name])
 		units_root.add_child(u)
-		i += 1
 
 
 # --- Queries ------------------------------------------------------------------

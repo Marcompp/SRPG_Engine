@@ -105,6 +105,8 @@ const DANGER_EDGE_COLOR := Color(0.85, 0.3, 1.0, 0.9)
 const MARKED_COLOR := Color(0.9, 0.1, 0.1, 0.3)
 const MARKED_EDGE_COLOR := Color(1.0, 0.35, 0.35, 0.95)
 const ARROW_COLOR := Color(1.0, 0.85, 0.25, 0.95)
+const DEPLOY_COLOR := Color(0.4, 0.85, 1.0, 0.25)
+const DEPLOY_EDGE_COLOR := Color(0.55, 0.9, 1.0, 0.95)
 
 var cols := 0
 var rows := 0
@@ -125,6 +127,16 @@ var danger_cells: Dictionary = {}:
 var marked_cells: Dictionary = {}:
 	set(value):
 		marked_cells = value
+		queue_redraw()
+## Check Map (formation): the chapter's deploy cells, and the cell of the unit
+## picked up to move (outlined), or (-1, -1).
+var deploy_cells: Dictionary = {}:
+	set(value):
+		deploy_cells = value
+		queue_redraw()
+var held_cell := Vector2i(-1, -1):
+	set(value):
+		held_cell = value
 		queue_redraw()
 ## Planned movement path for the selected unit, start cell first.
 var arrow_path: Array[Vector2i] = []:
@@ -432,6 +444,7 @@ func _draw() -> void:
 	_draw_objects()
 	_draw_zone(danger_cells, DANGER_COLOR, DANGER_EDGE_COLOR)
 	_draw_zone(marked_cells, MARKED_COLOR, MARKED_EDGE_COLOR)
+	_draw_zone(deploy_cells, DEPLOY_COLOR, DEPLOY_EDGE_COLOR)
 	for c in move_cells:
 		draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), MOVE_COLOR)
 	for c in attack_cells:
@@ -440,6 +453,8 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), SUPPORT_COLOR)
 	for c in area_cells:
 		draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), AREA_COLOR)
+	if held_cell.x >= 0:
+		draw_rect(Rect2(Vector2(held_cell * TILE) + Vector2(1, 1), Vector2(TILE - 2, TILE - 2)), ARROW_COLOR, false, 2.0)
 	_draw_arrow()
 
 

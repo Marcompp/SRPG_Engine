@@ -117,6 +117,7 @@ func _run_all() -> void:
 		"test_campaign_army_carries_over",
 		"test_promotion",
 		"test_prep_screen",
+		"test_check_map_formation",
 		"test_campaign_suspend_resume",
 		"test_chapters_enemy_phases_run",
 		"test_marked_enemy_freed",
@@ -165,7 +166,7 @@ func _run_all() -> void:
 		# Every test starts on the default test map, outside the campaign.
 		Levels.selected = "river_crossing"
 		Campaign.active = false
-		Campaign.deployed = []
+		Campaign.clear_deployment()
 		await _fresh_battle()
 		var before := failures.size()
 		await call(t)
@@ -188,13 +189,15 @@ func _run_all() -> void:
 
 # --- Helpers -------------------------------------------------------------------
 
-func _fresh_battle() -> void:
+## Builds the battle scene and waits until it takes input (`ready_state`: IDLE in the
+## player phase, FORMATION for Check Map).
+func _fresh_battle(ready_state := Battle.State.IDLE) -> void:
 	b = load(MAIN_SCENE).instantiate()
 	# Nobody presses Z in tests: level-ups time out instead (see test_level_up_waits_for_confirm).
 	b.get_node("UI").level_up_waits = false
 	DialogueBox.auto_advance = true  # event dialogue continues on its own
 	root.add_child(b)
-	while b.state != b.State.IDLE:
+	while b.state != ready_state:
 		await process_frame
 
 
@@ -2303,6 +2306,71 @@ func test_prep_screen() -> void:
 	prep._move_item()
 	check(Campaign.convoy.is_empty() and Campaign.army_unit("Lord").items.size() == 2, "and taken back")
 	prep.queue_free()
+
+
+func test_check_map_formation() -> void:
+	Campaign.start_new()
+	Campaign.active = true
+	Campaign.deployed = Campaign.default_deployment()
+	Campaign.checking_map = true
+	Levels.selected = Chapters.ORDER[0]
+	b.queue_free()
+	await process_frame
+	await _fresh_battle(Battle.State.FORMATION)
+	var cells: Array = Campaign.chapter_data().deploy
+	check_eq(b.turn, 0, "Check Map doesn't start the battle")
+	check_eq(b.map.deploy_cells.size(), cells.size(), "deploy cells shown")
+	var lord: Unit = b.unit_at(cells[0])
+	var second: Unit = b.unit_at(cells[1])
+	check(lord != null and lord.is_lord, "the Lord starts on the first deploy cell")
+	check(b.unit_at(cells[5]) == null, "5 units, 6 cells: the last is free")
+	# Z on the Lord, Z on the second unit: they swap.
+	b.cursor.cell = cells[0]
+	b.input.formation_accept()
+	check(b.input.held == lord, "Lord picked up")
+	b.cursor.cell = cells[1]
+	b.input.formation_accept()
+	check(lord.cell == cells[1] and second.cell == cells[0], "swapped")
+	check(b.input.held == null, "put down")
+	# Onto an empty deploy cell, and not off the deploy cells.
+	b.cursor.cell = cells[1]
+	b.input.formation_accept()
+	b.cursor.cell = cells[5]
+	b.input.formation_accept()
+	check_eq(lord.cell, cells[5], "moved to a free deploy cell")
+	b.cursor.cell = cells[5]
+	b.input.formation_accept()
+	b.cursor.cell = Vector2i(10, 2)
+	b.input.formation_accept()
+	check_eq(lord.cell, cells[5], "not off the deploy cells")
+	check(b.input.held == lord, "still held")
+	b.input.drop_held()
+	check_eq(Campaign.placement.get(lord.unit_name), cells[5], "placement saved")
+	# Fight!: the battle starts with that layout.
+	b.input.end_formation()
+	b.begin()
+	while b.state != Battle.State.IDLE:
+		await process_frame
+	check_eq(b.turn, 1, "battle started")
+	check(not Campaign.checking_map and b.map.deploy_cells.is_empty(), "Check Map over")
+	check_eq(lord.cell, cells[5], "layout kept")
+	# A restart (or a retry) deploys the same layout; stale cells are ignored.
+	var lord_name: String = lord.unit_name
+	var second_name: String = second.unit_name
+	Campaign.placement[second_name] = Vector2i(10, 2)
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	check_eq(b.unit_at(cells[5]).unit_name, lord_name, "placement used")
+	check_eq(b.unit_at(cells[0]).unit_name, second_name, "a unit placed off the deploy cells takes a free one")
+	# The prep screen keeps picks made before Check Map.
+	Campaign.deployed = ["Lord", "Archer"]
+	var prep: Control = load("res://scenes/prep.tscn").instantiate()
+	root.add_child(prep)
+	await process_frame
+	check_eq(prep.picked, ["Lord", "Archer"], "picks kept")
+	prep.queue_free()
+	Campaign.clear_deployment()
 
 
 func test_campaign_suspend_resume() -> void:

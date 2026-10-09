@@ -6,13 +6,15 @@ extends Control
 ##               for now; it will cost gold once there is gold).
 ##   Promote:    units at Classes.PROMOTION_LEVEL+ change into a promoted class.
 ##   Status:     the status screen for any army unit.
+##   Check Map:  the chapter's map, to look around and swap the deployed units'
+##               starting cells (see BattleInput.start_formation); Fight! from there too.
 ##   Fight!:     start the chapter.
 ## Up/Down: choose. Z: confirm. X: back. Changes are saved to the campaign at once.
 
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 const DIM := Color(0.7, 0.75, 0.95)
-const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Promote", "Status", "Fight!", "Level Select"]
+const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Promote", "Status", "Check Map", "Fight!", "Level Select"]
 
 ## "menu", "pick", "items_unit", "items", "repair", "promote_unit", "promote_class", "status_unit", "status"
 var mode := "menu"
@@ -53,7 +55,7 @@ func _ready() -> void:
 	if not Campaign.load_save():
 		Campaign.start_new()
 	Campaign.active = true
-	picked = Campaign.default_deployment()
+	picked = _kept_picks()
 	_render()
 
 
@@ -118,8 +120,10 @@ func _accept() -> void:
 					_enter("promote_unit")
 				"Status":
 					_enter("status_unit")
+				"Check Map":
+					_go_to_map(true)
 				"Fight!":
-					_fight()
+					_go_to_map(false)
 				"Level Select":
 					Campaign.active = false
 					get_tree().change_scene_to_file(LEVEL_SELECT_SCENE)
@@ -214,7 +218,20 @@ func _repair() -> void:
 	index = clampi(index, 0, maxi(0, _row_count() - 1))
 
 
-func _fight() -> void:
+## The picks made before Check Map (or a lost try at this chapter), if they still
+## fit the army; otherwise the default deployment.
+func _kept_picks() -> Array:
+	var slots: int = Campaign.chapter_data().deploy.size()
+	var kept := Campaign.deployed.filter(func(n): return not Campaign.army_unit(n).is_empty())
+	var has_lord := Campaign.army.all(func(d): return not d.is_lord or kept.has(d.unit_name))
+	if kept.is_empty() or kept.size() > slots or not has_lord:
+		Campaign.placement = {}
+		return Campaign.default_deployment()
+	return kept
+
+
+## Starts the chapter, or with `check_map`, shows its map first (Check Map).
+func _go_to_map(check_map: bool) -> void:
 	# Keep the army's order (Lord first, as default_deployment does).
 	var order := Campaign.default_deployment()
 	var names := []
@@ -225,6 +242,7 @@ func _fight() -> void:
 		if picked.has(unit_name) and not names.has(unit_name):
 			names.append(unit_name)
 	Campaign.deployed = names if not names.is_empty() else order
+	Campaign.checking_map = check_map
 	Campaign.active = true
 	Levels.selected = Campaign.chapter_id()
 	Levels.resume = false

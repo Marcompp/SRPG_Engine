@@ -24,6 +24,11 @@ static var fallen: Array = []
 static var recruited: Array = []
 ## Names of the units chosen in the prep screen for the next battle.
 static var deployed: Array = []
+## Starting cells the player arranged with Check Map: {unit name: cell}. Units
+## without one take the chapter's free deploy cells in order (see Battle.deploy_army).
+static var placement: Dictionary = {}
+## True while the prep screen's Check Map shows the chapter's map (Battle formation).
+static var checking_map := false
 
 
 static func has_save() -> bool:
@@ -36,7 +41,7 @@ static func start_new() -> void:
 	convoy = []
 	fallen = []
 	recruited = []
-	deployed = []
+	clear_deployment()
 	add_recruits()
 	save()
 
@@ -60,8 +65,15 @@ static func load_save() -> bool:
 	convoy = data.convoy
 	fallen = data.fallen
 	recruited = data.recruited
-	deployed = []
 	return true
+
+
+## Forgets the picks and placement of the chapter being prepared. Not done by
+## load_save, so they survive the trip to Check Map and a retried chapter.
+static func clear_deployment() -> void:
+	deployed = []
+	placement = {}
+	checking_map = false
 
 
 static func delete_save() -> void:
@@ -140,6 +152,7 @@ static func finish_chapter(battle: Battle) -> void:
 			# Recruited during the chapter (see BattleEvents.recruit).
 			army.append(SaveGame.unit_to_dict(u))
 	chapter += 1
+	clear_deployment()
 	if not is_complete():
 		add_recruits()
 	save()
