@@ -507,13 +507,14 @@ func take_damage(amount: int) -> void:
 
 ## Spends one use of the equipped weapon. Returns true if it broke
 ## (it is removed, and the next item becomes equipped).
+## Spends one use of the equipped weapon. Returns true when that broke it (it stays,
+## weakened: see Weapons.is_broken); a broken weapon doesn't lose more uses.
 func use_weapon() -> bool:
-	var i := equipped_index()
-	items[i].uses -= 1
-	if items[i].uses <= 0:
-		items.remove_at(i)
-		return true
-	return false
+	var w := items[equipped_index()]
+	if Weapons.is_broken(w):
+		return false
+	w.uses -= 1
+	return w.uses <= 0
 
 
 ## Floating combat text above the unit.

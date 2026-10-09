@@ -56,11 +56,11 @@ static func attack_speed(u: Unit) -> int:
 # what the stats screen shows; the matchup functions below build on them.
 
 static func base_attack(u: Unit) -> int:
-	return u.combat_str() + u.weapon.mt
+	return u.combat_str() + Weapons.mt(u.weapon)
 
 
 static func base_hit(u: Unit) -> int:
-	return u.weapon.hit + u.combat_dex() * 2 + int(u.combat_lck() * 0.5)
+	return Weapons.hit(u.weapon) + u.combat_dex() * 2 + int(u.combat_lck() * 0.5)
 
 
 static func base_avoid(u: Unit) -> int:
@@ -68,7 +68,7 @@ static func base_avoid(u: Unit) -> int:
 
 
 static func base_crit(u: Unit) -> int:
-	return u.weapon.crit + int(u.combat_dex() * 0.5)
+	return Weapons.crit(u.weapon) + int(u.combat_dex() * 0.5)
 
 
 ## Skill "battle" modifiers for `u` fighting `foe` in a fight `initiator` started.
@@ -93,7 +93,7 @@ static func damage(attacker: Unit, defender: Unit, map: BattleMap, initiator: Un
 		return 0
 	var init := initiator if initiator else attacker
 	var atk: int = base_attack(attacker) + triangle(attacker, defender) * TRIANGLE_DMG
-	atk += attacker.weapon.mt * (multiplier(attacker.weapon, defender) - 1)
+	atk += Weapons.mt(attacker.weapon) * (multiplier(attacker.weapon, defender) - 1)
 	atk += mods(attacker, defender, map, init).atk
 	var def: int = defender.combat_def() + map.unit_terrain_def(defender) + mods(defender, attacker, map, init).def
 	def -= floori(maxi(def, 0) * pierce)

@@ -42,7 +42,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 - **Carried over:** levels, EXP, items and promotions. Survivors are healed between chapters.
 - **Permadeath:** fallen units leave the army for good. They're kept in `Campaign.fallen` (with chapter and turn) for future mechanics, and "Fell in …" is added to their biography.
 - **Defeat** retries the chapter with the army as it was before it.
-- **Prep screen** before each chapter: Pick Units (the Lord always deploys), Items (unit ↔ convoy), Promote (Lv 15+, class-dependent stat bonus, level kept), Status, Fight!
+- **Prep screen** before each chapter: Pick Units (the Lord always deploys), Items (unit ↔ convoy), Repair (any worn or broken weapon in the army or convoy, free for now), Promote (Lv 15+, class-dependent stat bonus, level kept), Status, Fight!
 - **Biography** logs joining, promotion, seizing and falling, plus moments from play: a unit's first kill, defeating a boss (noting a critical finishing blow), barely surviving a hit (10% HP or less, once per battle) and being saved by Miracle.
 - **Generic enemies** (roster `"generic": true`, all non-boss campaign enemies) get a random name by race and gender (`scripts/names.gd`; races without their own lists use the default ones) and show their class's initial on the map.
 - **Objectives** (`scripts/objectives.gd`) work on any level: `"objective": {"type": "rout" | "boss" | "seize" | "survive" | "defend" | "escape", ...}`, plus `"objects"` (villages, chests) and `"reinforcements"` (enemies arriving on a given turn).
@@ -77,10 +77,10 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - Grid movement with terrain costs, player and enemy phases, Victory (rout) and Defeat (lord dies)
 - Classes (see below): each decides a unit's weapon types, movement type and abilities
 - Races (see below): per-unit, independent of class; can change movement, add effectiveness tags, weaknesses and resistances, and give regen or EXP perks
-- FE-style combat: hit/crit with "two RN" true hit, weapon triangle (sword > axe > spear > sword), doubling, weapon weight and durability
+- FE-style combat: hit/crit with "two RN" true hit, weapon triangle (sword > axe > spear > sword), doubling, weapon weight and durability. A weapon that runs out of uses breaks but stays (as in Three Houses): still usable at half Mt, -30 Hit and no Crit until repaired, and labeled "broken" in menus
 - Ranged weapons (bows, javelins, hatchets, knives); bows win the triangle at range. Staves are melee weapons outside the triangle
 - Effectiveness levels, checked against a unit's tags (its class's move type plus its race's tags). **Effective** (×3 might, tagged "x3" in the forecast): bows vs fliers, Pike vs horses, Hammer vs heavy armor, Woodcutter vs ships, silver weapons vs spirits. **Weak** (×2 might or spell power, "x2"): whole weapon types and spell elements vs some races (see Races). **Resistant** (half damage, "1/2"): spirits vs non-silver weapons, and some races vs elements. Levels don't stack: the strongest one counts
-- 5-slot inventories with equip, weapon choice on attack, and consumables (Potion: 3 uses, heals 15; Ether: 3 uses, restores 15 MP). Units can carry weapons their class can't wield (marked `(x)`), but not equip them
+- 5-slot inventories with equip, weapon choice on attack, and consumables (Potion: 3 uses, heals 15; Ether: 3 uses, restores 15 MP; Repair Kit: 2 uses, restores a chosen weapon to full uses). Units can carry weapons their class can't wield (marked `(x)`), but not equip them
 - Trade with adjacent allies any number of times before acting (trading commits the move)
 - Shove (FE9-style): any unit that isn't mounted or a ship can push an adjacent ally (also not mounted or a ship) one tile away, onto walkable empty ground; ends the shover's turn. Centaurs can shove; Centaurs, Ents and Stoneborn can't be shoved
 - Rescue/Drop (Thracia 776-style): mounted classes (horse units, Flier, Whitewing) and Centaurs can carry an adjacent ally off the map (not a mounted unit, ship, Centaur, Ent or Stoneborn) (carrier's DEX/AGI halved) and set it down on an adjacent tile later. Each action ends the carrier's turn, but a dropped ally that hasn't acted can still move, so mounted units can ferry others. A fallen carrier's passenger is set down where it fell.

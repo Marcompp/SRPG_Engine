@@ -2,6 +2,8 @@ extends Control
 ## Battle preparations for the next campaign chapter (see Campaign):
 ##   Pick Units: who deploys (the Lord always does; up to the chapter's slots).
 ##   Items:      move items between a unit and the convoy (also how units swap items).
+##   Repair:     restore any worn weapon in the army or convoy to full uses (free
+##               for now; it will cost gold once there is gold).
 ##   Promote:    units at Classes.PROMOTION_LEVEL+ change into a promoted class.
 ##   Status:     the status screen for any army unit.
 ##   Fight!:     start the chapter.
@@ -10,9 +12,9 @@ extends Control
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 const DIM := Color(0.7, 0.75, 0.95)
-const MENU: Array[String] = ["Pick Units", "Items", "Promote", "Status", "Fight!", "Level Select"]
+const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Promote", "Status", "Fight!", "Level Select"]
 
-## "menu", "pick", "items_unit", "items", "promote_unit", "promote_class", "status_unit", "status"
+## "menu", "pick", "items_unit", "items", "repair", "promote_unit", "promote_class", "status_unit", "status"
 var mode := "menu"
 var index := 0
 ## Items mode: 0 = the unit's inventory, 1 = the convoy.
@@ -110,6 +112,8 @@ func _accept() -> void:
 					_enter("pick")
 				"Items":
 					_enter("items_unit")
+				"Repair":
+					_enter("repair")
 				"Promote":
 					_enter("promote_unit")
 				"Status":
@@ -127,6 +131,8 @@ func _accept() -> void:
 			_enter("items")
 		"items":
 			_move_item()
+		"repair":
+			_repair()
 		"promote_unit":
 			var eligible := _promotable()
 			if not eligible.is_empty():
@@ -184,6 +190,30 @@ func _move_item() -> void:
 	index = clampi(index, 0, maxi(0, _row_count() - 1))
 
 
+## Worn weapons in the army and convoy: [[owner name or "Convoy", item]].
+func _repairables() -> Array:
+	var result := []
+	for d in Campaign.army:
+		for it in d.items:
+			if Items.is_weapon(it) and it.uses < Weapons.max_uses(it):
+				result.append([d.unit_name, it])
+	for it in Campaign.convoy:
+		if Items.is_weapon(it) and it.uses < Weapons.max_uses(it):
+			result.append(["Convoy", it])
+	return result
+
+
+func _repair() -> void:
+	var list := _repairables()
+	if index >= list.size():
+		return
+	var it: Dictionary = list[index][1]
+	it.uses = Weapons.max_uses(it)
+	Campaign.save()
+	message = "%s's %s repaired." % [list[index][0], it.name]
+	index = clampi(index, 0, maxi(0, _row_count() - 1))
+
+
 func _fight() -> void:
 	# Keep the army's order (Lord first, as default_deployment does).
 	var order := Campaign.default_deployment()
@@ -228,6 +258,8 @@ func _row_count() -> int:
 			return Campaign.army.size()
 		"items":
 			return Campaign.army_unit(current_unit).items.size() if column == 0 else Campaign.convoy.size()
+		"repair":
+			return _repairables().size()
 		"promote_unit":
 			return _promotable().size()
 		"promote_class":
@@ -281,6 +313,16 @@ func _render() -> void:
 				side.append(_row(i, Items.label(Campaign.convoy[i], " "), column == 1))
 			if Campaign.convoy.is_empty():
 				side.append("   (empty)")
+		"repair":
+			var list := _repairables()
+			if list.is_empty():
+				lines.append("Every weapon is in good repair.")
+			for i in list.size():
+				var it: Dictionary = list[i][1]
+				lines.append(_row(i, "%s: %s  %s/%d" % [list[i][0], it.name,
+					"broken" if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it)]))
+			side.append("Repairs are free")
+			side.append("for now.")
 		"promote_unit":
 			var eligible := _promotable()
 			if eligible.is_empty():
@@ -301,6 +343,7 @@ func _render() -> void:
 		"menu": "Up/Down: choose  Z: select",
 		"pick": "Z: deploy / bench  X: back",
 		"items": "Z: move item  Left/Right: unit/convoy  X: back",
+		"repair": "Z: repair  X: back",
 		"status": "Left/Right: page  Up/Down: unit  X: back",
 	}
 	_hint.text = message if message != "" else hints.get(mode, "Z: select  X: back")

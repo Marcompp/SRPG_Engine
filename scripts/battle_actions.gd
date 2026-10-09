@@ -145,6 +145,29 @@ func loot(enemy: Unit, object: Dictionary) -> void:
 	await get_tree().create_timer(0.6).timeout
 
 
+# --- Repair -----------------------------------------------------------------------
+
+## Weapons `u` carries that have used up some of their uses (indices in u.items).
+func repairable_weapons(u: Unit) -> Array[int]:
+	var result: Array[int] = []
+	for i in u.items.size():
+		var it := u.items[i]
+		if Items.is_weapon(it) and it.uses < Weapons.max_uses(it):
+			result.append(i)
+	return result
+
+
+## Uses the repair item at `kit` to restore the weapon at `weapon` to full uses.
+func repair_weapon(u: Unit, kit: int, weapon: int) -> void:
+	var w := u.items[weapon]
+	w.uses = Weapons.max_uses(w)
+	u.popup("Repaired " + w.name, Color.PALE_GREEN)
+	u.items[kit].uses -= 1
+	if u.items[kit].uses <= 0:
+		u.items.remove_at(kit)
+	await get_tree().create_timer(0.5).timeout
+
+
 # --- Steal ------------------------------------------------------------------------
 
 ## Items `target` carries that can be stolen: anything but weapons (as in GBA FE).
@@ -439,9 +462,7 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 # --- Combat -------------------------------------------------------------------
 
 func do_combat(attacker: Unit, defender: Unit) -> void:
-	# A unit whose weapon breaks makes no further strikes this combat (as in GBA FE),
-	# even though its next item is equipped right away.
-	var broke: Array[Unit] = []
+	# A weapon that breaks stays equipped, weakened, for the rest of the fight.
 	var dealt: Array[Unit] = []
 	defender.notify_attacked()
 	for pair in Combat.strike_order(attacker, defender, battle.map):
@@ -449,13 +470,12 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 		var d: Unit = pair[1]
 		if a.hp <= 0 or d.hp <= 0:
 			break
-		if a.weapon.is_empty() or broke.has(a):
+		if a.weapon.is_empty():
 			continue
 		var result := Combat.strike(a, d, battle.map, attacker)
 		await a.lunge(d.cell)
 		_apply_strike(a, d, result, dealt)
 		if result.hit and a.use_weapon():
-			broke.append(a)
 			a.popup("Broke!", Color.LIGHT_GRAY)
 		await get_tree().create_timer(0.45).timeout
 	await _finish_exchange(attacker, defender, dealt)

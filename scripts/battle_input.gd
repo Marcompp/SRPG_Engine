@@ -39,6 +39,9 @@ var trade_held := Vector2i(-1, -1)
 var area_centers: Array[Vector2i] = []
 ## Cells to pick from while target_mode is one of CELL_MODES.
 var target_cells: Array[Vector2i] = []
+## Repair Kit: its inventory index, and the weapon indices behind the Repair menu's entries.
+var repair_kit := -1
+var repair_choices: Array[int] = []
 ## Steal: the foe picked, and the item indices behind the Steal menu's entries.
 var steal_target: Unit
 var steal_choices: Array[int] = []
@@ -625,6 +628,17 @@ func open_rewind_menu() -> void:
 	_open_menu("rewind", options, "Rewind to the start of (%s):" % uses)
 
 
+## Which weapon the Repair Kit at `kit` should restore.
+func open_repair_menu(kit: int) -> void:
+	repair_kit = kit
+	repair_choices = battle.actions.repairable_weapons(selected)
+	var options: Array[String] = []
+	for i in repair_choices:
+		var w := selected.items[i]
+		options.append("%s  %d/%d" % [w.name, w.uses, Weapons.max_uses(w)])
+	_open_menu("repair", options, "Repair which weapon?")
+
+
 ## Which item to take from `foe`.
 func open_steal_menu(foe: Unit) -> void:
 	steal_target = foe
@@ -754,6 +768,8 @@ func menu_accept() -> void:
 			start_unload_targeting(passenger_choices[battle.ui.menu_index])
 		"steal":
 			_act(battle.actions.do_steal.bind(selected, steal_target, steal_choices[battle.ui.menu_index]))
+		"repair":
+			_act(battle.actions.repair_weapon.bind(selected, repair_kit, repair_choices[battle.ui.menu_index]))
 		"rewind":
 			# Newest turn first.
 			battle.phases.rewind_to(battle.turn_history.size() - 1 - battle.ui.menu_index)
@@ -764,6 +780,8 @@ func menu_accept() -> void:
 				open_items_menu()
 			elif item.get("kind", "") == "scroll" and Items.can_use(selected, item):
 				_read_scroll(battle.ui.menu_index)
+			elif item.get("kind", "") == "repair" and Items.can_use(selected, item):
+				open_repair_menu(battle.ui.menu_index)
 			elif Items.can_use(selected, item):
 				_act(_use_item.bind(battle.ui.menu_index))
 			else:
@@ -823,6 +841,8 @@ func menu_cancel() -> void:
 			open_unit_menu()
 		"steal":
 			start_unit_targeting("steal", battle.actions.steal_targets(selected))
+		"repair":
+			open_items_menu()
 
 
 # --- Targeting ----------------------------------------------------------------

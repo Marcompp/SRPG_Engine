@@ -99,12 +99,17 @@ static func item(it: Dictionary) -> String:
 			text += " Equipped: %s (%s)" % [skill, Skills.get_data(skill).description]
 		if it.get("kills", 0) > 0:
 			text += " Kills: %d." % it.kills
+		if Weapons.is_broken(it):
+			text += " BROKEN: half Mt, -%d Hit, no Crit until repaired." % Weapons.BROKEN_HIT_PENALTY
 		return text
 	match it.get("kind", ""):
 		"heal":
 			return "%s: restores %d HP to the user and ends its turn. Uses %d." % [it.name, it.heal, it.uses]
 		"mp":
 			return "%s: restores %d MP to the user and ends its turn. Uses %d." % [it.name, it.mp, it.uses]
+		"repair":
+			return "%s: restores one of the user's weapons to full uses, broken ones too. Ends the user's turn. Uses %d." % [
+				it.name, it.uses]
 		"scroll":
 			return "%s: teaches %s (%s) for good. Ends the user's turn." % [it.name, it.skill,
 				Skills.get_data(it.skill).description]

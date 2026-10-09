@@ -5,6 +5,7 @@ extends RefCounted
 
 ## kind "heal": restores `heal` HP to the user. kind "mp": restores `mp` MP.
 ## kind "scroll": teaches `skill` for good (see Skills; a full unit picks one to forget).
+## kind "repair": restores one of the user's weapons to full uses (broken ones too).
 ## Using an item ends the unit's turn.
 ## Any item (or weapon) can list "skills": held items grant them while in the
 ## inventory, weapons only while equipped. Items without "uses" never run out.
@@ -13,6 +14,7 @@ const CONSUMABLES := {
 	"Ether": {"kind": "mp", "mp": 15, "uses": 3},
 	# Opens a chest (one use per chest). Rogue-movement units open chests without one.
 	"Chest Key": {"kind": "key", "uses": 1},
+	"Repair Kit": {"kind": "repair", "uses": 2},
 	"Celerity Scroll": {"kind": "scroll", "skill": "Celerity", "uses": 1},
 	"Vigor Scroll": {"kind": "scroll", "skill": "Strength +2", "uses": 1},
 	# Held items with skills.
@@ -43,9 +45,14 @@ static func can_use(user: Unit, item: Dictionary) -> bool:
 			return user.mp < user.max_mp
 		"scroll":
 			return not Skills.has(user, item.skill)
+		"repair":
+			return user.items.any(func(it): return Items.is_weapon(it) and it.uses < Weapons.max_uses(it))
 	return false
 
 
-## "Name  uses" for menus, or just the name for items that never run out.
+## "Name  uses" for menus ("broken" for broken weapons), or just the name for items
+## that never run out.
 static func label(item: Dictionary, sep := "  ") -> String:
+	if is_weapon(item) and Weapons.is_broken(item):
+		return item.name + sep + "broken"
 	return "%s%s%d" % [item.name, sep, item.uses] if item.has("uses") else item.name

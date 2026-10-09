@@ -150,6 +150,8 @@ func _run_all() -> void:
 		"test_auto_save",
 		"test_turn_rewind",
 		"test_dragon_and_fire_breath",
+		"test_broken_weapons_and_repair",
+		"test_prep_screen_repair",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -288,16 +290,18 @@ func test_bow_and_thrown_ranges() -> void:
 
 
 func test_weapon_break_ends_strikes() -> void:
+	# (Name kept for history: weapons no longer vanish; see test_broken_weapons_and_repair.)
 	var lord := unit_named("Lord")
 	var brig := unit_named("Brigand", Unit.Team.ENEMY)
 	clear_board([lord, brig])
 	lord.set_cell(Vector2i(5, 2))
 	brig.set_cell(Vector2i(6, 2))
 	lord.items[0].uses = 1
+	lord.dexterity = 100
 	await b.actions.do_combat(lord, brig)
-	check_eq(lord.weapon.get("name", ""), "Knife", "next weapon equipped after break")
-	check_eq(lord.weapon.get("uses", 0), 30, "no follow-up strike with the new weapon")
-	check(lord.items.all(func(i): return i.name != "Iron Sword"), "broken weapon removed")
+	check_eq(lord.weapon.get("name", ""), "Iron Sword", "a broken weapon stays equipped")
+	check(Weapons.is_broken(lord.weapon), "and is broken")
+	check_eq(lord.weapon.uses, 0, "at 0 uses, never below")
 
 
 func test_exp_formula_and_level_up() -> void:
@@ -3265,3 +3269,63 @@ func test_dragon_and_fire_breath() -> void:
 	brig.dexterity = 100
 	await EnemyAI.take_turn(brig, b)
 	check(lord.hp < hp_before, "the enemy Dragon breathed on the Lord")
+
+
+func test_broken_weapons_and_repair() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	_spawn_enemy(Vector2i(14, 9))
+	b.units_root.add_child(Unit.create("Idle", Unit.Team.PLAYER, Vector2i(0, 0), {"class": "Axeman", "items": [],
+		"hp": 20, "str": 5, "dex": 5, "agi": 5, "lck": 5, "def": 5, "mov": 5}))
+	var sword := lord.items[0]
+	var atk := Combat.base_attack(lord)
+	var hit := Combat.base_hit(lord)
+	sword.uses = 1
+	check(lord.use_weapon(), "the last use breaks it")
+	check(Weapons.is_broken(sword) and lord.items.has(sword), "it stays in the inventory")
+	check(not lord.use_weapon(), "a broken weapon doesn't break again")
+	check_eq(Combat.base_attack(lord), atk - sword.mt + floori(sword.mt / 2.0), "half Mt")
+	check_eq(Combat.base_hit(lord), hit - Weapons.BROKEN_HIT_PENALTY, "-30 Hit")
+	check_eq(Combat.base_crit(lord), int(lord.combat_dex() * 0.5), "no Crit")
+	check_eq(Items.label(sword), "Iron Sword  broken", "menus say it's broken")
+	check(Glossary.item(sword).contains("BROKEN"), "and so does its description")
+	check(Combat.damage(lord, brig, b.map) >= 0 and lord.can_attack_at(1), "it can still attack")
+	# Repair Kit: pick the weapon from the Items menu.
+	lord.items.append(Items.make("Repair Kit"))
+	await open_menu_in_place(lord)
+	await pick("Items")
+	await pick("Repair Kit  2")
+	check_eq(b.input.menu_context, "repair", "choose what to repair")
+	await press(KEY_X)
+	check_eq(b.input.menu_context, "items", "X: back to the items")
+	await pick("Repair Kit  2")
+	await pick("Iron Sword  0/46")
+	check_eq(sword.uses, Weapons.max_uses(sword), "repaired to full uses")
+	check(not Weapons.is_broken(sword), "and no longer broken")
+	check_eq(lord.items.filter(func(it): return it.name == "Repair Kit")[0].uses, 1, "the kit has a use left")
+	check(lord.has_acted, "repairing ends the turn")
+	check(not Items.can_use(lord, lord.items[-1]), "nothing left to repair")
+
+
+func test_prep_screen_repair() -> void:
+	await start_chapter(0)
+	var lord_data := Campaign.army_unit("Lord")
+	lord_data.items[0].uses = 0
+	Campaign.convoy.append(Weapons.make("Iron Axe"))
+	Campaign.convoy[-1].uses = 5
+	Campaign.save()  # the prep screen loads the campaign from its save
+	var prep: Control = load("res://scenes/prep.tscn").instantiate()
+	root.add_child(prep)
+	await process_frame
+	lord_data = Campaign.army_unit("Lord")
+	check(prep.MENU.has("Repair"), "prep has Repair")
+	prep._enter("repair")
+	check_eq(prep._row_count(), 2, "a broken weapon and a worn one in the convoy")
+	prep._repair()
+	check_eq(lord_data.items[0].uses, Weapons.max_uses(lord_data.items[0]), "the Lord's weapon repaired")
+	prep.index = 0
+	prep._repair()
+	check_eq(Campaign.convoy[-1].uses, Weapons.max_uses(Campaign.convoy[-1]), "and the convoy's")
+	check_eq(prep._row_count(), 0, "nothing left to repair")
+	prep.queue_free()
