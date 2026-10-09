@@ -28,6 +28,8 @@ var campaign_deaths: Array = []
 ## "victory" or "defeat" once the battle has ended.
 var battle_result := ""
 
+## Scrolls the view over maps bigger than the screen (see BattleCamera).
+var camera: BattleCamera
 ## The battle's parts, created in _ready (child nodes, so input gets events).
 var input: BattleInput
 var actions: BattleActions
@@ -43,9 +45,13 @@ func _ready() -> void:
 	input = _add_part(BattleInput.new(), "Input")
 	actions = _add_part(BattleActions.new(), "Actions")
 	phases = _add_part(BattlePhases.new(), "Phases")
+	camera = BattleCamera.new()
+	camera.name = "Camera"
+	add_child(camera)
 	if Levels.resume:
 		Levels.resume = false
 		phases.resume_suspended()
+		_start_camera()
 		return
 	danger_on = Settings.value("danger_zone_default")
 	var level := Levels.get_level(Levels.selected)
@@ -60,7 +66,22 @@ func _ready() -> void:
 		units_root.add_child(Unit.create(data.name, Unit.Team.ENEMY, data.cell, data))
 	var players := units_of(Unit.Team.PLAYER)
 	cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
+	_start_camera()
 	phases.start_player_phase()
+
+
+func _start_camera() -> void:
+	camera.setup(map.cols, map.rows)
+	camera.snap(cursor.cell)
+	ui.view_origin = camera.origin
+
+
+## The cell the camera keeps in view: a unit while it moves, otherwise the cursor.
+func camera_focus() -> Vector2i:
+	for u in units():
+		if u.moving:
+			return Vector2i((u.position / BattleMap.TILE).round())
+	return cursor.cell
 
 
 func _add_part(part: Node, part_name: String) -> Node:
@@ -198,6 +219,8 @@ func refresh_threat() -> void:
 ## Game speed comes from Options; holding cancel during the enemy phase multiplies
 ## it by the fast-forward speed (also from Options).
 func _process(_delta: float) -> void:
+	camera.follow(camera_focus())
+	ui.view_origin = camera.origin
 	var ff: float = Settings.value("fast_forward_speed") if enemy_phase and Input.is_action_pressed("cancel") else 1.0
 	var speed: float = Settings.value("game_speed") * ff
 	if Engine.time_scale != speed:

@@ -69,6 +69,8 @@ var carrying: Unit
 var passengers: Array[Unit] = []
 ## The unit (rescuer or ship) carrying this one, or null.
 var carried_by: Unit
+## True while walking a path (the camera follows it).
+var moving := false
 ## Left the map through an exit (escape objective): off the map but alive.
 var escaped := false
 ## STR/DEF bonus from an Inspire; cleared at the start of the unit's next phase.
@@ -113,7 +115,7 @@ var defense := 2
 var intelligence := 0
 ## Computed properties (getters over other fields) that suspend saves must skip:
 ## they're rebuilt from the fields they read. Add any new computed property here.
-const SAVE_SKIP: Array[String] = ["mov", "max_hp", "max_mp", "weapon", "min_range", "max_range"]
+const SAVE_SKIP: Array[String] = ["mov", "max_hp", "max_mp", "weapon", "min_range", "max_range", "moving"]
 ## MOV from the roster and level-ups; `mov` adds the race's bonus (see Races).
 var base_mov := 5
 var mov_bonus := 0
@@ -447,10 +449,12 @@ func move_along(path: Array[Vector2i]) -> void:
 	if path.size() <= 1:
 		position = Vector2(cell * BattleMap.TILE)
 		return
+	moving = true
 	var tw := create_tween()
 	for c in path.slice(1):
 		tw.tween_property(self, "position", Vector2(c * BattleMap.TILE), 0.07)
 	await tw.finished
+	moving = false
 
 
 func lunge(toward: Vector2i) -> void:

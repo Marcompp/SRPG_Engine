@@ -168,6 +168,8 @@ static func take_turn(enemy: Unit, battle: Battle) -> void:
 		return
 
 	battle.cursor.cell = enemy.cell
+	battle.camera.follow(enemy.cell)
+	await battle.camera.settle()
 	await battle.get_tree().create_timer(0.2).timeout
 
 	update_wake(enemy, battle)

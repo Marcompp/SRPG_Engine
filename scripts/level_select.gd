@@ -10,8 +10,12 @@ const DIM := Color(0.7, 0.75, 0.95)
 var index := 0
 ## [{"label", "description", "level", "resume"}], in display order.
 var choices: Array = []
+## Rows of the choice list shown at once.
+const LIST_ROWS := 5
+
 var _list: Label
 var _description: Label
+var _hint: Label
 var _options: OptionsScreen
 ## New Campaign was pressed once while a campaign exists (needs a second press).
 var _confirm_new := false
@@ -42,10 +46,9 @@ func _ready() -> void:
 	_description = Label.new()
 	_description.add_theme_color_override("font_color", DIM)
 	box.add_child(_description)
-	var hint := Label.new()
-	hint.text = "Up/Down: choose   Z: play"
-	hint.add_theme_color_override("font_color", DIM)
-	box.add_child(hint)
+	_hint = Label.new()
+	_hint.add_theme_color_override("font_color", DIM)
+	box.add_child(_hint)
 
 	_options = OptionsScreen.new()
 	add_child(_options)
@@ -133,8 +136,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _refresh() -> void:
 	_confirm_new = false  # moving away cancels a pending "press Z again"
+	# A window of LIST_ROWS entries that scrolls to keep the selection in view.
+	var first := clampi(index - LIST_ROWS / 2, 0, maxi(0, choices.size() - LIST_ROWS))
 	var lines: Array[String] = []
-	for i in choices.size():
+	for i in range(first, mini(first + LIST_ROWS, choices.size())):
 		lines.append(("> " if i == index else "   ") + choices[i].label)
 	_list.text = "\n".join(lines)
 	_description.text = choices[index].description
+	_hint.text = "Up/Down: choose   Z: play   (%d/%d)" % [index + 1, choices.size()]

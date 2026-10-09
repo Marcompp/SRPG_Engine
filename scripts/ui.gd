@@ -8,6 +8,8 @@ var menu_index := 0
 var _menu_title := ""
 ## Level-up windows wait for confirm; the test suite turns this off (2 s timeout instead).
 var level_up_waits := true
+## Top-left map cell on screen (from BattleCamera), for placing panels away from the cursor.
+var view_origin := Vector2i.ZERO
 signal level_up_confirmed
 var _fast_forward: Label
 
@@ -202,9 +204,15 @@ func _place(panel: Control, right: bool, bottom: bool) -> void:
 	panel.visible = true
 
 
-## Put panels on the side of the screen away from the cursor.
+## Put panels on the side of the screen away from the cursor (map cells are turned
+## into screen cells with view_origin, so this works on scrolled maps).
 func _away_right(cursor_cell: Vector2i) -> bool:
-	return cursor_cell.x < 8
+	return (cursor_cell - view_origin).x < 8
+
+
+## Whether the cursor is in the top `rows` rows of the screen.
+func _near_top(cursor_cell: Vector2i, rows: int) -> bool:
+	return (cursor_cell - view_origin).y < rows
 
 
 ## `tile_hp` is the remaining HP of a breakable tile (-1 otherwise); it's shown
@@ -250,7 +258,7 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i, tile_hp
 	else:
 		text += "%s  DEF%+d AVO%+d" % [terrain.name, terrain.def, terrain.avo]
 	_info_label.text = text
-	_place(_info, _away_right(cursor_cell), cursor_cell.y < 4)
+	_place(_info, _away_right(cursor_cell), _near_top(cursor_cell, 4))
 
 
 func hide_info() -> void:
@@ -350,7 +358,7 @@ func show_area_forecast(caster: Unit, spell_name: String, rows: Array, cursor_ce
 	if note:
 		lines.append(note)
 	_spell_label.text = "\n".join(lines)
-	_place(_spell_forecast, _away_right(cursor_cell), cursor_cell.y < 5)
+	_place(_spell_forecast, _away_right(cursor_cell), _near_top(cursor_cell, 5))
 
 
 func show_rescue_forecast(target: Unit, cursor_cell: Vector2i) -> void:

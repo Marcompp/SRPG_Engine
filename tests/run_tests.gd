@@ -143,6 +143,8 @@ func _run_all() -> void:
 		"test_range_skills",
 		"test_class_skill_effects",
 		"test_max_hp_weight_and_crit_skills",
+		"test_camera_on_small_and_big_maps",
+		"test_great_valley_phases_run_without_errors",
 		"test_ruined_fort_phases_run_without_errors",
 		"test_enemy_phases_run_without_errors",
 		"test_coastal_raid_phases_run_without_errors",
@@ -2733,6 +2735,7 @@ func test_proc_skills() -> void:
 	var brig: Unit = pair[1]
 	lord.dexterity = 100  # 100%+ activation and hit
 	brig.dexterity = 100
+	brig.max_hp = 99  # room for the HP the checks below give it
 	var plain := Combat.damage(lord, brig, b.map)
 	var def := brig.combat_def()
 	lord.personal_skills.assign(["Luna"])
@@ -3029,3 +3032,46 @@ func test_max_hp_weight_and_crit_skills() -> void:
 	# Class data: Bishops pray, Clerics learn Max MP +5.
 	check(Classes.get_data("Bishop").skills.has("Prayer"), "Bishop: Prayer")
 	check_eq(Classes.get_data("Cleric").learn[10], "Max MP +5", "Cleric Lv 10: Max MP +5")
+
+
+# --- Bigger maps (BattleCamera) -------------------------------------------------------
+
+func test_camera_on_small_and_big_maps() -> void:
+	# One-screen maps never scroll.
+	b.cursor.cell = Vector2i(14, 9)
+	await process_frame
+	check_eq(b.camera.origin, Vector2i.ZERO, "a 15x10 map doesn't scroll")
+	await start_level("great_valley")
+	check_eq(b.camera.view, Vector2i(15, 10), "the view is 15x10 tiles")
+	check_eq(b.camera.origin, Vector2i(0, 10), "starts on the Lord (bottom-left)")
+	check(b.camera.is_settled(), "without scrolling there")
+	# Moving the cursor right scrolls once it's within 2 tiles of the edge.
+	for i in 12:
+		await press(KEY_RIGHT)
+	check_eq(b.cursor.cell.x, 14, "cursor moved")
+	check_eq(b.camera.origin.x, 2, "the view scrolled to keep 2 tiles of margin")
+	check_eq(b.camera.screen_cell(b.cursor.cell).x, 12, "cursor 2 tiles from the right edge")
+	for i in 20:
+		await press(KEY_RIGHT)
+	check_eq(b.cursor.cell.x, 29, "cursor at the map's right edge")
+	check_eq(b.camera.origin.x, 15, "the view stops at the map edge")
+	# Panels go to the side of the screen away from the cursor, not the map.
+	b.cursor.cell = Vector2i(17, 15)
+	await process_frame
+	check(b.ui._away_right(b.cursor.cell), "cursor on the left of the screen: panels on the right")
+	await b.camera.settle()
+	check_eq(b.camera.position, Vector2(b.camera.origin * BattleMap.TILE), "scrolling finishes")
+	# A moving unit is followed instead of the cursor.
+	var lord := unit_named("Lord")
+	b.cursor.cell = lord.cell
+	await process_frame
+	lord.moving = true
+	lord.position = Vector2(Vector2i(10, 4) * BattleMap.TILE)
+	check_eq(b.camera_focus(), Vector2i(10, 4), "the camera follows a moving unit")
+	lord.moving = false
+	lord.set_cell(lord.cell)
+
+
+func test_great_valley_phases_run_without_errors() -> void:
+	await start_level("great_valley")
+	await test_enemy_phases_run_without_errors()

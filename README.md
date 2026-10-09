@@ -24,6 +24,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Frozen Pass | Snow, ice, hills, mountains, thickets, a waterfall; climbers, a swimmer and armor on ice |
 | Castle Keep | Indoors: floor, carpet, walls, pillars, pits and fences; slow mounted units and a wall-walking Wraith |
 | Ruined Fort | Breakable terrain: a cracked wall and fence, a locked door (the Scout opens it) and trunks to fell across the river. Skills: the Lord has Sol, the Warden boss Pavise and Vantage; a Power Ring and a Celerity Scroll |
+| Great Valley | A 30x20 map: the camera scrolls with the cursor (and follows moving units), stopping at the map edges |
 
 ## Campaign
 
@@ -86,6 +87,7 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - Board/Unload: a unit next to an allied ship with room can Board it (ends the boarder's turn; a Galley holds 2). The ship can Unload passengers onto adjacent cells they can stand on without ending its own turn, and passengers that haven't acted can then move. A sunk ship's passengers are set down on the nearest free cell they can stand on
 - Dance (Performer) refreshes an adjacent ally; Inspire (Bannerman) gives every adjacent ally +STR/DEF until the next player phase: +1, plus 1 more every 5 levels (+5 at Lv 20)
 - Enemy AI that heals, picks weapons and casts spells
+- Maps of any size: a camera (`scripts/battle_camera.gd`) shows a 15x10 window and scrolls, GBA-style, to keep the cursor (or a moving unit) 2 tiles from the screen edge; panels go on the side of the screen away from the cursor. Maps that fit on one screen don't scroll
 - Map readability: enemy danger zone, per-enemy range view, a movement arrow that follows the cursor's trail, full unit stats screen
 - Configurable enemy behaviors (see below) and Fort tiles (DEF +2, AVO +20, heal 20% max HP at the start of the occupant's phase)
 - Movement types (see below), shown as a small colored badge on each unit
