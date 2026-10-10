@@ -320,7 +320,7 @@ func unit_cost(u: Unit, cell: Vector2i) -> float:
 ## "parents": {cell: previous cell}}. Enemies block the way, unless it has Pass.
 func get_reachable(unit: Unit, units: Array[Unit], budget := -1.0) -> Dictionary:
 	if budget < 0:
-		budget = unit.mov
+		budget = 0.0 if Statuses.restricts(unit, "move") else unit.mov
 	var passes := Skills.map_rules(unit).has("pass")
 	var occupied := {}
 	for u in units:

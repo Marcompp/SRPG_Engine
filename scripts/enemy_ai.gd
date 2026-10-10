@@ -417,7 +417,7 @@ static func _retreat_cell(u: Unit, battle: Battle, reach: Dictionary) -> Vector2
 		for ally in battle.units_of(u.team):
 			if ally == u:
 				continue
-			var can_heal: bool = ally.spells.any(func(s: String) -> bool:
+			var can_heal: bool = ally.can_use_magic() and ally.spells.any(func(s: String) -> bool:
 				return Spells.is_support(s) and Spells.can_afford(ally, s))
 			if can_heal and (healer == null
 					or BattleMap.distance(u.cell, ally.cell) < BattleMap.distance(u.cell, healer.cell)):
@@ -486,7 +486,7 @@ static func _try_heal(caster: Unit, battle: Battle, reach: Dictionary) -> bool:
 	var best_target: Unit = null
 	var best_cell := caster.cell
 	var best_amount := MIN_USEFUL_HEAL - 1
-	for s in caster.spells:
+	for s in caster.spells if caster.can_use_magic() else []:
 		if not Spells.is_support(s) or not Spells.can_afford(caster, s):
 			continue
 		var spell := Spells.get_spell(s)

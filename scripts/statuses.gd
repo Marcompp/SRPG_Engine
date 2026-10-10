@@ -7,19 +7,36 @@ extends RefCounted
 ##
 ## description: shown on the status screen (also used as its skill description).
 ## color:       its marker on the map tile.
-## duration:    default turns (-1: until cured). Turns go down at the start of the
-##              afflicted unit's side's phase, after its tick.
+## duration:    default turns (-1: until cured): how many of the afflicted unit's own
+##              phases it lasts. Turns go down at the end of each of them.
 ## tick:        at the start of its side's phase: {"damage": [min, max]}. Tick damage
 ##              never kills, leaving 1 HP, unless the unit is already at 1 HP.
+## restrict:    what it can't do (see RESTRICTIONS): "move", "act" (no commands and no
+##              counterattacks: it starts its phase as having acted), "magic" (spells
+##              and racial attacks), "items".
+## cure_on_hit: ends when the unit takes damage (popup: `cured_text`, or "<name> ended").
+## no_avoid:    its Avoid is 0 (terrain and skills included).
 ## lingers:     kept when the chapter ends (others are cleared).
 ## effects:     skill keys (see Skills) that apply while it lasts.
 
 const DATA := {
 	"Poison": {"description": "Loses 4-6 HP at the start of each of its phases (never below 1, unless already at 1 HP).",
 		"color": Color("b050e0"), "duration": 3, "tick": {"damage": [4, 6]}},
+	"Silence": {"description": "Can't use spells or racial attacks.",
+		"color": Color("5aa0ff"), "duration": 3, "restrict": ["magic"]},
+	"Sleep": {"description": "Can't move, act or counterattack. Wakes up when it takes damage.",
+		"color": Color("7080b0"), "duration": 2, "restrict": ["move", "act"], "cure_on_hit": true,
+		"cured_text": "Woke up"},
+	"Paralyse": {"description": "Can't move, but can still act where it stands.",
+		"color": Color("e0c040"), "duration": 1, "restrict": ["move"]},
+	"Petrify": {"description": "Turned to stone: can't move, act or counterattack, and has no Avoid, but DEF +10. Lasts until cured, even between chapters.",
+		"color": Color("909090"), "duration": -1, "restrict": ["move", "act"], "no_avoid": true, "lingers": true,
+		"effects": {"stats": {"def": 10}}},
 }
 
-const KEYS: Array[String] = ["description", "color", "duration", "tick", "lingers", "effects"]
+const KEYS: Array[String] = ["description", "color", "duration", "tick", "restrict", "cure_on_hit", "cured_text",
+	"no_avoid", "lingers", "effects"]
+const RESTRICTIONS: Array[String] = ["move", "act", "magic", "items"]
 const TICK_KEYS: Array[String] = ["damage"]
 
 
@@ -33,6 +50,31 @@ static func skill_data(status: String) -> Dictionary:
 	var d: Dictionary = get_data(status).get("effects", {}).duplicate()
 	d.description = get_data(status).description
 	return d
+
+
+## Whether one of `u`'s statuses stops it doing `what` (see RESTRICTIONS).
+static func restricts(u: Unit, what: String) -> bool:
+	for s: String in u.statuses:
+		if get_data(s).get("restrict", []).has(what):
+			return true
+	return false
+
+
+## Whether one of `u`'s statuses has the flag `key` (e.g. "no_avoid").
+static func has_flag(u: Unit, key: String) -> bool:
+	for s: String in u.statuses:
+		if get_data(s).get(key, false):
+			return true
+	return false
+
+
+## `u` took damage: ends its cure_on_hit statuses (Sleep), with a popup each.
+static func on_damaged(u: Unit) -> void:
+	for s: String in u.statuses.keys():
+		if get_data(s).get("cure_on_hit", false):
+			u.statuses.erase(s)
+			u.popup(get_data(s).get("cured_text", s + " ended"), Color.LIGHT_GRAY, 10.0)
+	u.queue_redraw()
 
 
 ## "3 turns", "1 turn" or "Until cured".
@@ -113,6 +155,9 @@ static func validate() -> Array[String]:
 		for key: String in ["description", "color", "duration"]:
 			if not d.has(key):
 				problems.append("%s: no %s" % [s, key])
+		for r: String in d.get("restrict", []):
+			if not RESTRICTIONS.has(r):
+				problems.append("%s: unknown restriction %s" % [s, r])
 		for key: String in d.get("tick", {}):
 			if not TICK_KEYS.has(key):
 				problems.append("%s: unknown tick key %s" % [s, key])

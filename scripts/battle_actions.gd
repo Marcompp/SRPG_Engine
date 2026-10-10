@@ -29,6 +29,8 @@ func can_attack_any(u: Unit) -> bool:
 ## Spells the unit can afford and that have a valid target from its current cell.
 func castable_spells(u: Unit) -> Array[String]:
 	var result: Array[String] = []
+	if not u.can_use_magic():
+		return result
 	for s in u.spells:
 		if Spells.can_afford(u, s) and Spells.has_targets(u, s, battle.units(), battle.map):
 			result.append(s)

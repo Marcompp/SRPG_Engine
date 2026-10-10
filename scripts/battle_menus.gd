@@ -58,7 +58,7 @@ func open_unit_menu() -> void:
 	if not battle.actions.castable_spells(selected).is_empty():
 		options.append("Magic")
 	for ability in Skills.abilities(selected):
-		if Spells.has_targets(selected, ability, battle.units(), battle.map):
+		if selected.can_use_magic() and Spells.has_targets(selected, ability, battle.units(), battle.map):
 			options.append(ability)
 	if not battle.actions.dance_targets(selected).is_empty():
 		options.append("Dance")

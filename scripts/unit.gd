@@ -455,11 +455,18 @@ func heal(amount: int) -> void:
 ## besides weapons.
 func attack_spells() -> Array[String]:
 	var result: Array[String] = []
+	if not can_use_magic():
+		return result
 	result.assign(spells)
 	for a in Skills.abilities(self):
 		if not result.has(a):
 			result.append(a)
 	return result
+
+
+## False while a status (Silence) stops it casting spells and racial attacks.
+func can_use_magic() -> bool:
+	return not Statuses.restricts(self, "magic")
 
 
 ## Distinct (min, max) reach across the unit's support (true) or offensive (false) spells.
@@ -569,6 +576,8 @@ func notify_attacked() -> void:
 
 func take_damage(amount: int) -> void:
 	hp = maxi(0, hp - amount)
+	if amount > 0 and hp > 0:
+		Statuses.on_damaged(self)
 	queue_redraw()
 	modulate = Color(1, 0.3, 0.3)
 	create_tween().tween_property(self, "modulate", Color.WHITE, 0.25)

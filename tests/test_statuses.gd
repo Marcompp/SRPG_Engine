@@ -37,13 +37,17 @@ func test_poison_ticks() -> void:
 	await b.phases.tick_statuses(Unit.Team.PLAYER)
 	var lost := lord.max_hp - lord.hp
 	check(lost >= 4 and lost <= 6, "loses 4-6 HP (lost %d)" % lost)
-	check_eq(lord.statuses.Poison, 2, "a turn goes by")
+	check_eq(lord.statuses.Poison, 3, "turns go down at the end of the phase...")
+	await b.phases.count_down_statuses(Unit.Team.PLAYER)
+	check_eq(lord.statuses.Poison, 2, "...not the start")
 	lord.hp = 3
 	await b.phases.tick_statuses(Unit.Team.PLAYER)
 	check_eq(lord.hp, 1, "never below 1")
+	await b.phases.count_down_statuses(Unit.Team.PLAYER)
 	lord.hp = 10
 	await b.phases.tick_statuses(Unit.Team.PLAYER)
-	check(lord.statuses.is_empty(), "wears off after its turns")
+	await b.phases.count_down_statuses(Unit.Team.PLAYER)
+	check(lord.statuses.is_empty(), "wears off after its 3 phases")
 	# Already at 1 HP: it kills, with no EXP for anyone.
 	var fighter := unit_named("Fighter")
 	fighter.hp = 1
@@ -117,3 +121,82 @@ func test_statuses_saved_and_cleared() -> void:
 	copy.free()
 	Statuses.clear_for_next_map(lord)
 	check(lord.statuses.is_empty(), "cleared between chapters (Poison doesn't linger)")
+
+
+func test_paralyse_and_sleep() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	Statuses.inflict(lord, "Paralyse")
+	check_eq(b.map.get_reachable(lord, b.units()).cells.keys(), [lord.cell], "Paralyse: can't move")
+	await open_menu_in_place(lord)
+	check(b.ui.menu_options.has("Attack"), "but can still act")
+	await press(KEY_X)
+	await press(KEY_X)
+	Statuses.cure(lord)
+	# Sleep: starts its phase as having acted, can't be selected or counter.
+	Statuses.inflict(lord, "Sleep")
+	await b.phases.tick_statuses(Unit.Team.PLAYER)
+	check(lord.has_acted, "Sleep: it can't act this phase")
+	lord.has_acted = false
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	check(b.state != b.State.SELECTED, "and can't be selected")
+	b.input.browse()
+	check(not Combat.can_counter(brig, lord, b.map), "nor counter")
+	lord.take_damage(1)
+	check(lord.statuses.is_empty(), "taking damage wakes it")
+	# A sleeping enemy threatens nothing.
+	Statuses.inflict(brig, "Sleep")
+	check(b.enemy_threat(brig).is_empty(), "a sleeping enemy isn't in the danger zone")
+
+
+func test_paralyse_lasts_the_enemy_phase() -> void:
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([lord, brig])
+	await process_frame
+	lord.set_cell(Vector2i(3, 6))
+	brig.set_cell(Vector2i(6, 6))
+	var start := brig.cell
+	Statuses.inflict(brig, "Paralyse")
+	b.phases.end_player_phase()
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+	check_eq(brig.cell, start, "inflicted in the player phase, it holds through the enemy phase")
+	check(brig.statuses.is_empty(), "then wears off")
+
+
+func test_silence() -> void:
+	var mage := unit_named("Mage")
+	mage.mp = mage.max_mp
+	Statuses.inflict(mage, "Silence")
+	check(mage.attack_spells().is_empty(), "Silence: no spells")
+	check(b.actions.castable_spells(mage).is_empty(), "nothing to cast")
+	check(b.offense_ranges(mage).all(func(r): return mage.weapon_ranges().has(r)), "only weapon ranges count")
+	var cleric := unit_named("Cleric")
+	Statuses.inflict(cleric, "Silence")
+	var lord := unit_named("Lord")
+	lord.hp = 1
+	lord.set_cell(cleric.cell + Vector2i(1, 0))
+	check(not b.actions.castable_spells(cleric).has("Heal"), "no healing either")
+
+
+func test_petrify() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	var def_before := lord.combat_def()
+	Statuses.inflict(lord, "Petrify")
+	check_eq(lord.statuses.Petrify, -1, "until cured")
+	check_eq(lord.combat_def(), def_before + 10, "DEF +10")
+	check_eq(Combat.avoid(lord, brig, b.map, brig), 0, "no Avoid")
+	check_eq(Combat.base_avoid(lord), 0, "(on the status screen too)")
+	check(not Combat.can_counter(brig, lord, b.map), "no counter")
+	check_eq(b.map.get_reachable(lord, b.units()).cells.size(), 1, "no moving")
+	await b.phases.count_down_statuses(Unit.Team.PLAYER)
+	check(lord.statuses.has("Petrify"), "doesn't wear off")
+	Statuses.clear_for_next_map(lord)
+	check(lord.statuses.has("Petrify"), "and lingers between chapters")
+	lord.take_damage(1)
+	check(lord.statuses.has("Petrify"), "and hits don't break it")

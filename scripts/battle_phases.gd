@@ -70,9 +70,9 @@ func heal_on_tiles(team: Unit.Team) -> void:
 		await get_tree().create_timer(0.5).timeout
 
 
-## Statuses at the start of `team`'s phase (see Statuses): tick damage (Poison),
-## then every status counts down a turn. A unit killed by a tick falls with no EXP
-## for anyone.
+## Statuses at the start of `team`'s phase (see Statuses): tick damage (Poison), then
+## units that can't act (Sleep, Petrify) start the phase as having acted. A unit
+## killed by a tick falls with no EXP for anyone.
 func tick_statuses(team: Unit.Team) -> void:
 	var shown := false
 	var dead: Array[Unit] = []
@@ -87,19 +87,30 @@ func tick_statuses(team: Unit.Team) -> void:
 			if u.hp <= 0:
 				dead.append(u)
 				continue
-		for ended in Statuses.count_down(u):
-			u.popup("%s wore off" % ended, Color.LIGHT_GRAY, 10.0 if damage > 0 else 0.0)
-			shown = true
+		if Statuses.restricts(u, "act"):
+			u.has_acted = true
 	if shown:
 		await get_tree().create_timer(0.5).timeout
 	if not dead.is_empty():
 		await battle.actions.remove_dead(dead, "Succumbed to poison")
 
 
+## End of `team`'s phase: its units' statuses count down a turn (see Statuses).
+func count_down_statuses(team: Unit.Team) -> void:
+	var shown := false
+	for u in battle.units_of(team):
+		for ended in Statuses.count_down(u):
+			u.popup("%s wore off" % ended, Color.LIGHT_GRAY)
+			shown = true
+	if shown:
+		await get_tree().create_timer(0.5).timeout
+
+
 func end_player_phase() -> void:
 	battle.state = Battle.State.BUSY
-	battle.enemy_phase = true
 	battle.ui.hide_info()
+	await count_down_statuses(Unit.Team.PLAYER)
+	battle.enemy_phase = true
 	await battle.ui.show_banner("Enemy Phase", Color("b02828"))
 	clear_inspire(Unit.Team.ENEMY)
 	for e in battle.units_of(Unit.Team.ENEMY):
@@ -129,6 +140,7 @@ func end_player_phase() -> void:
 				return
 	if check_game_over(true):
 		return
+	await count_down_statuses(Unit.Team.ENEMY)
 	start_player_phase()
 
 

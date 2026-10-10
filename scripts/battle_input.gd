@@ -82,7 +82,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				move_cursor(dir)
 			elif accept:
 				var u := battle.unit_at(battle.cursor.cell)
-				if u and u.team == Unit.Team.PLAYER and not u.has_acted:
+				if u and u.team == Unit.Team.PLAYER and not u.has_acted and not Statuses.restricts(u, "act"):
 					select(u)
 				elif u and u.team != Unit.Team.PLAYER:
 					toggle_mark(u)
@@ -409,7 +409,7 @@ func _can_act_on_from(u: Unit, target: Unit, dist: int) -> bool:
 				return true
 	elif target.hp >= target.max_hp:
 		return false
-	for s in u.spells:
+	for s in u.spells if u.can_use_magic() else []:
 		var spell := Spells.get_spell(s)
 		var wanted := "enemy" if target.team != u.team else "ally"
 		if spell.target == wanted and Spells.can_afford(u, s) and Spells.reaches(s, dist, u):

@@ -64,6 +64,8 @@ static func base_hit(u: Unit) -> int:
 
 
 static func base_avoid(u: Unit) -> int:
+	if Statuses.has_flag(u, "no_avoid"):
+		return 0
 	return attack_speed(u) * 2 + u.combat_lck()
 
 
@@ -83,6 +85,8 @@ static func speed(u: Unit, foe: Unit, map: BattleMap, initiator: Unit) -> int:
 
 ## Avoid in a fight: speed, luck, terrain and skill modifiers.
 static func avoid(u: Unit, foe: Unit, map: BattleMap, initiator: Unit) -> int:
+	if Statuses.has_flag(u, "no_avoid"):
+		return 0
 	return speed(u, foe, map, initiator) * 2 + u.combat_lck() + map.unit_terrain_avoid(u) \
 		+ mods(u, foe, map, initiator).avo
 
@@ -179,7 +183,8 @@ static func doubles(a: Unit, b: Unit, map: BattleMap = null, initiator: Unit = n
 ## Whether `defender` strikes back: in its weapon's range (any range with
 ## "counter_any"), unless the attacker has "no_counter".
 static func can_counter(attacker: Unit, defender: Unit, map: BattleMap = null) -> bool:
-	if defender.weapon.is_empty() or Skills.rules(attacker, defender, map, true).has("no_counter"):
+	if defender.weapon.is_empty() or Skills.rules(attacker, defender, map, true).has("no_counter") \
+			or Statuses.restricts(defender, "act"):
 		return false
 	if Skills.rules(defender, attacker, map, false).has("counter_any"):
 		return true

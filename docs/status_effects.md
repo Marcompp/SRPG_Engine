@@ -1,7 +1,8 @@
 # Status effects (design notes)
 
-Design notes. Step 1 of the build order is built (`scripts/statuses.gd`): the core,
-Poison, Antitoxin, Panacea, Restore and the `@status` / `@cure` event commands.
+Design notes. Steps 1 and 2 of the build order are built (`scripts/statuses.gd`):
+the core, Poison, Silence, Sleep, Paralyse, Petrify, Antitoxin, Panacea, Restore and
+the `@status` / `@cure` event commands.
 A **status** is a temporary condition on a unit
 (Poison, Silence, Sleep...) that changes what it can do or how it fights, until it
 runs out or is cured.
@@ -17,8 +18,11 @@ runs out or is cured.
   SaveGame, so suspend, auto save and rewind keep them.
 - **Several at once.** Different statuses coexist; the same one again refreshes its
   duration rather than stacking.
-- **Ticks** at the start of the afflicted unit's side's phase: damage first, then
-  turns left go down; at 0 the status ends (popup "Poison wore off").
+- **Ticks** at the start of the afflicted unit's side's phase (damage; units that
+  can't act start the phase as having acted). **Turns go down at the end** of that
+  side's phase; at 0 the status ends (popup "Poison wore off"). So a duration is how
+  many of the unit's own phases it covers: a 1-turn Paralyse put on an enemy during
+  the player phase holds through the next enemy phase.
 - **Immunity:** the existing skill key `immune: [status]` (Poison Immunity on Orcs,
   Trolls, Lizals, Stoneborn, Skeletons, Ghosts) blocks it from being inflicted;
   the attempt pops up "Immune".

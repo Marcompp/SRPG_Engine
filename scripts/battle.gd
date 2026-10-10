@@ -217,7 +217,10 @@ func turn_text() -> String:
 
 ## Every cell an enemy could attack next phase: where it can move, plus what its
 ## weapons and affordable damage spells reach from there.
+## Cells `e` could attack this coming phase (none while asleep or petrified).
 func enemy_threat(e: Unit) -> Dictionary:
+	if Statuses.restricts(e, "act"):
+		return {}
 	return EnemyAI.threat_from(e, self, EnemyAI.movement_cells(e, self))
 
 

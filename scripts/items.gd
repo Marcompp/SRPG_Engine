@@ -41,6 +41,8 @@ static func is_weapon(item: Dictionary) -> bool:
 
 ## Whether `user` gets anything out of using this item right now.
 static func can_use(user: Unit, item: Dictionary) -> bool:
+	if Statuses.restricts(user, "items"):
+		return false
 	match item.get("kind", ""):
 		"heal":
 			return user.hp < user.max_hp
