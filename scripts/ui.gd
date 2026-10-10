@@ -344,9 +344,11 @@ func _fill_forecast_column(col: int, unit: Unit, stats: Dictionary, can_attack: 
 
 func show_heal_forecast(caster: Unit, target: Unit, spell_name: String, amount: int, cursor_cell: Vector2i) -> void:
 	var cost: int = Spells.get_spell(spell_name).mp
-	_spell_label.text = "%s  (%d MP)\n%s  MP %d -> %d\n%s  HP %d -> %d" % [
-		spell_name, cost, caster.unit_name, caster.mp, caster.mp - cost,
-		target.unit_name, target.hp, target.hp + amount]
+	var effect := "HP %d -> %d" % [target.hp, target.hp + amount]
+	if Spells.get_spell(spell_name).get("cures", false):
+		effect = "Cures " + ", ".join(target.statuses.keys())
+	_spell_label.text = "%s  (%d MP)\n%s  MP %d -> %d\n%s  %s" % [
+		spell_name, cost, caster.unit_name, caster.mp, caster.mp - cost, target.unit_name, effect]
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
@@ -412,6 +414,12 @@ static func unit_notes(unit: Unit) -> Array[String]:
 	for pair in Skills.visible_sources(unit):
 		if Skills.get_data(pair[0]).has("command") or Skills.get_data(pair[0]).has("abilities"):
 			lines.append("Skill: %s" % pair[0])
+	if not unit.statuses.is_empty():
+		var shown: Array[String] = []
+		for s: String in unit.statuses:
+			var turns: int = unit.statuses[s]
+			shown.append(s if turns < 0 else "%s (%d)" % [s, turns])
+		lines.append("Status: " + ", ".join(shown))
 	if unit.inspire_bonus > 0:
 		lines.append("Inspired: STR/DEF +%d" % unit.inspire_bonus)
 	if unit.carrying:

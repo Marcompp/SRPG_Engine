@@ -198,7 +198,7 @@ static func finish_chapter(battle: Battle) -> void:
 		var d := army_unit(death.name)
 		if d.is_empty():
 			continue
-		d.biography.append("Fell in %s, turn %d." % [name, death.turn])
+		d.biography.append("%s in %s, turn %d." % [death.get("how", "Fell"), name, death.turn])
 		fallen.append({"unit": d, "chapter": name, "turn": death.turn})
 		army.erase(d)
 	for unit_name in survivors:
@@ -278,5 +278,6 @@ static func _reset_for_next_map(u: Unit) -> void:
 	u.passengers.clear()
 	u.inspire_bonus = 0
 	u.escaped = false
+	Statuses.clear_for_next_map(u)
 	u.was_attacked = false
 	u.retreating = false

@@ -4,6 +4,7 @@ extends RefCounted
 ## Weapons are the entries with "mt"; everything else here is a consumable.
 
 ## kind "heal": restores `heal` HP to the user. kind "mp": restores `mp` MP.
+## kind "cure": cures the user's `cures` status (every status when it has none).
 ## kind "scroll": teaches `skill` for good (see Skills; a full unit picks one to forget).
 ## kind "repair": restores one of the user's weapons to full uses (broken ones too).
 ## Using an item ends the unit's turn.
@@ -12,6 +13,8 @@ extends RefCounted
 const CONSUMABLES := {
 	"Potion": {"kind": "heal", "heal": 15, "uses": 3},
 	"Ether": {"kind": "mp", "mp": 15, "uses": 3},
+	"Antitoxin": {"kind": "cure", "cures": "Poison", "uses": 3},
+	"Panacea": {"kind": "cure", "uses": 1},
 	# Opens a chest (one use per chest). Rogue-movement units open chests without one.
 	"Chest Key": {"kind": "key", "uses": 1},
 	"Repair Kit": {"kind": "repair", "uses": 2},
@@ -43,6 +46,8 @@ static func can_use(user: Unit, item: Dictionary) -> bool:
 			return user.hp < user.max_hp
 		"mp":
 			return user.mp < user.max_mp
+		"cure":
+			return user.statuses.has(item.cures) if item.has("cures") else not user.statuses.is_empty()
 		"scroll":
 			return not Skills.has(user, item.skill)
 		"repair":

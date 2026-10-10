@@ -21,7 +21,7 @@ extends RefCounted
 ## abilities:  racial attacks it can use (Spells entries with "ability"): each gets
 ##             its own unit menu entry.
 ## exp:        multiplier on EXP earned.
-## immune:     statuses it ignores ("poison": statuses aren't implemented yet).
+## immune:     statuses it can't be given (see Statuses): ["Poison"].
 ## battle:     combat modifiers while fighting: {"atk", "def", "res" (magic defense),
 ##             "hit", "avo", "crit", "crit_avo", "as"} (see BATTLE_KEYS). Shown in the
 ##             forecast.
@@ -107,7 +107,7 @@ const DATA := {
 	"Adaptable": {"description": "Earns 10% more EXP.", "exp": 1.1},
 	"Regeneration": {"description": "Recovers 10% of max HP at the start of each turn.", "turn_start": {"heal": 0.1}},
 	"Mana Flow": {"description": "Recovers 1 extra MP at the start of each turn.", "turn_start": {"mp": 1}},
-	"Poison Immunity": {"description": "Immune to poison.", "immune": ["poison"]},
+	"Poison Immunity": {"description": "Immune to poison.", "immune": ["Poison"]},
 	# Stat skills.
 	"Celerity": {"description": "+1 MOV.", "stats": {"mov": 1}},
 	"Strength +2": {"description": "+2 STR.", "stats": {"str": 2}},
@@ -195,7 +195,10 @@ const DATA := {
 }
 
 
+## A skill's data; an active status counts as a skill too (see Statuses.skill_data).
 static func get_data(skill: String) -> Dictionary:
+	if not DATA.has(skill) and Statuses.DATA.has(skill):
+		return Statuses.skill_data(skill)
 	assert(DATA.has(skill), "unknown skill: " + skill)
 	return DATA[skill]
 
@@ -206,7 +209,8 @@ static func is_hidden(skill: String) -> bool:
 
 ## Every skill `u` has, in a stable order, each once (its first source wins):
 ## [[skill, source]], where source is "Personal", "Class", "Race", "Learned" or the
-## name of the weapon or item that grants it.
+## name of the weapon or item that grants it. Active statuses come last (their
+## effects work like skills), with their turns left as the source ("2 turns").
 static func sources(u: Unit) -> Array:
 	var result := []
 	var seen := {}
@@ -236,6 +240,8 @@ static func sources(u: Unit) -> Array:
 	for item in u.items:
 		if not Items.is_weapon(item):
 			add.call(item.get("skills", []), item.name)
+	for status: String in u.statuses:
+		add.call([status], Statuses.duration_text(u.statuses[status]))
 	return result
 
 
@@ -250,9 +256,11 @@ static func has(u: Unit, skill: String) -> bool:
 	return of(u).has(skill)
 
 
-## The skills shown to the player, with their sources (hidden ones left out).
+## The skills shown to the player, with their sources (hidden ones and statuses left
+## out: statuses show on the status screen's Stats page).
 static func visible_sources(u: Unit) -> Array:
-	return sources(u).filter(func(pair: Array) -> bool: return not is_hidden(pair[0]))
+	return sources(u).filter(func(pair: Array) -> bool:
+		return not is_hidden(pair[0]) and not Statuses.DATA.has(pair[0]))
 
 
 ## Sum of `stats` bonuses for `key` ("str", "mov"...).
@@ -531,50 +539,59 @@ static func roll_proc(u: Unit, skill: String) -> bool:
 static func validate() -> Array[String]:
 	var problems: Array[String] = []
 	for skill: String in DATA:
-		var d: Dictionary = DATA[skill]
-		if not d.has("description"):
-			problems.append(skill + ": no description")
-		for key: String in d:
-			if not EFFECT_KEYS.has(key):
-				problems.append("%s: unknown key %s" % [skill, key])
-		for key: String in d.get("stats", {}):
-			if not Experience.STATS.has(key) and key != "mov":
-				problems.append("%s: unknown stat %s" % [skill, key])
-		for key: String in d.get("battle", {}):
+		problems.append_array(problems_in(skill, DATA[skill]))
+	return problems
+
+
+## Problems in one skill's data `d` (also used for statuses' effects).
+static func problems_in(skill: String, d: Dictionary) -> Array[String]:
+	var problems: Array[String] = []
+	if not d.has("description"):
+		problems.append(skill + ": no description")
+	for key: String in d:
+		if not EFFECT_KEYS.has(key):
+			problems.append("%s: unknown key %s" % [skill, key])
+	for key: String in d.get("stats", {}):
+		if not Experience.STATS.has(key) and key != "mov":
+			problems.append("%s: unknown stat %s" % [skill, key])
+	for key: String in d.get("battle", {}):
+		if not BATTLE_KEYS.has(key):
+			problems.append("%s: unknown battle key %s" % [skill, key])
+	for r: String in d.get("rules", []):
+		if not RULES.has(r):
+			problems.append("%s: unknown rule %s" % [skill, r])
+	for key: String in d.get("if", {}):
+		if not CONDITIONS.has(key):
+			problems.append("%s: unknown condition %s" % [skill, key])
+	for r: String in d.get("map", []):
+		if not MAP_RULES.has(r):
+			problems.append("%s: unknown map rule %s" % [skill, r])
+	if d.has("after_combat") and not AFTER_EFFECTS.has(d.after_combat.get("effect", "")):
+		problems.append("%s: unknown after_combat effect" % skill)
+	if d.has("aura"):
+		for key: String in d.aura.get("battle", {}):
 			if not BATTLE_KEYS.has(key):
-				problems.append("%s: unknown battle key %s" % [skill, key])
-		for r: String in d.get("rules", []):
-			if not RULES.has(r):
-				problems.append("%s: unknown rule %s" % [skill, r])
-		for key: String in d.get("if", {}):
-			if not CONDITIONS.has(key):
-				problems.append("%s: unknown condition %s" % [skill, key])
-		for r: String in d.get("map", []):
-			if not MAP_RULES.has(r):
-				problems.append("%s: unknown map rule %s" % [skill, r])
-		if d.has("after_combat") and not AFTER_EFFECTS.has(d.after_combat.get("effect", "")):
-			problems.append("%s: unknown after_combat effect" % skill)
-		if d.has("aura"):
-			for key: String in d.aura.get("battle", {}):
-				if not BATTLE_KEYS.has(key):
-					problems.append("%s: unknown aura battle key %s" % [skill, key])
-			if not d.aura.get("affects", "") in ["allies", "enemies"] or not d.aura.has("radius"):
-				problems.append("%s: aura needs radius and affects: allies/enemies" % skill)
-		for key: String in d.get("terrain_costs", {}):
-			if not BattleMap.TERRAIN.has(key):
-				problems.append("%s: unknown terrain %s" % [skill, key])
-		for key: String in d.get("range", {}):
-			if not ["sword", "spear", "axe", "bow", "staff", "spell"].has(key):
-				problems.append("%s: unknown range kind %s" % [skill, key])
-		for a: String in d.get("abilities", []):
-			if not Spells.DATA.has(a) or not Spells.DATA[a].get("ability", false):
-				problems.append("%s: %s isn't an ability in Spells" % [skill, a])
-		for key: String in d.get("growths", {}):
-			if not Experience.STATS.has(key) and key != "all":
-				problems.append("%s: unknown growth %s" % [skill, key])
-		if d.has("proc"):
-			if not PROC_EFFECTS.has(d.proc.get("effect", "")):
-				problems.append("%s: unknown proc effect" % skill)
-			if not d.proc.get("on", "") in ["attack", "defend"]:
-				problems.append("%s: proc needs on: attack/defend" % skill)
+				problems.append("%s: unknown aura battle key %s" % [skill, key])
+		if not d.aura.get("affects", "") in ["allies", "enemies"] or not d.aura.has("radius"):
+			problems.append("%s: aura needs radius and affects: allies/enemies" % skill)
+	for key: String in d.get("terrain_costs", {}):
+		if not BattleMap.TERRAIN.has(key):
+			problems.append("%s: unknown terrain %s" % [skill, key])
+	for key: String in d.get("range", {}):
+		if not ["sword", "spear", "axe", "bow", "staff", "spell"].has(key):
+			problems.append("%s: unknown range kind %s" % [skill, key])
+	for a: String in d.get("abilities", []):
+		if not Spells.DATA.has(a) or not Spells.DATA[a].get("ability", false):
+			problems.append("%s: %s isn't an ability in Spells" % [skill, a])
+	for key: String in d.get("growths", {}):
+		if not Experience.STATS.has(key) and key != "all":
+			problems.append("%s: unknown growth %s" % [skill, key])
+	for status: String in d.get("immune", []):
+		if not Statuses.DATA.has(status):
+			problems.append("%s: unknown status %s" % [skill, status])
+	if d.has("proc"):
+		if not PROC_EFFECTS.has(d.proc.get("effect", "")):
+			problems.append("%s: unknown proc effect" % skill)
+		if not d.proc.get("on", "") in ["attack", "defend"]:
+			problems.append("%s: proc needs on: attack/defend" % skill)
 	return problems

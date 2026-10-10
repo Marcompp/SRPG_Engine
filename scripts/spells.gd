@@ -7,7 +7,8 @@ extends RefCounted
 ## current MP is also magic defense: spent MP should stay spent for a while.
 const MP_REGEN := 1
 
-## target: "ally"  = heal another unit on the caster's team.
+## target: "ally"  = heal another unit on the caster's team (with "cures": cure its
+##                   statuses instead, healing nothing; see Statuses).
 ##         "enemy" = single-target damage; the target may counter.
 ##         "area"  = damage every enemy within `radius` of a chosen cell; no counters.
 ## element: "fire", "ice", "water", "earth", "lightning", "light" or "dark"; some
@@ -20,6 +21,7 @@ const MP_REGEN := 1
 ##           magic defense.
 const DATA := {
 	"Heal": {"mp": 4, "target": "ally", "min_rng": 1, "max_rng": 1, "power": 10, "exp": 11},
+	"Restore": {"mp": 6, "target": "ally", "min_rng": 1, "max_rng": 1, "power": 0, "exp": 11, "cures": true},
 	"Fire": {"mp": 3, "target": "enemy", "element": "fire", "min_rng": 1, "max_rng": 2, "power": 5, "hit": 90},
 	"Firestorm": {"mp": 8, "target": "area", "element": "fire", "min_rng": 1, "max_rng": 3, "radius": 1, "power": 3, "hit": 80},
 	"Earth Spike": {"mp": 5, "target": "area", "element": "earth", "min_rng": 1, "max_rng": 2, "radius": 0, "power": 6, "hit": 85,
@@ -43,6 +45,8 @@ static func is_support(spell_name: String) -> bool:
 
 ## HP restored by a healing spell: INT + power, capped by the target's missing HP.
 static func heal_amount(caster: Unit, spell: Dictionary, target: Unit) -> int:
+	if spell.get("cures", false):
+		return 0
 	return mini(caster.combat_int() + spell.power, target.max_hp - target.hp)
 
 
@@ -76,7 +80,8 @@ static func targets_for(caster: Unit, spell_name: String, units: Array[Unit]) ->
 			continue
 		match spell.target:
 			"ally":
-				if u.team != caster.team or u.hp >= u.max_hp:
+				var needs := not u.statuses.is_empty() if spell.get("cures", false) else u.hp < u.max_hp
+				if u.team != caster.team or not needs:
 					continue
 			"enemy":
 				if u.team == caster.team:

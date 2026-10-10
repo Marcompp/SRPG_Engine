@@ -199,6 +199,14 @@ func _run_command(c: Array) -> void:
 			var u := find_unit(c[1])
 			if u:
 				u.popup(battle.actions.give_item(u, c[2]), Color.GOLD)
+		"status":
+			var u := find_unit(c[1])
+			if u:
+				battle.actions.inflict(u, c[2], c[3])
+		"cure":
+			var u := find_unit(c[1])
+			if u and not Statuses.cure(u, c[2]).is_empty():
+				u.popup("Cured", Color.PALE_GREEN)
 		"camera":
 			battle.cursor.cell = c[1]
 			if skipping:

@@ -31,7 +31,7 @@ func test_skill_sources_and_stats() -> void:
 	check_eq(Skills.exp_multiplier(lord), 1.1, "Adaptable: +10% EXP")
 	lord.set_race("Troll")
 	check_eq(Skills.turn_heal(lord), 0.1, "Trolls regenerate")
-	check(Skills.is_immune(lord, "poison"), "and are immune to poison")
+	check(Skills.is_immune(lord, "Poison"), "and are immune to poison")
 
 
 func test_scroll_learning_and_cap() -> void:

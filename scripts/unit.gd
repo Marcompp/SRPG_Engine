@@ -91,6 +91,8 @@ var inspire_bonus := 0:
 	set(value):
 		inspire_bonus = value
 		queue_redraw()
+## Active status effects: {name: turns left} (-1: until cured). See Statuses.
+var statuses := {}
 ## Enemy behavior (see AIProfiles), resolved from the roster's "ai" entry.
 var ai: Dictionary = AIProfiles.resolve({})
 ## Galeforce-style skills: it may act again once this action is done, and it already
@@ -516,6 +518,9 @@ func use_item(index: int) -> void:
 			var amount := mini(item.mp, max_mp - mp)
 			regen_mp(amount)
 			popup("+%d MP" % amount, MP_COLOR)
+		"cure":
+			Statuses.cure(self, item.get("cures", ""))
+			popup("Cured", Color.PALE_GREEN)
 	item.uses -= 1
 	if item.uses <= 0:
 		items.remove_at(index)
@@ -619,6 +624,11 @@ func _draw() -> void:
 		draw_rect(Rect2(11, 2, 2, 2), MOVE_TYPE_BADGES[badge_key()])
 	if inspire_bonus > 0:
 		draw_rect(Rect2(11, 5, 2, 2), INSPIRED_COLOR)
+	# One dot per status, up the left edge.
+	var i := 0
+	for status: String in statuses:
+		draw_rect(Rect2(3, 9 - 3 * i, 2, 2), Statuses.get_data(status).color)
+		i += 1
 	var aboard: Unit = carrying if carrying else (passengers[0] if not passengers.is_empty() else null)
 	if aboard:
 		# Small flag in the carried unit's team color.

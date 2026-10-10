@@ -28,6 +28,9 @@ extends RefCounted
 ##   @remove Thief                     take a unit off the map
 ##   @recruit Thief                    a unit joins the player's side
 ##   @give Lord, Silver Sword          an item for a unit
+##   @status Lord, Poison              give a unit a status (see Statuses)...
+##   @status Lord, Poison, 5           ...for this many turns (-1: until cured)
+##   @cure Lord                        cure a unit's statuses (or "@cure Lord, Poison")
 ##   @camera (10, 4)                   pan the view
 ##   @wait 0.5                         pause, in seconds
 ##   @flag bridge_held                 set a flag (see "if"/"unless")
@@ -36,14 +39,15 @@ extends RefCounted
 ## Each event is {"trigger", "args", "repeat", "if": [flags], "unless": [flags],
 ## "script": [command arrays], "line"}. Commands are arrays: ["say", speaker, text],
 ## ["narrate", text], ["move", unit, cell], ["spawn", name, cell], ["remove", unit],
-## ["recruit", unit], ["give", unit, item], ["camera", cell], ["wait", seconds],
+## ["recruit", unit], ["give", unit, item], ["status", unit, status, turns (0: its
+## default)], ["cure", unit, status ("": all)], ["camera", cell], ["wait", seconds],
 ## ["flag", name], ["banner", text]. A level's "events" entry can hold events in
 ## that same shape (with "script" written as command arrays) for anything the text
 ## can't express.
 
 const TRIGGERS: Array[String] = ["start", "turn", "talk", "battle", "death", "area", "visit", "victory", "defeat"]
-const COMMANDS: Array[String] = ["say", "narrate", "move", "spawn", "remove", "recruit", "give", "camera",
-	"wait", "flag", "banner"]
+const COMMANDS: Array[String] = ["say", "narrate", "move", "spawn", "remove", "recruit", "give", "status",
+	"cure", "camera", "wait", "flag", "banner"]
 
 
 ## Events in the file at `path`, or [] if there's none. Errors are pushed (and
@@ -183,6 +187,21 @@ static func _command(line: String, n: int, errors: Array) -> Array:
 				errors.append("line %d: @give needs \"Unit, Item\"" % n)
 				return []
 			return ["give", parts[0].strip_edges(), parts[1].strip_edges()]
+		"status":
+			var parts := rest.split(",")
+			var turns := parts[2].strip_edges() if parts.size() == 3 else "0"
+			if parts.size() < 2 or parts.size() > 3 or not Statuses.DATA.has(parts[1].strip_edges()) 					or not turns.is_valid_int():
+				errors.append("line %d: @status needs \"Unit, Status\" or \"Unit, Status, turns\" (statuses: %s)"
+					% [n, ", ".join(Statuses.DATA.keys())])
+				return []
+			return ["status", parts[0].strip_edges(), parts[1].strip_edges(), turns.to_int()]
+		"cure":
+			var parts := rest.split(",")
+			var status := parts[1].strip_edges() if parts.size() == 2 else ""
+			if rest == "" or parts.size() > 2 or (status != "" and not Statuses.DATA.has(status)):
+				errors.append("line %d: @cure needs \"Unit\" or \"Unit, Status\"" % n)
+				return []
+			return ["cure", parts[0].strip_edges(), status]
 	errors.append("line %d: unknown command @%s" % [n, word])
 	return []
 

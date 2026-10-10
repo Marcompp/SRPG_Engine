@@ -26,6 +26,9 @@ func start_player_phase() -> void:
 	battle.turn += 1
 	await battle.ui.show_banner("Player Phase\n" + battle.turn_text(), Color("2850b0"))
 	await heal_on_tiles(Unit.Team.PLAYER)
+	await tick_statuses(Unit.Team.PLAYER)
+	if check_game_over():
+		return
 	await battle.events.on_turn(battle.turn, "player")
 	if check_game_over():
 		return
@@ -67,6 +70,32 @@ func heal_on_tiles(team: Unit.Team) -> void:
 		await get_tree().create_timer(0.5).timeout
 
 
+## Statuses at the start of `team`'s phase (see Statuses): tick damage (Poison),
+## then every status counts down a turn. A unit killed by a tick falls with no EXP
+## for anyone.
+func tick_statuses(team: Unit.Team) -> void:
+	var shown := false
+	var dead: Array[Unit] = []
+	for u in battle.units_of(team):
+		if u.statuses.is_empty():
+			continue
+		var damage := Statuses.tick_damage(u)
+		if damage > 0:
+			u.take_damage(damage)
+			u.popup("-%d" % damage, Color("b050e0"))
+			shown = true
+			if u.hp <= 0:
+				dead.append(u)
+				continue
+		for ended in Statuses.count_down(u):
+			u.popup("%s wore off" % ended, Color.LIGHT_GRAY, 10.0 if damage > 0 else 0.0)
+			shown = true
+	if shown:
+		await get_tree().create_timer(0.5).timeout
+	if not dead.is_empty():
+		await battle.actions.remove_dead(dead, "Succumbed to poison")
+
+
 func end_player_phase() -> void:
 	battle.state = Battle.State.BUSY
 	battle.enemy_phase = true
@@ -76,6 +105,9 @@ func end_player_phase() -> void:
 	for e in battle.units_of(Unit.Team.ENEMY):
 		e.regen_mp(e.mp_regen())
 	await heal_on_tiles(Unit.Team.ENEMY)
+	await tick_statuses(Unit.Team.ENEMY)
+	if check_game_over():
+		return
 	await spawn_reinforcements()
 	await battle.events.on_turn(battle.turn, "enemy")
 	EnemyAI.update_all_wake(battle)

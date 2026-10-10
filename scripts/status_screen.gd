@@ -257,6 +257,29 @@ func _render_stats() -> void:
 			Vector2(0, y + 13), DIM), Mounts.species_data(m.species).description)
 	if unit.carrying:
 		_label(_page, "Carrying %s (DEX/AGI halved)" % unit.carrying.unit_name, Vector2(0, y + 24), DIM)
+	_render_statuses(Vector2(0, y + 37))
+
+
+## One square per status in its map color, with its initial (placeholders for icons);
+## highlight one in detail mode for what it does and how long it lasts.
+func _render_statuses(pos: Vector2) -> void:
+	if unit.statuses.is_empty():
+		return
+	_label(_page, "Status", pos, DIM)
+	var x := 30.0
+	for status: String in unit.statuses:
+		var square := ColorRect.new()
+		square.color = Statuses.get_data(status).color
+		square.position = Vector2(x, pos.y + 1)
+		square.size = Vector2(9, 9)
+		_page.add_child(square)
+		var initial := _label(square, status.left(1), Vector2.ZERO)
+		initial.size = square.size
+		initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_entry(square, "%s (%s): %s" % [status, Statuses.duration_text(unit.statuses[status]).to_lower(),
+			Statuses.get_data(status).description])
+		x += 12.0
 
 
 func _render_items() -> void:

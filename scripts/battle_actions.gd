@@ -453,8 +453,12 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
 	await caster.lunge(target.cell)
-	target.heal(amount)
-	target.popup("+%d" % amount, Color.PALE_GREEN)
+	if spell.get("cures", false):
+		Statuses.cure(target)
+		target.popup("Cured", Color.PALE_GREEN)
+	else:
+		target.heal(amount)
+		target.popup("+%d" % amount, Color.PALE_GREEN)
 	await get_tree().create_timer(0.5).timeout
 	if caster.team == Unit.Team.PLAYER and earns_exp(caster):
 		await gain_exp(caster, spell.exp)
@@ -683,10 +687,24 @@ func _after_combat(u, foe, foe_cell: Vector2i, effect: Dictionary) -> void:
 	await get_tree().create_timer(0.4).timeout
 
 
-func _remove_dead_and_award(involved: Array[Unit], awards: Array) -> void:
+## Gives `u` a status (for `turns`; 0: its default), with a popup: its name, or
+## "Immune". Returns whether it took.
+func inflict(u: Unit, status: String, turns := 0) -> bool:
+	var took := Statuses.inflict(u, status, turns)
+	u.popup(status if took else "Immune", Statuses.get_data(status).color if took else Color.LIGHT_GRAY)
+	return took
+
+
+## Removes units killed outside a fight (e.g. by poison): no EXP for anyone. `how`
+## starts their campaign biography's last line ("Succumbed to poison in ...").
+func remove_dead(units: Array[Unit], how := "Fell") -> void:
+	await _remove_dead_and_award(units, [], how)
+
+
+func _remove_dead_and_award(involved: Array[Unit], awards: Array, how := "Fell") -> void:
 	for u in involved:
 		if u.hp <= 0 and u.team == Unit.Team.PLAYER:
-			battle.campaign_deaths.append({"name": u.unit_name, "turn": battle.turn})
+			battle.campaign_deaths.append({"name": u.unit_name, "turn": battle.turn, "how": how})
 		if u.hp <= 0:
 			await battle.events.on_death(u)
 			var cell := u.cell
