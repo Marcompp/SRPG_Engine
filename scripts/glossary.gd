@@ -56,6 +56,7 @@ const SPELL_NOTES := {
 	"Fire": "Single-target fire magic: INT + {power} damage. The target may counter.",
 	"Firestorm": "Hits every enemy in a small cross: INT + {power} damage each. No counters.",
 	"Earth Spike": "INT + {power} damage to a unit on the target tile, then raises a mountain there.",
+	"Restore": "Cures every status of an adjacent ally.",
 }
 
 
@@ -95,6 +96,8 @@ static func item(it: Dictionary) -> String:
 		if not effective.is_empty():
 			text += " Effective (x%d might) against %s." % [Combat.EFFECTIVE_MULTIPLIER,
 				", ".join(effective.map(func(t): return str(t).capitalize()))]
+		if it.has("inflict"):
+			text += " Hits inflict %s (%d%%)." % [it.inflict.status, it.inflict.get("chance", 100)]
 		if it.get("silver", false):
 			text += " Silver: spirits don't resist it, and the undead are weak to it."
 		if WEAPON_NOTES.has(it.name):
@@ -111,6 +114,9 @@ static func item(it: Dictionary) -> String:
 			return "%s: restores %d HP to the user and ends its turn. Uses %d." % [it.name, it.heal, it.uses]
 		"mp":
 			return "%s: restores %d MP to the user and ends its turn. Uses %d." % [it.name, it.mp, it.uses]
+		"cure":
+			return "%s: cures the user's %s and ends its turn. Uses %d." % [it.name,
+				it.cures if it.has("cures") else "statuses", it.uses]
 		"repair":
 			return "%s: restores one of the user's weapons to full uses, broken ones too. Ends the user's turn. Uses %d." % [
 				it.name, it.uses]
@@ -129,4 +135,7 @@ static func spell(spell_name: String) -> String:
 	var s := Spells.get_spell(spell_name)
 	var rng := str(s.max_rng) if s.min_rng == s.max_rng else "%d-%d" % [s.min_rng, s.max_rng]
 	var note: String = SPELL_NOTES.get(spell_name, "").format({"power": s.get("power", 0)})
+	if s.get("status_only", false):
+		note = "No damage: a hit inflicts %s (%s). Can't be countered." % [s.inflict.status,
+			Statuses.get_data(s.inflict.status).description]
 	return "%s. %s Cost %d MP, range %s." % [spell_name, note, s.mp, rng]

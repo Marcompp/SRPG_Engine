@@ -250,6 +250,7 @@ static func strike(attacker: Unit, defender: Unit, map: BattleMap, initiator: Un
 	if not roll_hit(hit_chance(attacker, defender, map, init)):
 		return result
 	result.hit = true
+	result.inflict = roll_inflict(attacker.weapon)
 	result.crit = randi_range(0, 99) < crit_chance(attacker, defender, map, init)
 	var effect := {}
 	for skill in Skills.procs(attacker, defender, map, init == attacker, "attack"):
@@ -293,7 +294,17 @@ static func side_stats(attacker: Unit, defender: Unit, map: BattleMap, initiator
 		"triangle": triangle(attacker, defender),
 		"multiplier": 1 if attacker.weapon.is_empty() else multiplier(attacker.weapon, defender),
 		"resisted": not attacker.weapon.is_empty() and resists(defender, attacker.weapon),
+		"inflict": attacker.weapon.get("inflict", {}),
 	}
+
+
+## The status a landed hit with `source` (a weapon or spell) inflicts, if its
+## "inflict" chance rolls; "" otherwise.
+static func roll_inflict(source: Dictionary) -> String:
+	var inflict: Dictionary = source.get("inflict", {})
+	if inflict.is_empty() or randi_range(0, 99) >= inflict.get("chance", 100):
+		return ""
+	return inflict.status
 
 
 # --- Magic --------------------------------------------------------------------
@@ -306,6 +317,8 @@ static func magic_defense(u: Unit) -> int:
 
 ## Physical abilities (Fire Breath) use STR against DEF instead.
 static func spell_damage(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> int:
+	if spell.get("status_only", false):
+		return 0
 	var power: int = spell.power * multiplier(spell, target)
 	var physical: bool = spell.get("physical", false)
 	var atk: int = (caster.combat_str() if physical else caster.combat_int()) + power \
@@ -330,10 +343,14 @@ static func spell_crit_chance(caster: Unit, target: Unit, spell: Dictionary, map
 
 ## Resolves one spell hit, same shape as strike().
 static func spell_strike(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> Dictionary:
-	var result := {"hit": false, "crit": false, "dmg": 0, "heal": 0, "procs": [], "spell": true}
+	var result := {"hit": false, "crit": false, "dmg": 0, "heal": 0, "procs": [], "spell": true,
+		"no_damage": spell.get("status_only", false)}
 	if not roll_hit(spell_hit_chance(caster, target, spell, map)):
 		return result
 	result.hit = true
+	result.inflict = roll_inflict(spell)
+	if result.no_damage:
+		return result
 	result.crit = randi_range(0, 99) < spell_crit_chance(caster, target, spell, map)
 	result.dmg = spell_damage(caster, target, spell, map) * (CRIT_MULTIPLIER if result.crit else 1)
 	return result
@@ -341,7 +358,7 @@ static func spell_strike(caster: Unit, target: Unit, spell: Dictionary, map: Bat
 
 ## Forecast for a single-target spell; the target counters with its weapon (once).
 static func spell_forecast(caster: Unit, target: Unit, spell: Dictionary, map: BattleMap) -> Dictionary:
-	var counter := can_counter(caster, target, map)
+	var counter: bool = not spell.get("status_only", false) and can_counter(caster, target, map)
 	var def_side := side_stats(target, caster, map, caster)
 	def_side.double = false
 	def_side.triangle = 0
@@ -354,6 +371,7 @@ static func spell_forecast(caster: Unit, target: Unit, spell: Dictionary, map: B
 			"triangle": 0,
 			"multiplier": multiplier(spell, target),
 			"resisted": resists(target, spell),
+			"inflict": spell.get("inflict", {}),
 		},
 		"def": def_side,
 		"can_counter": counter,

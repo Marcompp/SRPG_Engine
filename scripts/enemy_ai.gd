@@ -254,7 +254,8 @@ static func _best_attack(enemy: Unit, battle: Battle, cells: Dictionary) -> Dict
 		if Spells.is_support(s) or not Spells.can_afford(enemy, s):
 			continue
 		var spell := Spells.get_spell(s)
-		if spell.has("terraform"):
+		# Status spells: the AI doesn't weigh statuses yet (see docs/status_effects.md).
+		if spell.has("terraform") or spell.get("status_only", false):
 			continue
 		# Spending MP has a cost, so a big spell must earn its price.
 		var mp_cost: float = spell.mp * MP_COST_WEIGHT

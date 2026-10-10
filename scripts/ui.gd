@@ -110,8 +110,9 @@ func _make_panel(label: Label) -> PanelContainer:
 	return panel
 
 
-## The MP row is only shown for spells, where current MP is the magic defense.
-const FORECAST_ROWS: Array[String] = ["", "", "HP", "MP", "Dmg", "Hit", "Crit"]
+## The MP row is only shown for spells, where current MP is the magic defense; the
+## Status row only when a side's hits can inflict a status.
+const FORECAST_ROWS: Array[String] = ["", "", "HP", "MP", "Dmg", "Hit", "Crit", "Status"]
 const DIM := Color(0.7, 0.75, 0.95)
 const ADVANTAGE := Color(0.5, 1.0, 0.5)
 const DISADVANTAGE := Color(1.0, 0.5, 0.5)
@@ -309,6 +310,11 @@ func show_forecast(attacker: Unit, defender: Unit, f: Dictionary, cursor_cell: V
 	_fill_forecast_column(2, defender, f.def, f.can_counter)
 	for label in _forecast_cells[3]:
 		label.visible = magic
+	var statuses: bool = not f.atk.get("inflict", {}).is_empty() or (f.can_counter and not f.def.get("inflict", {}).is_empty())
+	for label in _forecast_cells[7]:
+		label.visible = statuses
+	_forecast_cells[7][1].text = inflict_text(f.atk.get("inflict", {}), defender)
+	_forecast_cells[7][2].text = inflict_text(f.def.get("inflict", {}), attacker) if f.can_counter else "--"
 	_place(_forecast, _away_right(cursor_cell), false)
 
 
@@ -431,6 +437,15 @@ static func unit_notes(unit: Unit) -> Array[String]:
 		lines.append("Aboard (%d/%d): %s" % [unit.passengers.size(), unit.passengers.size() + unit.cargo_space(),
 			", ".join(names) if not names.is_empty() else "--"])
 	return lines
+
+
+## Forecast Status cell: "Poison 100", "Immune" or "--".
+static func inflict_text(inflict: Dictionary, target: Unit) -> String:
+	if inflict.is_empty():
+		return "--"
+	if Skills.is_immune(target, inflict.status):
+		return "Immune"
+	return "%s %d" % [inflict.status, inflict.get("chance", 100)]
 
 
 static func item_label(unit: Unit, index: int) -> String:

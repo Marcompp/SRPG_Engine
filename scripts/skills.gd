@@ -41,7 +41,8 @@ extends RefCounted
 ## after_combat: once a fight it took part in is over, if it's still standing:
 ##             {"effect", "value"}: "heal" (`value` of max HP), "refresh" (act again,
 ##             once per turn), "damage_foe" (the foe loses `value` of its max HP, never
-##             below 1), "damage_near_foe" (so do the foe's allies within 2 of it).
+##             below 1), "damage_near_foe" (so do the foe's allies within 2 of it),
+##             "inflict" (the foe, if still standing, gets the status named by `value`).
 ## map:        movement rules: "pass" (move through enemies), "pathfinder" (every
 ##             passable tile costs 1 MOV), "canto" (move again with the MOV left after
 ##             acting; player units), "footwork" (Canto, but only after Dancing).
@@ -67,7 +68,7 @@ const CONDITIONS: Array[String] = ["initiating", "defending", "phase", "hp_below
 const EFFECT_KEYS: Array[String] = ["description", "stats", "command", "turn_start", "exp", "immune", "battle",
 	"rules", "proc", "after_combat", "map", "aura", "growths", "terrain_costs", "range", "weight_relief", "abilities", "if",
 	"hidden"]
-const AFTER_EFFECTS: Array[String] = ["heal", "refresh", "damage_foe", "damage_near_foe"]
+const AFTER_EFFECTS: Array[String] = ["heal", "refresh", "damage_foe", "damage_near_foe", "inflict"]
 const MAP_RULES: Array[String] = ["pass", "pathfinder", "canto", "footwork"]
 ## Skills that make terrain cheaper (see terrain_costs): innate to scouts, climbers and
 ## swimmers, and what amphibious races get in foot classes.
@@ -171,6 +172,8 @@ const DATA := {
 		"after_combat": {"effect": "refresh"}, "if": {"initiating": true, "killed": true}},
 	"Poison Strike": {"description": "A foe it attacks loses 20% of max HP after combat (never below 1).",
 		"after_combat": {"effect": "damage_foe", "value": 0.2}, "if": {"initiating": true}},
+	"Envenom": {"description": "A foe it attacks is poisoned after combat, if still standing.",
+		"after_combat": {"effect": "inflict", "value": "Poison"}, "if": {"initiating": true}},
 	"Savage Blow": {"description": "Foes within 2 tiles of the one it attacks lose 20% of max HP (never below 1).",
 		"after_combat": {"effect": "damage_near_foe", "value": 0.2}, "if": {"initiating": true}},
 	# Turn start.
@@ -568,6 +571,8 @@ static func problems_in(skill: String, d: Dictionary) -> Array[String]:
 			problems.append("%s: unknown map rule %s" % [skill, r])
 	if d.has("after_combat") and not AFTER_EFFECTS.has(d.after_combat.get("effect", "")):
 		problems.append("%s: unknown after_combat effect" % skill)
+	if d.get("after_combat", {}).get("effect", "") == "inflict" and not Statuses.DATA.has(d.after_combat.get("value", "")):
+		problems.append("%s: after_combat inflict needs a status as its value" % skill)
 	if d.has("aura"):
 		for key: String in d.aura.get("battle", {}):
 			if not BATTLE_KEYS.has(key):

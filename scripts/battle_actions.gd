@@ -501,7 +501,7 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 	await caster.lunge(target.cell)
 	_apply_strike(caster, target, result, dealt)
 	await get_tree().create_timer(0.45).timeout
-	if target.hp > 0 and Combat.can_counter(caster, target, battle.map):
+	if target.hp > 0 and not spell.get("status_only", false) and Combat.can_counter(caster, target, battle.map):
 		var counter := Combat.strike(target, caster, battle.map, caster)
 		await target.lunge(caster.cell)
 		_apply_strike(target, caster, counter, dealt)
@@ -558,7 +558,9 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 	if result.get("heal", 0) > 0:
 		a.heal(result.heal)
 		a.popup("+%d" % result.heal, Color.PALE_GREEN)
-	if result.hit:
+	if result.hit and result.get("no_damage", false):
+		pass
+	elif result.hit:
 		d.take_damage(result.dmg)
 		if result.dmg > 0 and not dealt.has(a):
 			dealt.append(a)
@@ -574,6 +576,9 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 			_record_close_call(d, a)
 	else:
 		d.popup("Miss", Color.LIGHT_GRAY)
+	# After the damage, so a sleep-inducing hit isn't undone by its own damage.
+	if result.hit and result.get("inflict", "") != "" and d.hp > 0:
+		inflict(d, result.inflict)
 
 
 ## Loyal: the mount takes the fatal blow and falls; the rider stays, on foot, at 1 HP.
@@ -668,6 +673,10 @@ func _after_combat(u, foe, foe_cell: Vector2i, effect: Dictionary) -> void:
 				return
 			u.refreshed = true
 			u.refresh_pending = true
+		"inflict":
+			if not is_instance_valid(foe) or foe.hp <= 0:
+				return
+			inflict(foe, effect.value)
 		"damage_foe", "damage_near_foe":
 			var victims: Array[Unit] = []
 			if effect.effect == "damage_foe":

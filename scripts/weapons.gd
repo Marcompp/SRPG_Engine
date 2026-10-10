@@ -4,6 +4,8 @@ extends RefCounted
 ## min_rng/max_rng are Manhattan distances the weapon can strike at.
 ## effective: move types this weapon's might is tripled against (Combat.EFFECTIVE_MULTIPLIER).
 ## silver:    spirits don't resist it (they halve damage from other weapons).
+## inflict:   {"status", "chance"}: each hit that lands gives the target that status
+##            (see Statuses) with `chance`% odds.
 
 const DATA := {
 	"Iron Sword": {"type": "sword", "mt": 5, "hit": 90, "crit": 0, "wt": 5, "min_rng": 1, "max_rng": 1, "uses": 46},
@@ -32,6 +34,9 @@ const DATA := {
 		"silver": true, "effective": ["spirit"]},
 	"Silver Bow": {"type": "bow", "mt": 13, "hit": 75, "crit": 0, "wt": 6, "min_rng": 2, "max_rng": 2, "uses": 20,
 		"silver": true, "effective": ["flying", "spirit"]},
+	# Status weapons.
+	"Venom Edge": {"type": "sword", "mt": 4, "hit": 80, "crit": 0, "wt": 5, "min_rng": 1, "max_rng": 1, "uses": 30,
+		"inflict": {"status": "Poison", "chance": 100}},
 	"Quarterstaff": {"type": "staff", "mt": 4, "hit": 85, "crit": 0, "wt": 4, "min_rng": 1, "max_rng": 1, "uses": 40},
 }
 

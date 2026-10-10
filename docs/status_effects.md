@@ -1,8 +1,9 @@
 # Status effects (design notes)
 
-Design notes. Steps 1 and 2 of the build order are built (`scripts/statuses.gd`):
-the core, Poison, Silence, Sleep, Paralyse, Petrify, Antitoxin, Panacea, Restore and
-the `@status` / `@cure` event commands.
+Design notes. Steps 1 to 3 of the build order are built (`scripts/statuses.gd`):
+the core, Poison, Silence, Sleep, Paralyse, Petrify, Antitoxin, Panacea, Restore,
+the `@status` / `@cure` event commands, `inflict` on weapons and spells (Venom Edge;
+the Silence, Sleep, Bind and Stone spells) and the Envenom skill. Berserk is next.
 A **status** is a temporary condition on a unit
 (Poison, Silence, Sleep...) that changes what it can do or how it fights, until it
 runs out or is cured.
@@ -60,11 +61,16 @@ EXP for it, and it counts as a death for defeat conditions and events.
 ## Sources and cures
 
 - **Inflicting:** weapons, spells and racial attacks get
-  `"inflict": {"status", "chance"}` (rolled on each hit that lands; the forecast
-  notes it). A new `after_combat` skill effect, `inflict`. An event command,
-  `status <unit> <status> [turns]`. Later: terrain (a poison swamp).
-- **Status spells** (Silence, Sleep, Berserk, Petrify) are enemy-target spells with
-  no damage that use the normal spell hit chance and inflict on a hit.
+  `"inflict": {"status", "chance"}`, rolled on each hit that lands, after its damage
+  (so a sleep hit isn't undone by its own damage). Counters inflict too. The forecast
+  gets a Status row ("Poison 100", "Immune") when either side can inflict. The
+  `after_combat` skill effect `inflict` (`value`: the status) poisons etc. the foe
+  after the fight (Envenom). Event commands `@status` / `@cure`. Later: terrain (a
+  poison swamp).
+- **Status spells** (`status_only`): enemy-target spells with no damage and no
+  counter, using the normal spell hit chance; a hit inflicts. Silence (Silence),
+  Sleep (Sleep), Bind (Paralyse), Stone (Petrify). Berserk comes with step 4. Venom
+  Edge is a weak sword that always poisons on a hit.
 - **Cures:** the turn count running out; a Restore spell (ally target, cures every
   status, heals nothing; the enemy AI doesn't cast it yet); items: Antitoxin
   (Poison), Panacea (everything).
@@ -83,6 +89,8 @@ EXP for it, and it counts as a death for defeat conditions and events.
 
 - First version: restricted units skip what they can't do; a Silenced caster
   fights with weapons; Berserk reuses the normal targeting with every unit as a foe.
+  The AI never casts status spells or Restore yet, but does use status weapons (it
+  just doesn't value the status).
 - Later: valuing statuses (silence the healer, finish off a sleeping unit).
 
 ## Build order

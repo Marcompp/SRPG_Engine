@@ -200,3 +200,71 @@ func test_petrify() -> void:
 	check(lord.statuses.has("Petrify"), "and lingers between chapters")
 	lord.take_damage(1)
 	check(lord.statuses.has("Petrify"), "and hits don't break it")
+
+
+## Lord vs a Brigand that can't dodge (so every hit lands) and won't die quickly.
+func _sure_hit_duel() -> Array[Unit]:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	lord.dexterity = 60
+	brig.agility = 0
+	brig.luck = 0
+	brig.base_max_hp = 80
+	brig.hp = brig.max_hp
+	return pair
+
+
+func test_status_weapon() -> void:
+	var pair := await _sure_hit_duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	give_weapon(lord, "Venom Edge")
+	var f := Combat.forecast(lord, brig, b.map)
+	check_eq(f.atk.inflict, {"status": "Poison", "chance": 100}, "the forecast knows the weapon poisons")
+	b.ui.show_forecast(lord, brig, f, lord.cell)
+	check(b.ui._forecast_cells[7][1].visible, "a Status row appears")
+	check_eq(b.ui._forecast_cells[7][1].text, "Poison 100", "with the status and its odds")
+	check_eq(BattleUI.inflict_text(f.atk.inflict, unit_named("Lord")), "Poison 100", "(text helper)")
+	b.ui.show_forecast(brig, lord, Combat.forecast(brig, lord, b.map), lord.cell)
+	check_eq([b.ui._forecast_cells[7][1].text, b.ui._forecast_cells[7][2].text], ["--", "Poison 100"],
+		"the defender's counter can inflict too")
+	lord.equip(lord.items.find(lord.items.filter(func(it): return it.name == "Iron Sword")[0]))
+	b.ui.show_forecast(lord, brig, Combat.forecast(lord, brig, b.map), lord.cell)
+	check(not b.ui._forecast_cells[7][1].visible, "no Status row when nobody inflicts")
+	give_weapon(lord, "Venom Edge")
+	await b.actions.do_combat(lord, brig)
+	check(brig.hp > 0 and brig.statuses.has("Poison"), "a hit poisons")
+	var immune := brig
+	Statuses.cure(immune)
+	immune.personal_skills.assign(["Poison Immunity"])
+	check_eq(BattleUI.inflict_text(f.atk.inflict, immune), "Immune", "the forecast shows immunity")
+	await b.actions.do_combat(lord, immune)
+	check(immune.statuses.is_empty(), "and it holds")
+
+
+func test_status_spell() -> void:
+	var pair := await _sure_hit_duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	lord.spells.assign(["Sleep"])
+	lord.mp = 20
+	var f := Combat.spell_forecast(lord, brig, Spells.get_spell("Sleep"), b.map)
+	check_eq(f.atk.dmg, 0, "a status spell deals no damage")
+	check(not f.can_counter, "and can't be countered")
+	var brig_hp := brig.hp
+	var lord_hp := lord.hp
+	await b.actions.do_spell_attack(lord, brig, "Sleep")
+	check(brig.statuses.has("Sleep"), "a hit puts it to sleep")
+	check_eq(brig.hp, brig_hp, "without waking it with damage")
+	check_eq(lord.hp, lord_hp, "no counter")
+	check(Glossary.spell("Sleep").contains("inflicts Sleep"), "described as a status spell")
+
+
+func test_envenom_after_combat() -> void:
+	var pair := await _sure_hit_duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	lord.personal_skills.assign(["Envenom"])
+	await b.actions.do_combat(lord, brig)
+	check(brig.hp > 0 and brig.statuses.has("Poison"), "Envenom: the foe it attacked is poisoned after combat")
