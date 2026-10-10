@@ -80,6 +80,13 @@ func move(step: int) -> void:
 	_render()
 
 
+## Moves the selection to `u` (e.g. the unit the stats screen was flipped to).
+func select_unit(u: Unit) -> void:
+	if units.has(u):
+		index = units.find(u)
+		_render()
+
+
 ## Left/Right picks the sort column; the selection follows its unit.
 func change_sort(step: int) -> void:
 	var keep := selected_unit()

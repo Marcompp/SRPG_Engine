@@ -299,7 +299,7 @@ func test_trade_repeatable_and_keeps_action() -> void:
 	await press(KEY_Z)
 	for partner in [knight, dancer, knight]:
 		await pick("Trade")
-		while b.input.targets[b.input.target_index] != partner:
+		while b.input.targeting.targets[b.input.targeting.index] != partner:
 			await press(KEY_RIGHT)
 		await press(KEY_Z)
 		# Give the Lord's last item to the partner (or swap if full).
@@ -629,9 +629,9 @@ func test_broken_weapons_and_repair() -> void:
 	await open_menu_in_place(lord)
 	await pick("Items")
 	await pick("Repair Kit  2")
-	check_eq(b.input.menu_context, "repair", "choose what to repair")
+	check_eq(b.input.menus.context, "repair", "choose what to repair")
 	await press(KEY_X)
-	check_eq(b.input.menu_context, "items", "X: back to the items")
+	check_eq(b.input.menus.context, "items", "X: back to the items")
 	await pick("Repair Kit  2")
 	await pick("Iron Sword  0/46")
 	check_eq(sword.uses, Weapons.max_uses(sword), "repaired to full uses")

@@ -51,7 +51,7 @@ func accept() -> void:
 	else:
 		input.battle.ui.hide_info()
 		var options: Array[String] = ["Fight!", "Units", "Objective", "Options", "Back to Prep"]
-		input._open_menu("formation", options)
+		input.menus.open("formation", options)
 
 
 func drop_held() -> void:

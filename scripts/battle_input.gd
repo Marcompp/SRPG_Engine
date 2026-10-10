@@ -1,64 +1,46 @@
 class_name BattleInput
 extends Node
 ## Player input: the browse/select/menu/targeting state machine (Battle.state),
-## the menus, targeting and forecasts, and the info screens (the trade screen and
-## Check Map are BattleTrade and BattleFormation, owned here). Owns
-## the state of whatever the player is doing with the selected unit. What actually
+## the cursor, selecting and moving units, and the info screens. Owns the state of
+## whatever the player is doing with the selected unit. Its parts, in their own
+## files: the menus (BattleMenus), targeting (BattleTargeting), the trade screen
+## (BattleTrade) and the prep screen's Check Map (BattleFormation). What actually
 ## happens when a unit acts lives in BattleActions.
-
-## Targeting modes that pick a cell (target_cells) rather than a unit (targets).
-const CELL_MODES: Array[String] = ["drop", "unload", "break", "door"]
 
 ## Emitted with the picked index when a `choose` prompt is answered.
 signal choice_made(index: int)
 
 var battle: Battle
 
+var menus := BattleMenus.new(self)
+var targeting := BattleTargeting.new(self)
+var trade := BattleTrade.new(self)
+var formation := BattleFormation.new(self)
+
 var selected: Unit
 var origin_cell := Vector2i.ZERO
 var reach := {}
-var menu_context := ""
-var targets: Array[Unit] = []
-var target_index := 0
-## Inventory indices behind each entry of the attack weapon menu.
-var weapon_choices: Array[int] = []
-## Spell names behind each entry of the magic menu.
-var spell_choices: Array[String] = []
-## Spell being targeted, or "" when targeting an attack.
-var active_spell := ""
-## What TARGETING is picking for: "attack", "spell", "dance", "trade", "shove",
-## "rescue", "board", "inspire", or one of CELL_MODES.
-var target_mode := "attack"
 ## Set once the selected unit trades or unloads; its move can no longer be undone.
 var move_committed := false
-## The trade screen and the prep screen's Check Map, in their own files.
-var trade := BattleTrade.new(self)
-var formation := BattleFormation.new(self)
-## Cells an area spell may be centered on while in AREA_TARGET.
-var area_centers: Array[Vector2i] = []
-## Cells to pick from while target_mode is one of CELL_MODES.
-var target_cells: Array[Vector2i] = []
-## Repair Kit: its inventory index, and the weapon indices behind the Repair menu's entries.
-var repair_kit := -1
-var repair_choices: Array[int] = []
-## Steal: the foe picked, and the item indices behind the Steal menu's entries.
-var steal_target: Unit
-var steal_choices: Array[int] = []
-## Passenger a ship is unloading, and the passengers behind the Unload menu's entries.
-var unload_passenger: Unit
-var passenger_choices: Array[Unit] = []
 ## Unit (either side) under the cursor while browsing, whose ranges are shown, or null.
 var hovered: Unit
 ## MOV the selected unit may spend on this move (its MOV, or what's left for Canto),
 ## and what its last move cost.
 var move_budget := 0.0
 var moved_cost := 0.0
-## True while picking a Canto move: moving (or cancelling) ends the unit's turn.
+## True while the selected unit is on its Canto move (picking where to go, or at
+## the Wait menu after it): it can only wait afterwards.
 var canto_move := false
 ## The last targeted action confirmed ("dance", "attack"...), for Footwork.
 var last_action := ""
 ## Planned path for the selected unit; follows the cursor's trail when it can.
 var arrow: Array[Vector2i] = []
+## The last cell in the selected unit's reach the cursor was on: where it stands to
+## act on a unit picked straight from the map, if it can from there.
+var last_reach_cell := Vector2i.ZERO
+## Unit picked from the map while moving (Z on an enemy or a hurt ally): after the
+## move, the menu for acting on it opens with it as the target.
+var quick_target: Unit
 ## Unit shown on the stats screen, and the state to return to when it closes.
 var status_unit: Unit
 var status_return_state := Battle.State.IDLE
@@ -104,12 +86,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					select(u)
 				elif u and u.team != Unit.Team.PLAYER:
 					toggle_mark(u)
-				elif u == null:
-					battle.ui.hide_info()
-					var options: Array[String] = ["Units", "Objective", "Options", "Suspend", "Restart", "Level Select", "End Turn"]
-					if battle.phases.can_rewind():
-						options.insert(3, "Rewind")
-					_open_menu("map", options)
+				else:
+					# An empty tile, or a unit that already acted.
+					open_map_menu()
 		Battle.State.FORMATION:
 			if next:
 				jump_to_next_unit()
@@ -125,10 +104,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			if dir != Vector2i.ZERO:
 				move_cursor(dir)
 				update_arrow(battle.cursor.cell)
+				if reach.cells.has(battle.cursor.cell):
+					last_reach_cell = battle.cursor.cell
 			elif accept and reach.cells.has(battle.cursor.cell):
 				move_selected(battle.cursor.cell)
+			elif accept:
+				var u := battle.unit_at(battle.cursor.cell)
+				if u and not canto_move:
+					move_to_act_on(u)
 			elif cancel and canto_move:
-				canto_move = false
 				finish_action(true)
 			elif cancel:
 				battle.map.clear_ranges()
@@ -143,10 +127,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif dir.x != 0:
 				list.change_sort(dir.x)
 			elif accept and list.selected_unit():
-				var target := list.selected_unit()
 				close_unit_list()
-				battle.cursor.cell = target.cell
-				refresh_info()
 			elif info and list.selected_unit():
 				open_status(list.selected_unit())
 			elif cancel:
@@ -196,84 +177,24 @@ func _unhandled_input(event: InputEvent) -> void:
 				battle.ui.menu_move(dir.y)
 			elif accept:
 				battle.ui.hide_menu()
-				menu_accept()
+				menus.accept()
 			elif cancel:
 				battle.ui.hide_menu()
-				menu_cancel()
+				menus.cancel()
 		Battle.State.TARGETING:
 			if dir != Vector2i.ZERO:
-				var step := 1 if dir.x + dir.y > 0 else -1
-				var count := target_cells.size() if target_mode in CELL_MODES else targets.size()
-				target_index = wrapi(target_index + step, 0, count)
-				show_target()
+				targeting.step(dir)
 			elif accept:
-				battle.ui.hide_forecast()
-				if target_mode == "trade":
-					trade.open(targets[target_index])
-					return
-				if target_mode == "steal":
-					open_steal_menu(targets[target_index])
-					return
-				battle.state = Battle.State.BUSY
-				last_action = target_mode
-				if target_mode == "unload":
-					# Unloading doesn't end the ship's turn, but commits its move.
-					await battle.actions.do_unload(selected, unload_passenger, target_cells[target_index])
-					move_committed = true
-					open_unit_menu()
-					return
-				if target_mode == "talk":
-					await battle.events.run_talk(selected, targets[target_index])
-				elif target_mode == "drop":
-					await battle.actions.do_drop(selected, target_cells[target_index])
-				elif target_mode == "break":
-					await battle.actions.do_break(selected, target_cells[target_index])
-				elif target_mode == "door":
-					await battle.actions.do_open_door(selected, target_cells[target_index])
-				elif target_mode == "rescue":
-					await battle.actions.do_rescue(selected, targets[target_index])
-				elif target_mode == "dance":
-					await battle.actions.do_dance(selected, targets[target_index])
-				elif target_mode == "board":
-					await battle.actions.do_board(selected, targets[target_index])
-				elif target_mode == "inspire":
-					await battle.actions.do_inspire(selected)
-				elif target_mode == "shove":
-					await battle.actions.do_shove(selected, targets[target_index])
-				elif active_spell and Spells.is_support(active_spell):
-					await battle.actions.cast_heal(selected, targets[target_index], active_spell)
-				elif active_spell:
-					await battle.actions.do_spell_attack(selected, targets[target_index], active_spell)
-				else:
-					await battle.actions.do_combat(selected, targets[target_index])
-				finish_action()
+				targeting.accept()
 			elif cancel:
-				battle.ui.hide_forecast()
-				battle.map.clear_ranges()
-				battle.cursor.cell = selected.cell
-				match target_mode:
-					"attack":
-						open_attack_menu()
-					"spell":
-						open_magic_menu()
-					_:
-						open_unit_menu()
+				targeting.cancel()
 		Battle.State.AREA_TARGET:
 			if dir != Vector2i.ZERO:
-				if area_centers.has(battle.cursor.cell + dir):
-					battle.cursor.cell += dir
-					show_area_preview()
+				targeting.area_move(dir)
 			elif accept:
-				if Spells.can_cast_at(selected, active_spell, battle.cursor.cell, battle.units(), battle.map):
-					battle.ui.hide_forecast()
-					battle.state = Battle.State.BUSY
-					await battle.actions.cast_area(selected, battle.cursor.cell, active_spell)
-					finish_action()
+				targeting.area_accept()
 			elif cancel:
-				battle.ui.hide_forecast()
-				battle.map.clear_ranges()
-				battle.cursor.cell = selected.cell
-				open_magic_menu()
+				targeting.area_cancel()
 		Battle.State.TRADE:
 			if dir != Vector2i.ZERO:
 				trade.move(dir)
@@ -312,17 +233,30 @@ func move_cursor(dir: Vector2i) -> void:
 
 
 ## Moves the cursor to the next player unit that hasn't acted, in roster order,
-## wrapping around (FE's L button).
+## wrapping around (FE's L button). On another side's unit, goes to the next unit
+## of that side instead.
 func jump_to_next_unit() -> void:
-	var waiting: Array[Unit] = []
-	for u in battle.units_of(Unit.Team.PLAYER):
-		if not u.has_acted:
-			waiting.append(u)
-	if waiting.is_empty():
+	var here := battle.unit_at(battle.cursor.cell)
+	var units: Array[Unit] = []
+	if here and here.team != Unit.Team.PLAYER:
+		units = battle.units_of(here.team)
+	else:
+		for u in battle.units_of(Unit.Team.PLAYER):
+			if not u.has_acted:
+				units.append(u)
+	if units.is_empty():
 		return
-	var i := waiting.find(battle.unit_at(battle.cursor.cell))
-	battle.cursor.cell = waiting[(i + 1) % waiting.size()].cell
+	var i := units.find(here)
+	battle.cursor.cell = units[(i + 1) % units.size()].cell
 	refresh_info()
+
+
+func open_map_menu() -> void:
+	battle.ui.hide_info()
+	var options: Array[String] = ["Units", "Objective", "Options", "Suspend", "Restart", "Level Select", "End Turn"]
+	if battle.phases.can_rewind():
+		options.insert(3, "Rewind")
+	menus.open("map", options)
 
 
 ## End Turn with units still waiting asks first; Cancel is selected by default.
@@ -335,8 +269,19 @@ func confirm_end_turn() -> void:
 		battle.phases.end_player_phase()
 		return
 	var options: Array[String] = ["Cancel", "End Turn"]
-	_open_menu("end_turn", options, "End turn? %d unit%s %s acted" % [
+	menus.open("end_turn", options, "End turn? %d unit%s %s acted" % [
 		waiting, "" if waiting == 1 else "s", "hasn't" if waiting == 1 else "haven't"])
+
+
+## Asks the player to pick one of `options` mid-action (e.g. which skill to forget)
+## and returns its index. Cancel picks the last option, so make that the safe one.
+func choose(options: Array[String], title: String) -> int:
+	var previous := battle.state
+	battle.state = Battle.State.CHOICE
+	battle.ui.show_menu(options, battle.cursor.cell, title)
+	var index: int = await choice_made
+	battle.state = previous
+	return index
 
 
 func refresh_info() -> void:
@@ -350,21 +295,29 @@ func refresh_info() -> void:
 func select(u: Unit) -> void:
 	selected = u
 	move_committed = false
+	quick_target = null
 	origin_cell = u.cell
 	move_budget = u.mov
 	moved_cost = 0.0
 	reach = battle.map.get_reachable(u, battle.units())
 	show_unit_ranges(u, reach)
-	arrow = [u.cell]
-	battle.map.arrow_path = arrow.duplicate()
-	battle.state = Battle.State.SELECTED
-	refresh_info()
+	_start_path()
 
 
 ## Shows a unit's move (blue), attack (red) and support (green) ranges.
 func show_unit_ranges(u: Unit, unit_reach: Dictionary) -> void:
 	battle.map.show_ranges(unit_reach.cells.keys(), battle.map.get_attack_cells(unit_reach.cells, battle.offense_ranges(u)),
 		battle.map.get_attack_cells(unit_reach.cells, u.spell_ranges(true)))
+
+
+## Starts picking where the selected unit moves (SELECTED), from where it stands.
+func _start_path() -> void:
+	arrow = [selected.cell]
+	battle.map.arrow_path = arrow.duplicate()
+	last_reach_cell = selected.cell
+	battle.cursor.cell = selected.cell
+	battle.state = Battle.State.SELECTED
+	refresh_info()
 
 
 ## Extends the arrow along the cursor's trail if that stays a legal path within
@@ -404,16 +357,91 @@ func move_selected(dest: Vector2i) -> void:
 			finish_action(true)
 			return
 	if canto_move:
-		canto_move = false
-		finish_action(true)
+		menus.open_canto_menu()
+	elif quick_target:
+		_open_quick_menu()
+	else:
+		menus.open_unit_menu()
+
+
+## X at the unit menu: back to where it started its move, picking where to go again.
+func undo_move() -> void:
+	selected.set_cell(origin_cell)
+	if canto_move:
+		_pick_canto_move()
+	else:
+		select(selected)
+
+
+## Z on a unit while picking where to move: an enemy to attack, or a hurt ally
+## to heal. Moves to a cell it can do that from (the last cell in its reach the
+## cursor was on, if it can from there; otherwise the nearest one to it), then
+## opens the menu for it with that unit as the target. Does nothing if no cell works.
+func move_to_act_on(u: Unit) -> void:
+	var cells := quick_cells(selected, u)
+	if cells.is_empty():
 		return
-	open_unit_menu()
+	var dest: Vector2i = cells[0]
+	for c in cells:
+		var closer := BattleMap.distance(c, last_reach_cell) < BattleMap.distance(dest, last_reach_cell)
+		var as_close := BattleMap.distance(c, last_reach_cell) == BattleMap.distance(dest, last_reach_cell)
+		if closer or (as_close and reach.cells[c] < reach.cells[dest]):
+			dest = c
+	quick_target = u
+	update_arrow(dest)
+	move_selected(dest)
+
+
+## Cells in the selected unit's reach from which it could act on `target`: hit it
+## with a weapon or an attack spell (a foe), or heal it (a hurt ally).
+func quick_cells(u: Unit, target: Unit) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for c in reach.cells:
+		if _can_act_on_from(u, target, BattleMap.distance(c, target.cell)):
+			result.append(c)
+	return result
+
+
+func _can_act_on_from(u: Unit, target: Unit, dist: int) -> bool:
+	if target.team != u.team:
+		for w in u.weapons():
+			if u.reaches(w, dist):
+				return true
+	elif target.hp >= target.max_hp:
+		return false
+	for s in u.spells:
+		var spell := Spells.get_spell(s)
+		var wanted := "enemy" if target.team != u.team else "ally"
+		if spell.target == wanted and Spells.can_afford(u, s) and Spells.reaches(s, dist, u):
+			return true
+	return false
+
+
+## After a move to act on `quick_target`: its weapon menu (a foe in weapon range)
+## or the magic menu, which then target it first. The unit menu if neither fits now.
+func _open_quick_menu() -> void:
+	var target := quick_target
+	quick_target = null
+	targeting.preferred = target
+	if not battle.units().has(target):
+		menus.open_unit_menu()
+	elif target.team != selected.team and selected.weapons().any(func(w: Dictionary) -> bool:
+			return selected.reaches(w, BattleMap.distance(selected.cell, target.cell))):
+		menus.open_attack_menu()
+	elif battle.actions.castable_spells(selected).any(func(s: String) -> bool:
+			return Spells.targets_for(selected, s, battle.units()).has(target)):
+		menus.open_magic_menu()
+	else:
+		menus.open_unit_menu()
 
 
 ## Ends the selected unit's action. Galeforce-style skills let it act again; Canto
 ## lets it move with the MOV it has left, unless `no_canto` (it waited, or that
 ## was its Canto move).
 func finish_action(no_canto := false) -> void:
+	if canto_move:
+		no_canto = true
+		canto_move = false
 	if is_instance_valid(selected) and selected.hp > 0:
 		if selected.refresh_pending:
 			selected.refresh_pending = false
@@ -424,6 +452,8 @@ func finish_action(no_canto := false) -> void:
 			selected.has_acted = true
 			battle.cursor.cell = selected.cell
 	selected = null
+	quick_target = null
+	targeting.preferred = null
 	battle.map.clear_ranges()
 	battle.refresh_threat()
 	if battle.phases.check_game_over():
@@ -437,7 +467,8 @@ func finish_action(no_canto := false) -> void:
 
 
 ## Canto: if the selected unit can still move somewhere with the MOV left, lets
-## the player pick where (SELECTED, with only movement shown). Returns whether it did.
+## the player pick where (SELECTED, with only movement shown), then Wait. Returns
+## whether it did.
 func _start_canto() -> bool:
 	var rules := Skills.map_rules(selected)
 	var allowed := rules.has("canto") or (rules.has("footwork") and last_action == "dance")
@@ -446,22 +477,22 @@ func _start_canto() -> bool:
 	if not allowed or selected.escaped or selected.carried_by or battle.phases.check_game_over():
 		return false
 	var left := move_budget - moved_cost
-	var canto_reach := battle.map.get_reachable(selected, battle.units(), left)
-	if canto_reach.cells.size() <= 1:
+	if battle.map.get_reachable(selected, battle.units(), left).cells.size() <= 1:
 		return false
 	canto_move = true
+	move_committed = false
 	move_budget = left
-	moved_cost = 0.0
-	reach = canto_reach
 	origin_cell = selected.cell
-	arrow = [selected.cell]
-	battle.map.arrow_path = arrow.duplicate()
-	battle.map.show_ranges(reach.cells.keys(), [])
-	battle.cursor.cell = selected.cell
-	battle.state = Battle.State.SELECTED
+	_pick_canto_move()
 	selected.popup("Canto", Color.LIGHT_SKY_BLUE)
-	refresh_info()
 	return true
+
+
+func _pick_canto_move() -> void:
+	moved_cost = 0.0
+	reach = battle.map.get_reachable(selected, battle.units(), move_budget)
+	battle.map.show_ranges(reach.cells.keys(), [])
+	_start_path()
 
 
 # --- Map info: unit ranges, marks, stats screen, unit list, objective ---------
@@ -511,9 +542,16 @@ func cycle_status(step: int) -> void:
 	battle.ui.show_status(status_unit)
 
 
+## Back to where the stats screen was opened from, on the unit it was flipped to
+## (the cursor goes to it while browsing; the unit list selects it).
 func close_status() -> void:
 	battle.ui.hide_status()
 	battle.state = status_return_state
+	if status_return_state == Battle.State.UNIT_LIST:
+		battle.ui.unit_list.select_unit(status_unit)
+		return
+	if status_return_state in [Battle.State.IDLE, Battle.State.FORMATION] and battle.units().has(status_unit):
+		battle.cursor.cell = status_unit.cell
 	refresh_info()
 
 
@@ -523,8 +561,13 @@ func open_unit_list() -> void:
 	battle.ui.unit_list.open(battle.units())
 
 
+## Closes the list with the cursor on the unit selected in it.
 func close_unit_list() -> void:
-	battle.ui.unit_list.close()
+	var list := battle.ui.unit_list
+	var target := list.selected_unit()
+	list.close()
+	if target and battle.units().has(target):
+		battle.cursor.cell = target.cell
 	browse()
 
 
@@ -543,491 +586,3 @@ func open_objective() -> void:
 	]
 	battle.state = Battle.State.OBJECTIVE
 	battle.ui.show_objective(lines)
-
-
-# --- Menus --------------------------------------------------------------------
-
-func weapon_label(w: Dictionary) -> String:
-	return Items.label(w)
-
-
-func open_unit_menu() -> void:
-	var options: Array[String] = []
-	var objective := Objectives.of(Levels.get_level(Levels.selected))
-	if Objectives.can_seize(objective, selected):
-		options.append("Seize")
-	if Objectives.can_escape(objective, selected):
-		options.append("Escape")
-	var here := battle.map.object_at(selected.cell)
-	if here.get("type", "") == "village" and here.state == "intact":
-		options.append("Visit")
-	if here.get("type", "") == "chest" and here.state == "intact" and battle.actions.can_open_chest(selected):
-		options.append("Open")
-	if not battle.actions.adjacent_doors(selected).is_empty() and battle.actions.can_open_chest(selected):
-		options.append("Open Door")
-	if battle.actions.can_attack_any(selected):
-		options.append("Attack")
-	if not battle.actions.breakable_in_reach(selected).is_empty():
-		options.append("Break")
-	if not battle.actions.castable_spells(selected).is_empty():
-		options.append("Magic")
-	for ability in Skills.abilities(selected):
-		if Spells.has_targets(selected, ability, battle.units(), battle.map):
-			options.append(ability)
-	if not battle.actions.dance_targets(selected).is_empty():
-		options.append("Dance")
-	if not battle.actions.inspire_targets(selected).is_empty():
-		options.append("Inspire")
-	if not battle.actions.steal_targets(selected).is_empty():
-		options.append("Steal")
-	if not battle.events.talk_targets(selected).is_empty():
-		options.append("Talk")
-	if not battle.actions.trade_partners(selected).is_empty():
-		options.append("Trade")
-	if not battle.actions.shove_targets(selected).is_empty():
-		options.append("Shove")
-	if not battle.actions.rescue_targets(selected).is_empty():
-		options.append("Rescue")
-	if not battle.actions.drop_cells_for(selected).is_empty():
-		options.append("Drop")
-	if not battle.actions.board_targets(selected).is_empty():
-		options.append("Board")
-	if not battle.actions.unloadable(selected).is_empty():
-		options.append("Unload")
-	if not selected.items.is_empty():
-		options.append("Items")
-	options.append("Wait")
-	_open_menu("unit", options)
-
-
-## Weapon choice for Attack: only weapons that can reach an enemy are listed.
-func open_attack_menu() -> void:
-	var options: Array[String] = []
-	weapon_choices = []
-	for i in selected.items.size():
-		if selected.can_wield(selected.items[i]) and not battle.actions.enemies_in_range(selected, selected.items[i]).is_empty():
-			options.append(weapon_label(selected.items[i]))
-			weapon_choices.append(i)
-	_open_menu("attack", options)
-
-
-## Break: pick a weapon that reaches a breakable tile, then the tile.
-func open_break_menu() -> void:
-	var options: Array[String] = []
-	weapon_choices = []
-	for i in selected.items.size():
-		var it := selected.items[i]
-		if Items.is_weapon(it) and selected.can_wield(it) and not battle.actions.breakable_cells(selected, it).is_empty():
-			options.append(weapon_label(it))
-			weapon_choices.append(i)
-	_open_menu("break", options)
-
-
-func open_magic_menu() -> void:
-	spell_choices = battle.actions.castable_spells(selected)
-	var options: Array[String] = []
-	for s in spell_choices:
-		options.append("%s  %dMP" % [s, Spells.get_spell(s).mp])
-	_open_menu("magic", options)
-
-
-## Inventory view. Picking a weapon equips it (does not end the unit's turn);
-## picking a usable consumable uses it (ends the turn). Weapons the unit's class
-## can't wield are marked (x).
-func open_items_menu() -> void:
-	var options: Array[String] = []
-	var equipped := selected.equipped_index()
-	for i in selected.items.size():
-		var item := selected.items[i]
-		var mark := ""
-		if i == equipped:
-			mark = "  (E)"
-		elif Items.is_weapon(item) and not selected.can_wield(item):
-			mark = "  (x)"
-		options.append(weapon_label(item) + mark)
-	_open_menu("items", options)
-
-
-## Map menu > Rewind: pick an earlier turn start (this turn's included), newest first.
-func open_rewind_menu() -> void:
-	var options: Array[String] = []
-	for i in range(battle.turn_history.size() - 1, -1, -1):
-		options.append("Turn %d" % battle.turn_history[i].turn)
-	var uses := "unlimited" if battle.rewinds_left < 0 else "%d left" % battle.rewinds_left
-	_open_menu("rewind", options, "Rewind to the start of (%s):" % uses)
-
-
-## Which weapon the Repair Kit at `kit` should restore.
-func open_repair_menu(kit: int) -> void:
-	repair_kit = kit
-	repair_choices = battle.actions.repairable_weapons(selected)
-	var options: Array[String] = []
-	for i in repair_choices:
-		var w := selected.items[i]
-		options.append("%s  %d/%d" % [w.name, w.uses, Weapons.max_uses(w)])
-	_open_menu("repair", options, "Repair which weapon?")
-
-
-## Which item to take from `foe`.
-func open_steal_menu(foe: Unit) -> void:
-	steal_target = foe
-	steal_choices = battle.actions.stealable_items(foe)
-	var options: Array[String] = []
-	for i in steal_choices:
-		options.append(Items.label(foe.items[i]))
-	battle.map.clear_ranges()
-	battle.cursor.cell = selected.cell
-	_open_menu("steal", options, "Steal from " + foe.unit_name)
-
-
-## Picks which passenger to unload (skipped when there's only one).
-func open_unload_menu() -> void:
-	passenger_choices = battle.actions.unloadable(selected)
-	if passenger_choices.size() == 1:
-		start_unload_targeting(passenger_choices[0])
-		return
-	var options: Array[String] = []
-	for p in passenger_choices:
-		options.append(p.unit_name)
-	_open_menu("unload", options)
-
-
-func _open_menu(context: String, options: Array[String], title := "") -> void:
-	menu_context = context
-	battle.ui.show_menu(options, selected.cell if selected else battle.cursor.cell, title)
-	battle.state = Battle.State.MENU
-
-
-func menu_accept() -> void:
-	match menu_context:
-		"end_turn":
-			if battle.ui.menu_choice() == "End Turn":
-				battle.phases.end_player_phase()
-			else:
-				battle.state = Battle.State.IDLE
-				refresh_info()
-		"restart":
-			if battle.ui.menu_choice() == "Restart":
-				get_tree().reload_current_scene()
-			else:
-				battle.state = Battle.State.IDLE
-				refresh_info()
-		"quit":
-			if battle.ui.menu_choice() == "Quit":
-				Campaign.active = false
-				get_tree().change_scene_to_file(Battle.LEVEL_SELECT_SCENE)
-			else:
-				battle.state = Battle.State.IDLE
-				refresh_info()
-		"map":
-			match battle.ui.menu_choice():
-				"End Turn":
-					confirm_end_turn()
-				"Units":
-					open_unit_list()
-				"Objective":
-					open_objective()
-				"Options":
-					battle.state = Battle.State.OPTIONS
-					battle.ui.options_screen.open()
-				"Rewind":
-					open_rewind_menu()
-				"Suspend":
-					battle.phases.suspend()
-				"Restart":
-					var options: Array[String] = ["Cancel", "Restart"]
-					_open_menu("restart", options, "Restart this map?")
-				"Level Select":
-					var options: Array[String] = ["Cancel", "Quit"]
-					var note := "You can resume from the start of this turn." if Settings.value("auto_save") \
-						else "Progress on this map is lost."
-					_open_menu("quit", options, "Quit to the level select?\n" + note)
-		"formation":
-			match battle.ui.menu_choice():
-				"Fight!":
-					formation.end()
-					battle.begin()
-				"Units":
-					open_unit_list()
-				"Objective":
-					open_objective()
-				"Options":
-					battle.state = Battle.State.OPTIONS
-					battle.ui.options_screen.open()
-				"Back to Prep":
-					formation.leave()
-		"unit":
-			match battle.ui.menu_choice():
-				"Seize":
-					_act(battle.actions.do_seize.bind(selected))
-				"Escape":
-					_act(battle.actions.do_escape.bind(selected))
-				"Visit":
-					_act(battle.actions.do_visit.bind(selected))
-				"Open":
-					_act(battle.actions.do_open.bind(selected))
-				"Attack":
-					open_attack_menu()
-				"Break":
-					open_break_menu()
-				"Open Door":
-					start_cell_targeting("door", battle.actions.adjacent_doors(selected))
-				"Magic":
-					open_magic_menu()
-				"Dance":
-					start_unit_targeting("dance", battle.actions.dance_targets(selected))
-				"Inspire":
-					start_unit_targeting("inspire", [selected])
-				"Board":
-					start_unit_targeting("board", battle.actions.board_targets(selected))
-				"Unload":
-					open_unload_menu()
-				"Trade":
-					start_unit_targeting("trade", battle.actions.trade_partners(selected))
-				"Steal":
-					start_unit_targeting("steal", battle.actions.steal_targets(selected))
-				"Talk":
-					start_unit_targeting("talk", battle.events.talk_targets(selected))
-				"Shove":
-					start_unit_targeting("shove", battle.actions.shove_targets(selected))
-				"Rescue":
-					start_unit_targeting("rescue", battle.actions.rescue_targets(selected))
-				"Drop":
-					start_cell_targeting("drop", battle.actions.drop_cells_for(selected))
-				"Items":
-					open_items_menu()
-				"Wait":
-					finish_action(true)
-				var choice:
-					if Skills.abilities(selected).has(choice):
-						start_ability_targeting(choice)
-		"attack":
-			selected.equip(weapon_choices[battle.ui.menu_index])
-			start_unit_targeting("attack", battle.actions.enemies_in_range(selected, selected.weapon))
-		"break":
-			selected.equip(weapon_choices[battle.ui.menu_index])
-			start_cell_targeting("break", battle.actions.breakable_cells(selected, selected.weapon))
-		"magic":
-			start_spell_targeting(spell_choices[battle.ui.menu_index])
-		"unload":
-			start_unload_targeting(passenger_choices[battle.ui.menu_index])
-		"steal":
-			_act(battle.actions.do_steal.bind(selected, steal_target, steal_choices[battle.ui.menu_index]))
-		"repair":
-			_act(battle.actions.repair_weapon.bind(selected, repair_kit, repair_choices[battle.ui.menu_index]))
-		"rewind":
-			# Newest turn first.
-			battle.phases.rewind_to(battle.turn_history.size() - 1 - battle.ui.menu_index)
-		"items":
-			var item := selected.items[battle.ui.menu_index]
-			if selected.can_wield(item):
-				selected.equip(battle.ui.menu_index)
-				open_items_menu()
-			elif item.get("kind", "") == "scroll" and Items.can_use(selected, item):
-				_read_scroll(battle.ui.menu_index)
-			elif item.get("kind", "") == "repair" and Items.can_use(selected, item):
-				open_repair_menu(battle.ui.menu_index)
-			elif Items.can_use(selected, item):
-				_act(_use_item.bind(battle.ui.menu_index))
-			else:
-				selected.popup("Can't use", Color.LIGHT_GRAY)
-				open_items_menu()
-
-
-## A scroll is used up (and ends the turn) only if the skill was learned.
-func _read_scroll(index: int) -> void:
-	battle.state = Battle.State.BUSY
-	var scroll := selected.items[index]
-	if await battle.actions.learn_skill(selected, scroll.skill):
-		selected.items.erase(scroll)
-		await get_tree().create_timer(0.3).timeout
-		finish_action()
-	else:
-		open_items_menu()
-
-
-## Asks the player to pick one of `options` mid-action (e.g. which skill to forget)
-## and returns its index. Cancel picks the last option, so make that the safe one.
-func choose(options: Array[String], title: String) -> int:
-	var previous := battle.state
-	battle.state = Battle.State.CHOICE
-	battle.ui.show_menu(options, battle.cursor.cell, title)
-	var index: int = await choice_made
-	battle.state = previous
-	return index
-
-
-## Runs an action that ends the selected unit's turn.
-func _act(action: Callable) -> void:
-	battle.state = Battle.State.BUSY
-	await action.call()
-	finish_action()
-
-
-func _use_item(index: int) -> void:
-	selected.use_item(index)
-	await get_tree().create_timer(0.5).timeout
-
-
-func menu_cancel() -> void:
-	match menu_context:
-		"map", "end_turn", "restart", "quit", "rewind", "formation":
-			browse()
-		"unit":
-			if move_committed:
-				# Trading commits the move, as in GBA FE (and so does unloading a ship).
-				open_unit_menu()
-				return
-			selected.set_cell(origin_cell)
-			battle.cursor.cell = origin_cell
-			select(selected)
-		"attack", "magic", "items", "unload", "break":
-			open_unit_menu()
-		"steal":
-			start_unit_targeting("steal", battle.actions.steal_targets(selected))
-		"repair":
-			open_items_menu()
-
-
-# --- Targeting ----------------------------------------------------------------
-
-## Picks one of `units` for `mode` ("attack", "dance", "trade", "steal", "shove",
-## "rescue", "board" or "inspire").
-func start_unit_targeting(mode: String, units: Array[Unit]) -> void:
-	active_spell = ""
-	target_mode = mode
-	targets = units
-	target_index = 0
-	battle.state = Battle.State.TARGETING
-	show_target()
-
-
-func start_spell_targeting(spell_name: String) -> void:
-	active_spell = spell_name
-	target_mode = "spell"
-	if Spells.get_spell(spell_name).target == "area":
-		start_area_targeting()
-		return
-	targets = Spells.targets_for(selected, spell_name, battle.units())
-	target_index = 0
-	battle.state = Battle.State.TARGETING
-	show_target()
-
-
-## A racial attack (Fire Breath...): targeted like a single-target spell, but X goes
-## back to the unit menu.
-func start_ability_targeting(ability: String) -> void:
-	active_spell = ability
-	target_mode = "ability"
-	targets = Spells.targets_for(selected, ability, battle.units())
-	target_index = 0
-	battle.state = Battle.State.TARGETING
-	show_target()
-
-
-## Picks one of `cells` for `mode` ("drop", "unload", "break" or "door").
-func start_cell_targeting(mode: String, cells: Array[Vector2i]) -> void:
-	active_spell = ""
-	target_mode = mode
-	target_cells = cells
-	target_index = 0
-	battle.state = Battle.State.TARGETING
-	show_target()
-
-
-func start_unload_targeting(passenger: Unit) -> void:
-	unload_passenger = passenger
-	start_cell_targeting("unload", battle.actions.landing_cells(selected, passenger))
-
-
-func show_target() -> void:
-	if target_mode in ["break", "door"]:
-		var cell := target_cells[target_index]
-		battle.cursor.cell = cell
-		battle.map.show_area([], [cell])
-		var tile_name: String = battle.map.terrain_at(cell).name
-		if target_mode == "door":
-			battle.ui.show_cell_forecast("Open Door", battle.cursor.cell)
-		else:
-			var hp: int = battle.map.tile_hp.get(cell, 0)
-			battle.ui.show_cell_forecast("%s  HP %d -> %d" % [tile_name, hp, maxi(0, hp - battle.actions.tile_damage(selected))], battle.cursor.cell)
-		return
-	if target_mode in ["drop", "unload"]:
-		var cell := target_cells[target_index]
-		battle.cursor.cell = cell
-		battle.map.show_area([], [cell])
-		var passenger := selected.carrying if target_mode == "drop" else unload_passenger
-		battle.ui.show_drop_forecast(passenger, battle.map.terrain_at(cell).name, battle.cursor.cell,
-			"Drop" if target_mode == "drop" else "Unload")
-		return
-	if target_mode == "inspire":
-		var allies := battle.actions.inspire_targets(selected)
-		battle.cursor.cell = selected.cell
-		battle.map.show_area([], allies.map(func(a: Unit) -> Vector2i: return a.cell))
-		battle.ui.show_inspire_forecast(allies, Classes.inspire_bonus(selected.level), battle.cursor.cell)
-		return
-	var target := targets[target_index]
-	battle.cursor.cell = target.cell
-	if target_mode == "rescue":
-		battle.map.show_area([], [target.cell])
-		battle.ui.show_rescue_forecast(target, battle.cursor.cell)
-	elif target_mode == "dance":
-		battle.ui.show_dance_forecast(target, battle.cursor.cell)
-	elif target_mode == "board":
-		battle.map.show_area([], [target.cell])
-		battle.ui.show_board_forecast(target, battle.cursor.cell)
-	elif target_mode == "shove":
-		var dest := battle.actions.shove_destination(selected, target)
-		battle.map.show_area([], [dest])
-		battle.ui.show_shove_forecast(target, battle.map.terrain_at(dest).name, battle.cursor.cell)
-	elif target_mode == "trade":
-		battle.ui.show_trade_preview(target, battle.cursor.cell)
-	elif target_mode == "talk":
-		battle.map.show_area([], [target.cell])
-		battle.ui.show_cell_forecast("Talk to %s" % target.unit_name, battle.cursor.cell)
-	elif target_mode == "steal":
-		var names: Array[String] = []
-		for i in battle.actions.stealable_items(target):
-			names.append(target.items[i].name)
-		battle.ui.show_cell_forecast("Steal from %s\n%s" % [target.unit_name, ", ".join(names)], battle.cursor.cell)
-	elif active_spell and Spells.is_support(active_spell):
-		var spell := Spells.get_spell(active_spell)
-		battle.ui.show_heal_forecast(selected, target, active_spell, Spells.heal_amount(selected, spell, target), battle.cursor.cell)
-	elif active_spell:
-		var spell := Spells.get_spell(active_spell)
-		battle.ui.show_forecast(selected, target, Combat.spell_forecast(selected, target, spell, battle.map), battle.cursor.cell,
-			active_spell, not spell.get("physical", false))  # MP is magic defense: shown for magic only
-	else:
-		battle.ui.show_forecast(selected, target, Combat.forecast(selected, target, battle.map), battle.cursor.cell)
-
-
-## Free cursor limited to the spell's cast range; starts on the center hitting the most enemies.
-func start_area_targeting() -> void:
-	area_centers = Spells.area_centers(selected, active_spell, battle.map, battle.units())
-	var best := selected.cell
-	var best_count := -1
-	for c in area_centers:
-		var count := Spells.area_targets(selected, active_spell, c, battle.units(), battle.map).size()
-		if count > best_count:
-			best = c
-			best_count = count
-	battle.cursor.cell = best
-	battle.state = Battle.State.AREA_TARGET
-	show_area_preview()
-
-
-func current_area_victims() -> Array[Unit]:
-	return Spells.area_targets(selected, active_spell, battle.cursor.cell, battle.units(), battle.map)
-
-
-func show_area_preview() -> void:
-	battle.map.show_area(area_centers, Spells.area_cells(active_spell, battle.cursor.cell, battle.map))
-	var spell := Spells.get_spell(active_spell)
-	var rows: Array = []
-	for v in current_area_victims():
-		rows.append([v.unit_name, v.hp, Combat.spell_damage(selected, v, spell, battle.map),
-			Combat.spell_hit_chance(selected, v, spell, battle.map)])
-	var note := ""
-	if spell.has("terraform"):
-		note = "%s -> %s" % [battle.map.terrain_at(battle.cursor.cell).name, BattleMap.TERRAIN[spell.terraform].name]
-	battle.ui.show_area_forecast(selected, active_spell, rows, battle.cursor.cell, note)

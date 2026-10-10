@@ -208,7 +208,7 @@ func test_rescue_and_drop_ferry() -> void:
 	await press(KEY_Z)
 	check_eq(fighter.cell, Vector2i(8, 6), "carrier moved (across the river ford)")
 	await pick("Drop")
-	var drop_cell: Vector2i = b.input.target_cells[0]
+	var drop_cell: Vector2i = b.input.targeting.cells[0]
 	await press(KEY_Z)
 	await press(KEY_X)  # no Canto move
 	check(fighter.carrying == null and lord.carried_by == null, "dropped")
@@ -399,7 +399,7 @@ func test_ship_board_and_unload() -> void:
 	await pick("Unload")
 	check_eq(b.state, b.State.MENU, "two passengers: pick who to unload")
 	await pick("Lord")
-	var lord_cell: Vector2i = b.input.target_cells[0]
+	var lord_cell: Vector2i = b.input.targeting.cells[0]
 	await press(KEY_Z)
 	check(lord.carried_by == null and lord.visible and b.units().has(lord), "Lord unloaded")
 	check_eq(lord.cell, lord_cell, "onto the chosen cell")
@@ -784,9 +784,9 @@ func test_dragon_and_fire_breath() -> void:
 	await open_menu_in_place(lord)
 	check(not b.ui.menu_options.has("Magic"), "no Magic menu")
 	await pick("Fire Breath")
-	check_eq(b.input.target_mode, "ability", "targeting the breath")
+	check_eq(b.input.targeting.mode, "ability", "targeting the breath")
 	await press(KEY_X)
-	check_eq(b.input.menu_context, "unit", "X goes back to the unit menu")
+	check_eq(b.input.menus.context, "unit", "X goes back to the unit menu")
 	await pick("Fire Breath")
 	brig.hp = 99
 	brig.max_hp = 99

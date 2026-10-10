@@ -20,6 +20,107 @@ func test_jump_to_next_unit() -> void:
 	check_eq(b.cursor.cell, waiting[0].cell, "wraps around to the first")
 
 
+func test_next_unit_of_another_side() -> void:
+	var enemies: Array[Unit] = b.units_of(Unit.Team.ENEMY)
+	b.cursor.cell = enemies[0].cell
+	await press(KEY_A)
+	check_eq(b.cursor.cell, enemies[1].cell, "on an enemy: the next enemy")
+	b.cursor.cell = enemies[-1].cell
+	await press(KEY_A)
+	check_eq(b.cursor.cell, enemies[0].cell, "wrapping around")
+
+
+func test_acted_unit_opens_map_menu() -> void:
+	var lord := unit_named("Lord")
+	lord.has_acted = true
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	check_eq(b.input.menus.context, "map", "Z on a unit that acted: the map menu, as on an empty tile")
+
+
+func test_cursor_follows_info_screens() -> void:
+	var players: Array[Unit] = b.units_of(Unit.Team.PLAYER)
+	b.cursor.cell = players[0].cell
+	await press(KEY_D)
+	await press(KEY_DOWN)
+	await press(KEY_X)
+	check_eq(b.cursor.cell, players[1].cell, "closing the stats screen: the cursor is on the unit it was flipped to")
+	# The unit list: X also leaves the cursor on the selected unit.
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("Units")
+	await press(KEY_DOWN)
+	await press(KEY_DOWN)
+	var picked: Unit = b.ui.unit_list.selected_unit()
+	await press(KEY_X)
+	check_eq(b.cursor.cell, picked.cell, "closing the unit list: the cursor is on its unit")
+	# Stats opened from the list: flipping units moves the list's selection.
+	b.cursor.cell = Vector2i(5, 5)
+	await press(KEY_Z)
+	await pick("Units")
+	await press(KEY_D)
+	await press(KEY_DOWN)
+	var flipped: Unit = b.input.status_unit
+	await press(KEY_X)
+	check_eq(b.ui.unit_list.selected_unit(), flipped, "back in the list, on the unit flipped to")
+
+
+func test_pick_target_from_map() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	var other := _spawn_enemy(Vector2i(7, 7))
+	lord.set_cell(Vector2i(3, 6))
+	lord.items.assign([Items.make("Iron Sword")])  # melee only
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_DOWN)
+	for i in 3:
+		await press(KEY_RIGHT)
+	var hovered_cell: Vector2i = b.cursor.cell
+	check(b.input.reach.cells.has(hovered_cell), "(the test's last hovered cell is in reach)")
+	await press(KEY_UP)
+	check_eq(b.cursor.cell, brig.cell, "cursor on the Brigand")
+	await press(KEY_Z)
+	check_eq(lord.cell, hovered_cell, "Z on an enemy: moves to the last cell hovered, as it can attack from there")
+	check_eq(b.input.menus.context, "attack", "and picks the weapon")
+	await press(KEY_Z)
+	check_eq(b.input.targeting.targets[b.input.targeting.index], brig, "then targets that enemy, not another in range")
+	check(b.input.targeting.targets.has(other), "(another enemy was in range)")
+	# X goes back through the menus, and the move can be undone.
+	await press(KEY_X)
+	await press(KEY_X)
+	await press(KEY_X)
+	check_eq(lord.cell, Vector2i(3, 6), "undone like any move")
+	# Hovering somewhere it can't attack from: the nearest cell that can.
+	b.cursor.cell = lord.cell
+	b.input.last_reach_cell = Vector2i(3, 5)
+	b.cursor.cell = brig.cell
+	await press(KEY_Z)
+	check_eq(BattleMap.distance(lord.cell, brig.cell), 1, "moves next to it")
+	check_eq(BattleMap.distance(lord.cell, Vector2i(3, 5)), 3, "on the cell nearest the last hovered")
+
+
+func test_pick_ally_to_heal_from_map() -> void:
+	var cleric := unit_named("Cleric")
+	var lord := unit_named("Lord")
+	isolate([cleric, lord])
+	await process_frame
+	cleric.set_cell(Vector2i(2, 6))
+	lord.set_cell(Vector2i(5, 6))
+	b.cursor.cell = cleric.cell
+	await press(KEY_Z)
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	check_eq(b.state, b.State.SELECTED, "a healthy ally: nothing to do")
+	lord.hp = 5
+	await press(KEY_Z)
+	check_eq(BattleMap.distance(cleric.cell, lord.cell), 1, "a hurt ally: moves next to it")
+	check_eq(b.input.menus.context, "magic", "and opens the magic menu")
+	await pick("Heal  4MP")
+	check_eq(b.input.targeting.targets[b.input.targeting.index], lord, "targeting the ally")
+
+
 func test_fast_forward_enemy_phase() -> void:
 	Input.action_press("cancel")
 	await process_frame
@@ -63,7 +164,7 @@ func test_end_turn_warning() -> void:
 	b.cursor.cell = Vector2i(5, 5)
 	await press(KEY_Z)
 	await pick("End Turn")
-	check_eq(b.input.menu_context, "end_turn", "End Turn with units waiting asks first")
+	check_eq(b.input.menus.context, "end_turn", "End Turn with units waiting asks first")
 	check_eq(b.ui.menu_options, ["Cancel", "End Turn"], "Cancel is listed (and selected) first")
 	check(b.ui._menu_label.text.contains("%d units haven't acted" % waiting), "the prompt says how many")
 	await press(KEY_Z)
@@ -220,7 +321,7 @@ func test_restart_asks_first() -> void:
 	b.cursor.cell = Vector2i(5, 5)
 	await press(KEY_Z)
 	await pick("Restart")
-	check_eq(b.input.menu_context, "restart", "Restart asks for confirmation")
+	check_eq(b.input.menus.context, "restart", "Restart asks for confirmation")
 	check_eq(b.ui.menu_options, ["Cancel", "Restart"], "Cancel first")
 	await press(KEY_Z)
 	check_eq(b.state, b.State.IDLE, "Z right away cancels")

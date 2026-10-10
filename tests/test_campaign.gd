@@ -339,7 +339,7 @@ func test_quit_to_level_select_asks_first() -> void:
 	b.cursor.cell = Vector2i(5, 5)
 	await press(KEY_Z)
 	await pick("Level Select")
-	check_eq(b.input.menu_context, "quit", "Level Select asks for confirmation")
+	check_eq(b.input.menus.context, "quit", "Level Select asks for confirmation")
 	check_eq(b.ui.menu_choice(), "Cancel", "Cancel is selected first")
 	await press(KEY_Z)
 	check_eq(b.state, b.State.IDLE, "Cancel returns to the map")

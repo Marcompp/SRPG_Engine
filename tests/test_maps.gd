@@ -21,7 +21,7 @@ func test_break_wall_through_menu() -> void:
 	await pick("Break")
 	check_eq(b.ui.menu_options.size(), 2, "both axes reach the wall")
 	await press(KEY_Z)  # Iron Axe
-	check_eq(b.input.target_mode, "break", "then pick the tile")
+	check_eq(b.input.targeting.mode, "break", "then pick the tile")
 	check_eq(b.cursor.cell, wall, "the cursor jumps to it")
 	check(b.ui._spell_label.text.contains("Cracked Wall  HP 20 -> 5"), "forecast: STR 7 + Mt 8 = 15 damage")
 	await press(KEY_Z)

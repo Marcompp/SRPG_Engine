@@ -86,7 +86,7 @@ func cancel() -> void:
 	input.battle.ui.hide_trade()
 	input.selected.queue_redraw()
 	partner.queue_redraw()
-	input.open_unit_menu()
+	input.menus.open_unit_menu()
 
 
 func _refresh() -> void:
