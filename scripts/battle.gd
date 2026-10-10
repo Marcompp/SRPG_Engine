@@ -78,7 +78,7 @@ func _ready() -> void:
 	cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	_start_camera()
 	if Campaign.active and Campaign.checking_map and level.has("deploy"):
-		input.start_formation(level.deploy)
+		input.formation.start(level.deploy)
 		return
 	await begin()
 

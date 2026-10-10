@@ -2,12 +2,13 @@
 # Runs the headless test suite. Also fails if Godot printed any runtime script
 # error: Godot logs those and keeps going, so the GDScript runner can't see them.
 #
-# Usage: GODOT=/path/to/godot tests/run_tests.sh   (GODOT defaults to "godot")
+# Usage: GODOT=/path/to/godot tests/run_tests.sh [suite...]   (GODOT defaults to "godot";
+# suites: core ai units ui campaign maps skills events, default all)
 
 GODOT="${GODOT:-godot}"
 cd "$(dirname "$0")/.." || exit 1
 
-output=$("$GODOT" --headless --path . --script res://tests/run_tests.gd 2>&1)
+output=$("$GODOT" --headless --path . --script res://tests/run_tests.gd -- "$@" 2>&1)
 code=$?
 echo "$output"
 

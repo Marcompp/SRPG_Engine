@@ -1,7 +1,8 @@
 class_name BattleInput
 extends Node
 ## Player input: the browse/select/menu/targeting state machine (Battle.state),
-## the menus, targeting and forecasts, the trade screen and the info screens. Owns
+## the menus, targeting and forecasts, and the info screens (the trade screen and
+## Check Map are BattleTrade and BattleFormation, owned here). Owns
 ## the state of whatever the player is doing with the selected unit. What actually
 ## happens when a unit acts lives in BattleActions.
 
@@ -30,11 +31,9 @@ var active_spell := ""
 var target_mode := "attack"
 ## Set once the selected unit trades or unloads; its move can no longer be undone.
 var move_committed := false
-## Trade screen state: the partner, cursor (x = side: 0 selected / 1 partner,
-## y = slot), and the picked-up item's (side, slot), or (-1, -1) when none.
-var trade_partner: Unit
-var trade_cursor := Vector2i.ZERO
-var trade_held := Vector2i(-1, -1)
+## The trade screen and the prep screen's Check Map, in their own files.
+var trade := BattleTrade.new(self)
+var formation := BattleFormation.new(self)
 ## Cells an area spell may be centered on while in AREA_TARGET.
 var area_centers: Array[Vector2i] = []
 ## Cells to pick from while target_mode is one of CELL_MODES.
@@ -63,11 +62,6 @@ var arrow: Array[Vector2i] = []
 ## Unit shown on the stats screen, and the state to return to when it closes.
 var status_unit: Unit
 var status_return_state := Battle.State.IDLE
-## Check Map (FORMATION): the deploy cells units can be swapped between, and the
-## unit picked up to move, or null.
-var formation := false
-var formation_cells: Array = []
-var held: Unit
 
 
 # --- Input --------------------------------------------------------------------
@@ -122,11 +116,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif dir != Vector2i.ZERO:
 				move_cursor(dir)
 			elif accept:
-				formation_accept()
-			elif cancel and held:
-				drop_held()
+				formation.accept()
+			elif cancel and formation.held:
+				formation.drop_held()
 			elif cancel:
-				leave_formation()
+				formation.leave()
 		Battle.State.SELECTED:
 			if dir != Vector2i.ZERO:
 				move_cursor(dir)
@@ -215,7 +209,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif accept:
 				battle.ui.hide_forecast()
 				if target_mode == "trade":
-					open_trade(targets[target_index])
+					trade.open(targets[target_index])
 					return
 				if target_mode == "steal":
 					open_steal_menu(targets[target_index])
@@ -282,11 +276,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				open_magic_menu()
 		Battle.State.TRADE:
 			if dir != Vector2i.ZERO:
-				trade_move(dir)
+				trade.move(dir)
 			elif accept:
-				trade_accept()
+				trade.accept()
 			elif cancel:
-				trade_cancel()
+				trade.cancel()
 		Battle.State.GAME_OVER:
 			if Campaign.active:
 				if accept:
@@ -474,7 +468,7 @@ func _start_canto() -> bool:
 
 ## Back to looking around the map: the player phase, or Check Map before the battle.
 func browse() -> void:
-	battle.state = Battle.State.FORMATION if formation else Battle.State.IDLE
+	battle.state = Battle.State.FORMATION if formation.active else Battle.State.IDLE
 	refresh_info()
 
 
@@ -751,7 +745,7 @@ func menu_accept() -> void:
 		"formation":
 			match battle.ui.menu_choice():
 				"Fight!":
-					end_formation()
+					formation.end()
 					battle.begin()
 				"Units":
 					open_unit_list()
@@ -761,7 +755,7 @@ func menu_accept() -> void:
 					battle.state = Battle.State.OPTIONS
 					battle.ui.options_screen.open()
 				"Back to Prep":
-					leave_formation()
+					formation.leave()
 		"unit":
 			match battle.ui.menu_choice():
 				"Seize":
@@ -1037,161 +1031,3 @@ func show_area_preview() -> void:
 	if spell.has("terraform"):
 		note = "%s -> %s" % [battle.map.terrain_at(battle.cursor.cell).name, BattleMap.TERRAIN[spell.terraform].name]
 	battle.ui.show_area_forecast(selected, active_spell, rows, battle.cursor.cell, note)
-
-
-# --- Trade screen -------------------------------------------------------------
-# Pick an item on either side, then a slot on the other side: an occupied slot
-# swaps the two items, an empty slot hands the item over. Trading never uses up
-# the unit's action, so it can trade repeatedly and with several partners.
-
-func open_trade(partner: Unit) -> void:
-	trade_partner = partner
-	trade_held = Vector2i(-1, -1)
-	trade_cursor = Vector2i(0 if not selected.items.is_empty() else 1, 0)
-	battle.cursor.cell = selected.cell
-	battle.state = Battle.State.TRADE
-	_refresh_trade()
-
-
-func _trade_side(side: int) -> Unit:
-	return selected if side == 0 else trade_partner
-
-
-## Highest slot the cursor may sit on for a side: only filled slots, plus the
-## first empty one when it is the drop target for a held item.
-func _trade_max_slot(side: int) -> int:
-	var count := _trade_side(side).items.size()
-	if trade_held.x >= 0 and side != trade_held.x:
-		return mini(count, Unit.MAX_ITEMS - 1)
-	return count - 1
-
-
-func trade_move(dir: Vector2i) -> void:
-	if dir.y != 0:
-		var top := _trade_max_slot(trade_cursor.x)
-		trade_cursor.y = wrapi(trade_cursor.y + dir.y, 0, top + 1)
-	elif trade_held.x < 0:
-		var other := 1 - trade_cursor.x
-		if _trade_max_slot(other) >= 0:
-			trade_cursor = Vector2i(other, mini(trade_cursor.y, _trade_max_slot(other)))
-	_refresh_trade()
-
-
-func trade_accept() -> void:
-	if trade_held.x < 0:
-		# Pick up the item under the cursor and jump to the other side.
-		trade_held = trade_cursor
-		var other := 1 - trade_cursor.x
-		trade_cursor = Vector2i(other, mini(trade_cursor.y, _trade_max_slot(other)))
-	else:
-		var from := _trade_side(trade_held.x).items
-		var to := _trade_side(trade_cursor.x).items
-		var item := from[trade_held.y]
-		if trade_cursor.y < to.size():
-			from[trade_held.y] = to[trade_cursor.y]
-			to[trade_cursor.y] = item
-		else:
-			from.remove_at(trade_held.y)
-			to.append(item)
-		move_committed = true
-		trade_held = Vector2i(-1, -1)
-		# Stay on this side if it still has items, otherwise hop back.
-		if _trade_max_slot(trade_cursor.x) < 0:
-			trade_cursor.x = 1 - trade_cursor.x
-		trade_cursor.y = mini(trade_cursor.y, _trade_max_slot(trade_cursor.x))
-	_refresh_trade()
-
-
-func trade_cancel() -> void:
-	if trade_held.x >= 0:
-		trade_cursor = trade_held
-		trade_held = Vector2i(-1, -1)
-		_refresh_trade()
-		return
-	battle.ui.hide_trade()
-	selected.queue_redraw()
-	trade_partner.queue_redraw()
-	open_unit_menu()
-
-
-func _refresh_trade() -> void:
-	battle.ui.show_trade(selected, trade_partner, trade_cursor, trade_held)
-
-
-# --- Check Map (formation) ------------------------------------------------------
-
-## The prep screen's Check Map: look around the chapter's map before it starts and
-## swap units between the deploy cells. Fight! starts the battle from here.
-func start_formation(cells: Array) -> void:
-	formation = true
-	formation_cells = cells
-	var shown := {}
-	for c in cells:
-		shown[c] = true
-	battle.map.deploy_cells = shown
-	battle.state = Battle.State.BUSY
-	await battle.ui.show_banner("Check Map", Color("2850b0"))
-	browse()
-
-
-## Z: pick up a unit, put it down on a deploy cell (swapping with whoever is
-## there), mark an enemy, or open the menu on an empty tile.
-func formation_accept() -> void:
-	var cell := battle.cursor.cell
-	var u := battle.unit_at(cell)
-	if held:
-		if u == held:
-			drop_held()
-		elif can_place(held, cell) and (u == null or can_place(u, held.cell)):
-			swap_start_cells(held, cell)
-			drop_held()
-		return
-	if u and u.team == Unit.Team.PLAYER:
-		held = u
-		battle.map.held_cell = u.cell
-	elif u:
-		toggle_mark(u)
-	else:
-		battle.ui.hide_info()
-		var options: Array[String] = ["Fight!", "Units", "Objective", "Options", "Back to Prep"]
-		_open_menu("formation", options)
-
-
-func drop_held() -> void:
-	held = null
-	battle.map.held_cell = Vector2i(-1, -1)
-	refresh_info()
-
-
-## Whether `u` may start on `cell`: a deploy cell it can stand on.
-func can_place(u: Unit, cell: Vector2i) -> bool:
-	return formation_cells.has(cell) and battle.map.unit_cost(u, cell) >= 0
-
-
-## Moves `u` to `cell`; a unit already there takes u's old cell. Saved to
-## Campaign.placement so the battle (and a later Check Map) keeps the layout.
-func swap_start_cells(u: Unit, cell: Vector2i) -> void:
-	var other := battle.unit_at(cell)
-	if other:
-		other.set_cell(u.cell)
-	u.set_cell(cell)
-	for p in battle.units_of(Unit.Team.PLAYER):
-		Campaign.placement[p.unit_name] = p.cell
-	battle.refresh_threat()
-
-
-func end_formation() -> void:
-	held = null
-	formation = false
-	Campaign.checking_map = false
-	battle.map.deploy_cells = {}
-	battle.map.held_cell = Vector2i(-1, -1)
-	battle.map.clear_ranges()
-	battle.ui.hide_info()
-
-
-## X (nothing picked up) or Back to Prep: return to the prep screen; the
-## placement is kept.
-func leave_formation() -> void:
-	end_formation()
-	get_tree().change_scene_to_file(BattlePhases.PREP_SCENE)

@@ -50,13 +50,14 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 
 ## Tests
 
-Headless test suite (combat math, ranges, inventory, EXP, spells, Dance, Inspire, classes, ships, enemy AI, levels, movement types, full enemy phases):
+Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills` and `events`. Every method named `test_*` in a suite runs on a fresh battle; there's no list to update.
 
 ```
-GODOT=/path/to/godot tests/run_tests.sh
+GODOT=/path/to/godot tests/run_tests.sh            # everything
+GODOT=/path/to/godot tests/run_tests.sh skills ui  # just these suites
 ```
 
-Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if Godot printed any runtime script error, because Godot logs those and keeps running, so the GDScript runner can't see them. To run the suite directly: `godot --headless --path . --script res://tests/run_tests.gd`.
+Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if Godot printed any runtime script error, because Godot logs those and keeps running, so the GDScript runner can't see them. To run the suite directly: `godot --headless --path . --script res://tests/run_tests.gd [-- suite...]`.
 
 ## Controls
 
@@ -227,7 +228,7 @@ Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`,
 - `scripts/levels.gd`: levels (terrain layout + both rosters)
 - `events/`, `scripts/event_script.gd`, `battle_events.gd`, `dialogue_box.gd`: map event scripts, their parser, the battle part that runs them, and the dialogue box
 - `scripts/battle.gd`: the battle scene root: shared state (`state`, `turn`, ...), unit queries and enemy threat. Its parts are child nodes reached as `battle.input`, `battle.actions`, `battle.phases` and `battle.events` (map events, see below):
-  - `battle_input.gd`: player input, menus, targeting and forecasts, the trade and info screens
+  - `battle_input.gd`: player input, menus, targeting and forecasts, the info screens; it owns `battle_trade.gd` (the trade screen) and `battle_formation.gd` (Check Map)
   - `battle_actions.gd`: what units can do and doing it (shove, rescue, ships, break, combat, EXP...), shared by the player and the enemy AI
   - `battle_phases.gd`: player/enemy phases, reinforcements, game over, campaign and suspend flow
 - `scripts/combat.gd`, `experience.gd`: formulas

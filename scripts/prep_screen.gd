@@ -7,7 +7,7 @@ extends Control
 ##   Promote:    units at Classes.PROMOTION_LEVEL+ change into a promoted class.
 ##   Status:     the status screen for any army unit.
 ##   Check Map:  the chapter's map, to look around and swap the deployed units'
-##               starting cells (see BattleInput.start_formation); Fight! from there too.
+##               starting cells (see BattleFormation.start); Fight! from there too.
 ##   Fight!:     start the chapter.
 ## Up/Down: choose. Z: confirm. X: back. Changes are saved to the campaign at once.
 
