@@ -8,7 +8,7 @@ extends SceneTree
 ## Every method named test_* runs, in order, each on a fresh battle scene. Pass
 ## suite names as extra arguments to run only those (e.g. "-- skills events").
 
-const SUITES: Array[String] = ["core", "ai", "units", "ui", "campaign", "maps", "skills", "events"]
+const SUITES: Array[String] = ["core", "ai", "units", "ui", "campaign", "maps", "skills", "events", "mounts"]
 
 var b: Node
 var failures: Array[String] = []

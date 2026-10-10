@@ -213,7 +213,7 @@ func _render_left() -> void:
 	name_label.size.x = LEFT_WIDTH
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	_entry(_label(_left, unit.unit_class, Vector2(6, 70)), Glossary.unit_class(unit))
+	_entry(_label(_left, unit.class_display_name(), Vector2(6, 70)), Glossary.unit_class(unit))
 	_entry(_label(_left, unit.race, Vector2(6, 80)), Glossary.race(unit))
 	_entry(_label(_left, "Lv %d" % unit.level, Vector2(6, 91)), Glossary.stat("lv", unit))
 	if unit.team == Unit.Team.PLAYER:
@@ -230,7 +230,8 @@ func _render_stats() -> void:
 		var key: String = STAT_ROWS[i][0]
 		var row_y := i * 13.0
 		var bonus := Skills.stat_bonus(unit, key)
-		var value: int = unit.get(Experience.STATS[key]) + bonus
+		var own: int = unit.get(Experience.STATS[key])
+		var value: int = unit.ridden(own, key) + bonus
 		var capped := unit.is_capped(key)
 		_label(_page, STAT_ROWS[i][1], Vector2(0, row_y), DIM)
 		var color := CAPPED if capped else (BOOSTED if bonus > 0 else Color.WHITE)
@@ -238,6 +239,8 @@ func _render_stats() -> void:
 		var text := Glossary.stat(key, unit)
 		if bonus != 0:
 			text += " Skills: %+d." % bonus
+		if not unit.mount.is_empty():
+			text += " Mounted: rider %d / 2 + %s %d." % [own, unit.mount.name, unit.mount.stats.get(key, 0)]
 		_entry(value_label, text)
 		var fill := _bar(_page, Vector2(50, row_y + 5), 90, float(value) / unit.stat_cap(key), CAPPED if capped else BAR_FILL)
 		if capped:
@@ -248,8 +251,12 @@ func _render_stats() -> void:
 	var mov_color := BOOSTED if Skills.stat_bonus(unit, "mov") > 0 else Color.WHITE
 	_entry(_label(_page, "%d  %s" % [unit.mov, unit.move_type.capitalize()], Vector2(30, y), mov_color),
 		Glossary.STATS.mov + " " + Glossary.MOVE_TYPES.get(unit.move_type, ""))
+	if not unit.mount.is_empty():
+		var m := unit.mount
+		_entry(_label(_page, "%s: %s Lv %d (%s)" % [m.species, m.name, m.level, m.gender.capitalize()],
+			Vector2(0, y + 13), DIM), Mounts.species_data(m.species).description)
 	if unit.carrying:
-		_label(_page, "Carrying %s (DEX/AGI halved)" % unit.carrying.unit_name, Vector2(0, y + 14), DIM)
+		_label(_page, "Carrying %s (DEX/AGI halved)" % unit.carrying.unit_name, Vector2(0, y + 24), DIM)
 
 
 func _render_items() -> void:

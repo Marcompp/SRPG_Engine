@@ -107,7 +107,31 @@ static func unit_from_dict(data: Dictionary) -> Unit:
 	var u := Unit.new()
 	u.name = data.unit_name
 	_apply(u, data, [])
+	_migrate_mount(u)
 	return u
+
+
+## Saves from before mounts: units on a mounted class (or the old Flier/Whitewing)
+## become their foot class riding a fresh mount, keeping their effective stats.
+const _OLD_MOUNTED := {"Equestrian": ["Swordsman", "Horse"], "Cavalry": ["Footman", "Horse"],
+	"Nomad": ["Archer", "Horse"], "Gendarme": ["Swordsmaster", "Horse"], "Hussar": ["Marksman", "Horse"],
+	"Flier": ["Footman", "Pegasus"], "Whitewing": ["Swordsmaster", "Pegasus"]}
+
+
+static func _migrate_mount(u: Unit) -> void:
+	if not u.mount.is_empty() or not _OLD_MOUNTED.has(u.unit_class):
+		return
+	var foot: String = _OLD_MOUNTED[u.unit_class][0]
+	var species: String = _OLD_MOUNTED[u.unit_class][1]
+	if species == "Pegasus":
+		u.gender = "female"
+	var record := Mounts.generate(species, maxi(1, u.level / 2))
+	for s in Mounts.STATS:
+		var prop: String = Experience.STATS[s]
+		u.set(prop, clampi(2 * (u.get(prop) - record.stats[s]), 0, 20))
+	u.unit_class = foot
+	u.set_class(foot)
+	u.mount_up(record)
 
 
 static func _apply(u: Unit, data: Dictionary, all: Array[Unit]) -> void:

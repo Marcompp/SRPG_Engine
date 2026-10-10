@@ -106,7 +106,7 @@ func _sort() -> void:
 func _value(u: Unit, key: String) -> Variant:
 	match key:
 		"name": return u.unit_name
-		"class": return u.unit_class
+		"class": return u.class_display_name()
 		"lv": return u.level
 		"hp": return u.hp
 		"str": return u.strength
@@ -136,7 +136,7 @@ func _render() -> void:
 		var y := TOP + (row - _scroll) * ROW_H
 		var color := ENEMY_TEXT if u.team == Unit.Team.ENEMY \
 			else (ACTED_TEXT if u.has_acted else PLAYER_TEXT)
-		var values := [u.unit_name, u.unit_class, u.level, "%d/%d" % [u.hp, u.max_hp],
+		var values := [u.unit_name, u.class_display_name(), u.level, "%d/%d" % [u.hp, u.max_hp],
 			u.strength, u.dexterity, u.agility, u.defense, u.mov]
 		for c in COLUMNS.size():
 			var label := _label(str(values[c]), Vector2(COLUMNS[c].x, y), color if c == 0 else Color.WHITE)

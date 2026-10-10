@@ -204,7 +204,7 @@ func do_steal(u: Unit, foe: Unit, index: int) -> void:
 		Campaign.convoy.append(item)
 		u.popup(item.name + " to convoy", Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
-	if u.team == Unit.Team.PLAYER and u.level < Experience.LEVEL_CAP:
+	if u.team == Unit.Team.PLAYER and earns_exp(u):
 		await gain_exp(u, Experience.STEAL_EXP)
 
 
@@ -432,7 +432,7 @@ func do_inspire(u: Unit) -> void:
 		ally.inspire_bonus = maxi(ally.inspire_bonus, bonus)
 		ally.popup("STR/DEF +%d" % bonus, Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
-	if u.team == Unit.Team.PLAYER and u.level < Experience.LEVEL_CAP:
+	if u.team == Unit.Team.PLAYER and earns_exp(u):
 		await gain_exp(u, Experience.INSPIRE_EXP)
 
 
@@ -443,7 +443,7 @@ func do_dance(dancer: Unit, target: Unit) -> void:
 	target.has_acted = false
 	target.popup("Refreshed", Color.PINK)
 	await get_tree().create_timer(0.5).timeout
-	if dancer.level < Experience.LEVEL_CAP:
+	if earns_exp(dancer):
 		await gain_exp(dancer, Experience.DANCE_EXP)
 
 
@@ -456,7 +456,7 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 	target.heal(amount)
 	target.popup("+%d" % amount, Color.PALE_GREEN)
 	await get_tree().create_timer(0.5).timeout
-	if caster.team == Unit.Team.PLAYER and caster.level < Experience.LEVEL_CAP:
+	if caster.team == Unit.Team.PLAYER and earns_exp(caster):
 		await gain_exp(caster, spell.exp)
 
 
@@ -529,11 +529,15 @@ func cast_area(caster: Unit, center: Vector2i, spell_name: String) -> void:
 	battle.map.clear_ranges()
 	# EXP: sum of what each target would give, capped at one level.
 	var awards: Array = []
-	if caster.team == Unit.Team.PLAYER and caster.level < Experience.LEVEL_CAP and not victims.is_empty():
+	if caster.team == Unit.Team.PLAYER and earns_exp(caster) and not victims.is_empty():
 		var total := 0
 		for v in victims:
 			total += Experience.combat_exp(caster, v, damaged.has(v), v.hp <= 0)
-		awards.append([caster, mini(total, Experience.EXP_PER_LEVEL)])
+		var mount_total := 0
+		if not caster.mount.is_empty():
+			for v in victims:
+				mount_total += Experience.mount_combat_exp(caster.mount, v, damaged.has(v), v.hp <= 0)
+		awards.append([caster, mini(total, Experience.EXP_PER_LEVEL), mini(mount_total, Experience.EXP_PER_LEVEL)])
 	await _remove_dead_and_award(victims, awards)
 
 
@@ -554,7 +558,9 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 			dealt.append(a)
 		d.popup(("Crit! %d" if result.crit else "%d") % result.dmg,
 			Color.ORANGE if result.crit else Color.WHITE)
-		if d.hp <= 0:
+		if d.hp <= 0 and d.mount.get("skills", []).has("Loyal"):
+			_loyal_save(d)
+		elif d.hp <= 0:
 			_record_kill(a, d, result)
 		elif saved_by != "":
 			_note(d, "Survived a lethal blow from %s at %s, thanks to %s." % [foe_label(a), map_title(), saved_by])
@@ -562,6 +568,16 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 			_record_close_call(d, a)
 	else:
 		d.popup("Miss", Color.LIGHT_GRAY)
+
+
+## Loyal: the mount takes the fatal blow and falls; the rider stays, on foot, at 1 HP.
+func _loyal_save(d: Unit) -> void:
+	var lost := d.dismount()
+	d.hp = 1
+	d.popup("%s fell!" % lost.name, Color.LIGHT_GRAY, 10.0)
+	_note(d, "Lost %s, their %s, at %s." % [lost.name, str(lost.species).to_lower(), map_title()])
+	d.queue_redraw()
+	battle.refresh_threat()
 
 
 ## The map's name for biographies: "Border Village" for "Chapter 1: Border Village".
@@ -609,8 +625,10 @@ func _finish_exchange(attacker: Unit, defender: Unit, dealt: Array[Unit]) -> voi
 	for pair in [[attacker, defender], [defender, attacker]]:
 		var u: Unit = pair[0]
 		var foe: Unit = pair[1]
-		if u.team == Unit.Team.PLAYER and u.hp > 0 and u.level < Experience.LEVEL_CAP:
-			awards.append([u, Experience.combat_exp(u, foe, dealt.has(u), foe.hp <= 0)])
+		if u.team == Unit.Team.PLAYER and u.hp > 0 and earns_exp(u):
+			var mount_exp := 0 if u.mount.is_empty() \
+				else Experience.mount_combat_exp(u.mount, foe, dealt.has(u), foe.hp <= 0)
+			awards.append([u, Experience.combat_exp(u, foe, dealt.has(u), foe.hp <= 0), mount_exp])
 	# After-combat skills, also decided before the dead are freed.
 	var after := []
 	for pair in [[attacker, defender], [defender, attacker]]:
@@ -691,11 +709,24 @@ func _remove_dead_and_award(involved: Array[Unit], awards: Array) -> void:
 				p.set_cell(land)
 				p.visible = true
 	for award in awards:
-		await gain_exp(award[0], award[1])
+		await gain_exp(award[0], award[1], award[2])
 
 
-func gain_exp(u: Unit, amount: int) -> void:
+## Whether `u` still gets anything from EXP: its own levels, or its mount's (a
+## level-20 rider's mount keeps learning).
+func earns_exp(u: Unit) -> bool:
+	return u.level < Experience.LEVEL_CAP or (not u.mount.is_empty() and u.mount.level < Mounts.LEVEL_CAP)
+
+
+## `mount_amount`: what its mount earns, worked out separately (see
+## Experience.mount_combat_exp); -1 (non-combat EXP): `amount` times the species rate.
+func gain_exp(u: Unit, amount: int, mount_amount := -1) -> void:
+	if mount_amount < 0 and not u.mount.is_empty():
+		mount_amount = roundi(amount * Mounts.species_data(u.mount.species).exp_rate)
 	amount = roundi(amount * Skills.exp_multiplier(u))
+	if u.level >= Experience.LEVEL_CAP:
+		await _mount_exp(u, mount_amount)
+		return
 	u.popup("+%d EXP" % amount, Color.AQUAMARINE)
 	await get_tree().create_timer(0.5).timeout
 	u.exp_points += amount
@@ -711,6 +742,21 @@ func gain_exp(u: Unit, amount: int) -> void:
 			await learn_skill(u, skill)
 	if u.level >= Experience.LEVEL_CAP:
 		u.exp_points = 0
+	await _mount_exp(u, mount_amount)
+
+
+## The mount's own EXP and level-ups (shown in a small panel).
+func _mount_exp(u: Unit, amount: int) -> void:
+	if u.mount.is_empty() or amount <= 0:
+		return
+	for gains in Mounts.gain_exp(u.mount, amount):
+		var parts: Array[String] = []
+		for s in gains:
+			parts.append("%s+1" % Experience.STAT_LABELS[s])
+		battle.ui.show_cell_forecast("%s reached Lv %d!\n%s" % [u.mount.name, u.mount.level,
+			"  ".join(parts) if not parts.is_empty() else "No gains"], u.cell)
+		await get_tree().create_timer(1.2).timeout
+		battle.ui.hide_forecast()
 
 
 ## Teaches `u` a skill for good (Unit.learned). With Skills.LEARNED_CAP already

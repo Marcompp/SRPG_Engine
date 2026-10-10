@@ -31,11 +31,25 @@ const CASTER_STATS: Array[String] = ["int"]
 
 ## EXP a unit earns from one combat against `foe`.
 static func combat_exp(unit: Unit, foe: Unit, dealt_damage: bool, killed: bool) -> int:
+	return exp_for_levels(unit.level, foe.level, dealt_damage, killed)
+
+
+## EXP a rider's mount earns from the same combat, worked out on its own: the
+## mount's level against the foe's (a mount's level counts double, since mounts cap
+## at Mounts.LEVEL_CAP and units at LEVEL_CAP), times its species' exp_rate. So a
+## young mount under a veteran rider levels fast while the rider barely moves.
+static func mount_combat_exp(mount: Dictionary, foe: Unit, dealt_damage: bool, killed: bool) -> int:
+	var level := roundi(mount.level * float(LEVEL_CAP) / Mounts.LEVEL_CAP)
+	var gained := exp_for_levels(level, foe.level, dealt_damage, killed)
+	return clampi(roundi(gained * Mounts.species_data(mount.species).exp_rate), 1, EXP_PER_LEVEL)
+
+
+static func exp_for_levels(own_level: int, foe_level: int, dealt_damage: bool, killed: bool) -> int:
 	if not dealt_damage:
 		return 1
-	var gained := maxi(1, int((31 + foe.level - unit.level) / 3.0))
+	var gained := maxi(1, int((31 + foe_level - own_level) / 3.0))
 	if killed:
-		gained += maxi(0, KILL_BONUS + (foe.level - unit.level) * 3)
+		gained += maxi(0, KILL_BONUS + (foe_level - own_level) * 3)
 	return clampi(gained, 1, EXP_PER_LEVEL)
 
 

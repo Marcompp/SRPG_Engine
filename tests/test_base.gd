@@ -184,3 +184,13 @@ func run_enemy_phases() -> void:
 		while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
 			await process_frame
 	check(b.state == b.State.IDLE or b.state == b.State.GAME_OVER, "battle loop settles")
+
+
+## Puts `u` on a fresh mount of `species` (as its foot class `foot`). Pegasi only
+## take female riders, so pegasus riders become female.
+func ride(u: Unit, species: String, foot := "Footman", level := 1) -> void:
+	if species == "Pegasus":
+		u.gender = "female"
+	u.dismount()
+	u.set_class(foot)
+	u.mount_up(Mounts.generate(species, level))

@@ -6,10 +6,11 @@ const TILE := 16
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
 ## Movement types (a class's "move"): what the unit is: foot (most units), heavy
-## (armor), horse, mermaid (aquatic), ship (seafaring), flying, spirit. A unit's race
+## (armor), horse, drake (mounted on a drake: foot costs, but hills and mountains
+## like a climber), mermaid (aquatic), ship (seafaring), flying, spirit. A unit's race
 ## can override its class's move type (see Races). Terrain specialties (Swimming,
 ## Climbing, Forester) are skills with "terrain_costs" (see Skills, unit_cost()).
-const MOVE_TYPES: Array[String] = ["foot", "heavy", "horse", "mermaid", "ship", "flying", "spirit"]
+const MOVE_TYPES: Array[String] = ["foot", "heavy", "horse", "drake", "mermaid", "ship", "flying", "spirit"]
 ## Move types that get no DEF/AVO from terrain (they pass over it).
 const NO_TERRAIN_BONUS: Array[String] = ["flying", "spirit"]
 const IMPASSABLE := -1.0
@@ -37,9 +38,9 @@ const TERRAIN := {
 	"#": {"name": "Thicket", "def": 2, "avo": 30, "color": Color("2f5f2c"),
 		"cost": {"*": 10, "horse": 20, "ship": 20}},
 	"h": {"name": "Hill", "def": 2, "avo": 20, "color": Color("9aa25a"),
-		"cost": {"*": 4, "horse": 10, "mermaid": 10, "heavy": 10, "ship": 20}},
+		"cost": {"*": 4, "horse": 10, "drake": 2, "mermaid": 10, "heavy": 10, "ship": 20}},
 	"M": {"name": "Mountain", "def": 3, "avo": 30, "color": Color("8a7a5c"),
-		"cost": {"*": 7, "horse": 15, "mermaid": 15, "heavy": 15, "ship": 20}},
+		"cost": {"*": 7, "horse": 15, "drake": 4, "mermaid": 15, "heavy": 15, "ship": 20}},
 	"~": {"name": "River", "def": 0, "avo": 10, "color": Color("3f7fd0"),
 		"cost": {"*": 6, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
 	"L": {"name": "Lake", "def": 0, "avo": 10, "color": Color("4a8ad8"),

@@ -31,6 +31,7 @@ const MOVE_TYPES := {
 	"foot": "On foot: the standard costs for every terrain.",
 	"heavy": "Heavy armor: slow in hills, mountains and water, but sure-footed on ice. Weak to Hammers.",
 	"horse": "Mounted on horseback: fast on open ground, slowed by forests, sand and indoors. Weak to Pikes. Can Rescue allies; can't Shove or be Shoved.",
+	"drake": "Riding a drake: foot costs, but hills and mountains are easy going.",
 	"mermaid": "Aquatic: moves freely through water, slowly on land.",
 	"ship": "Seafaring: sails water; land is very slow going. Weak to Woodcutters.",
 	"flying": "Flying: 1 MOV over any terrain except walls (1.5 indoors), but no terrain bonuses. Weak to bows. Can Rescue allies; can't Shove or be Shoved.",
@@ -67,9 +68,12 @@ static func stat(key: String, unit: Unit) -> String:
 
 static func unit_class(unit: Unit) -> String:
 	var data := Classes.get_data(unit.unit_class)
-	var text := "%s. Weapons: %s. Movement: %s." % [unit.unit_class,
+	var text := "%s. Weapons: %s. Movement: %s." % [unit.class_display_name(),
 		", ".join(data.weapons.map(func(w): return str(w).capitalize())), unit.move_type.capitalize()]
-	var promotions := Classes.promotions(unit.unit_class)
+	if not unit.mount.is_empty():
+		text += " Riding %s (%s, Lv %d); on foot: %s." % [unit.mount.name, unit.mount.species, unit.mount.level,
+			unit.foot_class]
+	var promotions := Classes.promotions(unit.promotion_class())
 	if not promotions.is_empty():
 		text += " Promotes to %s." % ", ".join(promotions)
 	elif data.get("promoted", false):

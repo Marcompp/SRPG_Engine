@@ -4,6 +4,8 @@ extends Control
 ##   Items:      move items between a unit and the convoy (also how units swap items).
 ##   Repair:     restore any worn weapon in the army or convoy to full uses (free
 ##               for now; it will cost gold once there is gold).
+##   Stable:     every mount: Z on a ridden one takes its rider off; Z on a free one
+##               picks a rider (riding reclasses the unit; see Mounts). D: rename.
 ##   Promote:    units at Classes.PROMOTION_LEVEL+ change into a promoted class.
 ##   Status:     the status screen for any army unit.
 ##   Check Map:  the chapter's map, to look around and swap the deployed units'
@@ -14,7 +16,7 @@ extends Control
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 const DIM := Color(0.7, 0.75, 0.95)
-const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Promote", "Status", "Check Map", "Fight!", "Level Select"]
+const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!", "Level Select"]
 
 ## "menu", "pick", "items_unit", "items", "repair", "promote_unit", "promote_class", "status_unit", "status"
 var mode := "menu"
@@ -32,6 +34,9 @@ var _right: Label
 var _hint: Label
 var _status: StatusScreen
 var _status_unit: Unit
+## Stable: the mount being given a rider, and the name editor.
+var _mount: Dictionary = {}
+var _rename: LineEdit
 
 
 func _ready() -> void:
@@ -51,6 +56,13 @@ func _ready() -> void:
 	_hint = _label(Vector2(8, 148), DIM)
 	_status = StatusScreen.new()
 	add_child(_status)
+	_rename = LineEdit.new()
+	_rename.visible = false
+	_rename.position = Vector2(96, 120)
+	_rename.size = Vector2(120, 14)
+	_rename.max_length = 16
+	_rename.text_submitted.connect(_finish_rename)
+	add_child(_rename)
 
 	if not Campaign.load_save():
 		Campaign.start_new()
@@ -77,6 +89,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	var right := event.is_action_pressed("ui_right", true)
 	var accept := event.is_action_pressed("confirm")
 	var cancel := event.is_action_pressed("cancel")
+	var info := event.is_action_pressed("unit_info")
+	if _rename.visible:
+		if cancel:
+			_rename.visible = false
+			_render()
+			get_viewport().set_input_as_handled()
+		return
+	if info and mode == "stable" and index < Campaign.all_mounts().size():
+		_start_rename(Campaign.all_mounts()[index].mount)
+		get_viewport().set_input_as_handled()
+		return
 	if not (up or down or left or right or accept or cancel):
 		return
 	get_viewport().set_input_as_handled()
@@ -116,6 +139,8 @@ func _accept() -> void:
 					_enter("items_unit")
 				"Repair":
 					_enter("repair")
+				"Stable":
+					_enter("stable")
 				"Promote":
 					_enter("promote_unit")
 				"Status":
@@ -137,13 +162,33 @@ func _accept() -> void:
 			_move_item()
 		"repair":
 			_repair()
+		"stable":
+			var mounts := Campaign.all_mounts()
+			if index < mounts.size():
+				if mounts[index].rider != "":
+					Campaign.unassign_mount(mounts[index].rider)
+					Campaign.save()
+					message = "%s is back in the stable." % mounts[index].mount.name
+				else:
+					_mount = mounts[index].mount
+					_enter("stable_rider")
+		"stable_rider":
+			var names := _army_names()
+			var problem := Campaign.ride_problem(names[index], _mount)
+			if problem != "":
+				message = problem
+			else:
+				Campaign.assign_mount(names[index], _mount)
+				Campaign.save()
+				message = "%s now rides %s." % [names[index], _mount.name]
+				_enter("stable")
 		"promote_unit":
 			var eligible := _promotable()
 			if not eligible.is_empty():
 				current_unit = eligible[index]
 				_enter("promote_class")
 		"promote_class":
-			var options := Classes.promotions(Campaign.army_unit(current_unit).unit_class)
+			var options := Campaign.promotion_options(Campaign.army_unit(current_unit))
 			var gains := Campaign.promote(current_unit, options[index])
 			Campaign.save()
 			message = "%s is now a %s! %s" % [current_unit, options[index], _gains_text(gains)]
@@ -158,6 +203,8 @@ func _back() -> void:
 			_enter("items_unit")
 		"promote_class":
 			_enter("promote_unit")
+		"stable_rider":
+			_enter("stable")
 		_:
 			_enter("menu")
 
@@ -192,6 +239,22 @@ func _move_item() -> void:
 			message = "%s can't carry more." % current_unit
 	Campaign.save()
 	index = clampi(index, 0, maxi(0, _row_count() - 1))
+
+
+func _start_rename(mount: Dictionary) -> void:
+	_mount = mount
+	_rename.text = mount.name
+	_rename.visible = true
+	_rename.grab_focus()
+	_rename.select_all()
+
+
+func _finish_rename(new_name: String) -> void:
+	if new_name.strip_edges() != "":
+		_mount.name = new_name.strip_edges()
+		Campaign.save()
+	_rename.visible = false
+	_render()
 
 
 ## Worn weapons in the army and convoy: [[owner name or "Convoy", item]].
@@ -278,10 +341,14 @@ func _row_count() -> int:
 			return Campaign.army_unit(current_unit).items.size() if column == 0 else Campaign.convoy.size()
 		"repair":
 			return _repairables().size()
+		"stable":
+			return Campaign.all_mounts().size()
+		"stable_rider":
+			return Campaign.army.size()
 		"promote_unit":
 			return _promotable().size()
 		"promote_class":
-			return Classes.promotions(Campaign.army_unit(current_unit).unit_class).size()
+			return Campaign.promotion_options(Campaign.army_unit(current_unit)).size()
 	return 0
 
 
@@ -313,7 +380,7 @@ func _render() -> void:
 			for i in names.size():
 				lines.append(_row(i, "[%s] %s" % ["x" if picked.has(names[i]) else " ", names[i]]))
 			var d := Campaign.army_unit(names[index])
-			side.append("%s  Lv %d" % [d.unit_class, d.level])
+			side.append("%s  Lv %d" % [Campaign.class_label(d), d.level])
 			side.append("Deployed %d/%d" % [picked.size(), chapter.deploy.size()])
 		"items_unit", "status_unit":
 			var names := _army_names()
@@ -341,15 +408,36 @@ func _render() -> void:
 					"broken" if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it)]))
 			side.append("Repairs are free")
 			side.append("for now.")
+		"stable":
+			var mounts := Campaign.all_mounts()
+			if mounts.is_empty():
+				lines.append("No mounts yet.")
+			for i in mounts.size():
+				var m: Dictionary = mounts[i].mount
+				lines.append(_row(i, "%s  %s Lv %d" % [m.name, m.species, m.level]))
+			if index < mounts.size():
+				var m: Dictionary = mounts[index].mount
+				side.append("Rider: %s" % (mounts[index].rider if mounts[index].rider != "" else "none"))
+				side.append("%s, %s" % [m.species, m.gender])
+				for s in Mounts.STATS:
+					side.append("%s %d" % [Experience.STAT_LABELS[s], m.stats[s]])
+				side.append(", ".join(m.get("skills", [])))
+		"stable_rider":
+			var names := _army_names()
+			lines.append("Who rides %s?" % _mount.name)
+			for i in names.size():
+				var d := Campaign.army_unit(names[i])
+				var mark := " " if Campaign.ride_problem(names[i], _mount) == "" else "x"
+				lines.append(_row(i, "[%s] %s  %s" % [mark, names[i], Campaign.class_label(d)]))
 		"promote_unit":
 			var eligible := _promotable()
 			if eligible.is_empty():
 				lines.append("No unit has reached Lv %d." % Classes.PROMOTION_LEVEL)
 			for i in eligible.size():
 				var d := Campaign.army_unit(eligible[i])
-				lines.append(_row(i, "%s  %s Lv %d" % [eligible[i], d.unit_class, d.level]))
+				lines.append(_row(i, "%s  %s Lv %d" % [eligible[i], Campaign.class_label(d), d.level]))
 		"promote_class":
-			var options := Classes.promotions(Campaign.army_unit(current_unit).unit_class)
+			var options := Campaign.promotion_options(Campaign.army_unit(current_unit))
 			lines.append("Promote %s to:" % current_unit)
 			for i in options.size():
 				lines.append(_row(i, options[i]))
@@ -362,6 +450,8 @@ func _render() -> void:
 		"pick": "Z: deploy / bench  X: back",
 		"items": "Z: move item  Left/Right: unit/convoy  X: back",
 		"repair": "Z: repair  X: back",
+		"stable": "Z: assign / unassign  D: rename  X: back",
+		"stable_rider": "Z: ride  X: back",
 		"status": "Left/Right: page  Up/Down: unit  X: back",
 	}
 	_hint.text = message if message != "" else hints.get(mode, "Z: select  X: back")

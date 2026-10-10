@@ -48,7 +48,7 @@ func test_level_select_loads_coastal_raid() -> void:
 	var siren := unit_named("Siren")
 	var lord := unit_named("Lord")
 	check(pegasus != null and pegasus.move_type == "flying", "roster loaded with move types")
-	check(pegasus.is_mounted() and pegasus.unit_class == "Flier", "and classes")
+	check(pegasus.is_mounted() and pegasus.class_display_name() == "Flier", "and classes (Cavalry on a pegasus)")
 	var galley: Unit = unit_named("Galley")
 	check(galley != null and galley.is_ship(), "player Galley is a ship")
 	# The island is out of reach on foot (sea costs 6 > MOV 5), but not for fliers and mermaids.
@@ -139,9 +139,10 @@ func test_mounted_units_cannot_shove() -> void:
 	fighter.set_class("Cavalry")
 	check(not b.actions.can_shove(fighter, knight), "a mounted unit can't shove")
 	check(not b.actions.can_shove(knight, fighter), "a mounted unit can't be shoved")
-	knight.set_class("Flier")
+	ride(knight, "Pegasus")
 	fighter.set_class("Axeman")
 	check(not b.actions.can_shove(fighter, knight), "Fliers are mounted")
+	knight.dismount()
 	knight.set_race("Harpy")
 	knight.set_class("Archer")
 	check(knight.move_type == "flying" and b.actions.can_shove(fighter, knight),
@@ -159,8 +160,9 @@ func test_rescue_rules() -> void:
 	check(b.actions.rescue_targets(fighter).is_empty(), "foot units can't rescue")
 	fighter.set_class("Cavalry")
 	check_eq(b.actions.rescue_targets(fighter).size(), 2, "a mounted unit can rescue adjacent foot allies")
-	archer.set_class("Flier")
+	ride(archer, "Pegasus")
 	check_eq(b.actions.rescue_targets(fighter), [knight], "mounted allies can't be rescued")
+	archer.dismount()
 	archer.set_race("Harpy")
 	archer.set_class("Archer")
 	check(b.actions.rescue_targets(fighter).has(archer), "unmounted fliers (Harpy) can be rescued")
@@ -529,11 +531,11 @@ func test_ai_prefers_effective_weapon() -> void:
 
 func test_race_class_bans() -> void:
 	for c in [
-		["Naga", "Cavalry", false], ["Naga", "Flier", false], ["Naga", "Footman", true],
-		["Centaur", "Flier", false], ["Centaur", "Guard", true], ["Minotaur", "Nomad", false],
+		["Naga", "Cavalry", false], ["Naga", "Raider", false], ["Naga", "Footman", true],
+		["Centaur", "Guard", true], ["Minotaur", "Nomad", false],
 		["Harpy", "Guard", false], ["Harpy", "Cavalry", true], ["Ent", "Equestrian", false],
 		["Stoneborn", "Rogue", false], ["Stoneborn", "Cavalry", false], ["Stoneborn", "Guard", true],
-		["Stoneborn", "Axeman", true], ["Human", "Flier", true],
+		["Stoneborn", "Axeman", true], ["Human", "Battlemage", true],
 	]:
 		check_eq(Races.allows(c[0], c[1]), c[2], "%s %s allowed" % [c[0], c[1]])
 	for r in Races.DATA:

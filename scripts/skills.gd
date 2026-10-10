@@ -3,7 +3,8 @@ extends RefCounted
 ## Skills: everything a unit has beyond its stats, from any source. Design and the
 ## planned effect kinds: docs/skills.md.
 ##
-## Sources (see `sources`): personal (roster "skills"), class (Classes "skills"),
+## Sources (see `sources`): personal (roster "skills"), class (Classes "skills"; a
+## mounted unit also keeps its foot class's, minus terrain movement), its mount's,
 ## race (Races "skills"), learned (Unit.learned: level-up tables and scrolls, at most
 ## LEARNED_CAP), the equipped weapon's "skills" and held non-weapon items' "skills".
 ##
@@ -95,6 +96,8 @@ const DATA := {
 	"Open Ground": {"description": "+10 Avo on open terrain (plains, paths, sand, snow, floors, bridges).",
 		"battle": {"avo": 10}, "if": {"terrain": [".", "=", "S", "*", "_", "c", "B"]}},
 	"Footwork": {"description": "Can move again after Dancing, with the MOV it has left.", "map": ["footwork"]},
+	# Mount skills.
+	"Loyal": {"description": "Mount skill: takes a fatal blow once. The mount falls; the rider stays on the map on foot, at 1 HP."},
 	"Prayer": {"description": "Adjacent allies recover 10% of max HP at the start of each turn.",
 		"turn_start": {"heal_allies": 0.1}},
 	# Racial attacks (see Spells "ability").
@@ -215,9 +218,17 @@ static func sources(u: Unit) -> Array:
 	add.call(u.personal_skills, "Personal")
 	if Classes.DATA.has(u.unit_class):  # unset while a unit is being built
 		add.call(Classes.get_data(u.unit_class).get("skills", []), "Class")
+	# Mounted: the foot class's innate skills stay, except terrain movement (the mount
+	# moves for it). The mount's own skills count too.
+	if Classes.DATA.has(u.foot_class):
+		var kept: Array = Classes.get_data(u.foot_class).get("skills", []).filter(
+			func(s): return not TERRAIN_SKILLS.has(s))
+		add.call(kept, "Class")
+	if not u.mount.is_empty():
+		add.call(u.mount.get("skills", []), u.mount.name)
 	add.call(Races.get_data(u.race).get("skills", []), "Race")
 	if Races.get_data(u.race).get("amphibious", false) and Classes.DATA.has(u.unit_class) \
-			and Classes.get_data(u.unit_class).move == "foot":
+			and Classes.get_data(u.unit_class).move == "foot" and u.mount.is_empty():
 		add.call(["Swimming", "Climbing"], "Race")
 	add.call(u.learned, "Learned")
 	if not u.weapon.is_empty():

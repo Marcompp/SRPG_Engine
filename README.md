@@ -26,6 +26,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Castle Keep | Indoors: floor, carpet, walls, pillars, pits and fences; slow mounted units and a wall-walking Wraith |
 | Ruined Fort | Breakable terrain: a cracked wall and fence, a locked door (the Scout opens it) and trunks to fell across the river. Skills: the Lord has Sol, the Warden boss Pavise and Vantage; a Power Ring and a Celerity Scroll |
 | Great Valley | A 30x20 map: the camera scrolls with the cursor (and follows moving units), stopping at the map edges |
+| Loyal Steeds | Mounts: a Loyal horse and pegasus on your side (the mount takes a fatal blow once), a Loyal enemy Lancer, and a level 20 rider whose level 1 horse still levels up |
 
 ## Campaign
 
@@ -42,7 +43,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 - **Carried over:** levels, EXP, items and promotions. Survivors are healed between chapters.
 - **Permadeath:** fallen units leave the army for good. They're kept in `Campaign.fallen` (with chapter and turn) for future mechanics, and "Fell in …" is added to their biography.
 - **Defeat** retries the chapter with the army as it was before it.
-- **Prep screen** before each chapter: Pick Units (the Lord always deploys), Items (unit ↔ convoy), Repair (any worn or broken weapon in the army or convoy, free for now), Promote (Lv 15+, class-dependent stat bonus, level kept), Status, Check Map, Fight!
+- **Prep screen** before each chapter: Pick Units (the Lord always deploys), Items (unit ↔ convoy), Repair (any worn or broken weapon in the army or convoy, free for now), Stable (assign, unassign and rename mounts; riders a mount refuses say why), Promote (Lv 15+, class-dependent stat bonus, level kept), Status, Check Map, Fight!
 - **Check Map** opens the chapter's map before it starts, with the deploy cells outlined: look around as in battle (ranges, danger zone, marks, status, unit list, objective), and Z on a unit then Z on a deploy cell to move it there (swapping with whoever is on it). The layout is kept for the battle, for restarts and for retries after a defeat. Z on an empty tile: Fight! (start from the map), Units, Objective, Options, Back to Prep; X also goes back to prep
 - **Biography** logs joining, promotion, seizing and falling, plus moments from play: a unit's first kill, defeating a boss (noting a critical finishing blow), barely surviving a hit (10% HP or less, once per battle) and being saved by Miracle.
 - **Generic enemies** (roster `"generic": true`, all non-boss campaign enemies) get a random name by race and gender (`scripts/names.gd`; races without their own lists use the default ones) and show their class's initial on the map.
@@ -50,7 +51,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 
 ## Tests
 
-Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills` and `events`. Every method named `test_*` in a suite runs on a fresh battle; there's no list to update.
+Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills`, `events` and `mounts`. Every method named `test_*` in a suite runs on a fresh battle; there's no list to update.
 
 ```
 GODOT=/path/to/godot tests/run_tests.sh            # everything
@@ -85,7 +86,8 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - 5-slot inventories with equip, weapon choice on attack, and consumables (Potion: 3 uses, heals 15; Ether: 3 uses, restores 15 MP; Repair Kit: 2 uses, restores a chosen weapon to full uses). Units can carry weapons their class can't wield (marked `(x)`), but not equip them
 - Trade with adjacent allies any number of times before acting (trading commits the move)
 - Shove (FE9-style): any unit that isn't mounted or a ship can push an adjacent ally (also not mounted or a ship) one tile away, onto walkable empty ground; ends the shover's turn. Centaurs can shove; Centaurs, Ents and Stoneborn can't be shoved
-- Rescue/Drop (Thracia 776-style): mounted classes (horse units, Flier, Whitewing) and Centaurs can carry an adjacent ally off the map (not a mounted unit, ship, Centaur, Ent or Stoneborn) (carrier's DEX/AGI halved) and set it down on an adjacent tile later. Each action ends the carrier's turn, but a dropped ally that hasn't acted can still move, so mounted units can ferry others. A fallen carrier's passenger is set down where it fell.
+- Mounts (design: [docs/mounts.md](docs/mounts.md), data: `scripts/mounts.gd`): Horse, Pegasus (flying, female riders only) and Drake (new `drake` move type: foot costs, but hills and mountains like a climber; reptile). Riding reclasses a unit into its foot class's mounted class (Swordsman/Rogue/Corsair/Performer: Equestrian; Footman/Bannerman: Cavalry; Axeman/Brigand: Raider; Archer/Poacher: Nomad; Mage/Cleric: Battlemage; promotions likewise), keeping the foot class's innate skills except terrain movement. Heavy armor can't ride. While mounted, STR/INT/DEX/AGI/LCK/DEF are the rider's / 2 + the mount's, HP and MP stay the rider's, and MOV is the species'. Mounts have levels (cap 10), growths, EXP worked out on their own (the combat formula with the mount's level, counted double, against the foe's, times a species rate; non-combat EXP is the fixed amount times the rate), so a young mount under a veteran levels fast, with their own level-up popup; a level 20 rider's mount keeps earning EXP, a visible gender and skills; **Loyal** lets the mount take a fatal blow once (the rider survives on foot at 1 HP). Rosters give units a `"mount": {"species": ...}` (level defaults to half the rider's); promotion goes through the foot class and stays mounted. In the campaign, mounts ride with their unit or wait in the stable
+- Rescue/Drop (Thracia 776-style): mounted units and Centaurs can carry an adjacent ally off the map (not a mounted unit, ship, Centaur, Ent or Stoneborn) (carrier's DEX/AGI halved) and set it down on an adjacent tile later. Each action ends the carrier's turn, but a dropped ally that hasn't acted can still move, so mounted units can ferry others. A fallen carrier's passenger is set down where it fell.
 - EXP and level-ups with growth rates
 - MP-based magic: Heal, Fire, Firestorm (area), Earth Spike (raises a mountain). Damage spells have an element (Fire, Earth...)
 - Board/Unload: a unit next to an allied ship with room can Board it (ends the boarder's turn; a Galley holds 2). The ship can Unload passengers onto adjacent cells they can stand on without ending its own turn, and passengers that haven't acted can then move. A sunk ship's passengers are set down on the nearest free cell they can stand on
@@ -123,13 +125,16 @@ Innate skills come with the class (a promoted class lists its own full set); Lv 
 | | Turret | Bow | heavy | | Max HP +5 | Juggernaut |
 | Mage | Mage | Staff | foot | | Magic +2 | Sorcerer (Staff, Sword; Spell Range +1) |
 | | Cleric | Staff | foot | | Max MP +5 | Bishop (Staff, Spear; Prayer) |
-| Horse | Equestrian | Sword | horse | Canto | | Gendarme (Sword, Spear; Canto) |
-| | Cavalry | Spear | horse | Canto | | Gendarme |
-| | Nomad | Bow | horse | Canto | | Hussar (Bow, Spear; Canto) |
-| Flying | Flier | Spear | flying | Canto | | Whitewing (Spear, Sword; Canto) |
+| Mounted | Equestrian | Sword | mount's | Canto | | Gendarme (Sword, Spear; Canto) |
+| | Cavalry | Spear | mount's | Canto | | Gendarme |
+| | Raider | Axe | mount's | Canto | | Warlord (Axe, Spear; Canto) |
+| | Nomad | Bow | mount's | Canto | | Hussar (Bow, Spear; Canto) |
+| | Battlemage | Staff | mount's | Canto | | Spellknight (Staff, Sword; Canto) |
 | Ship | Galley | Bow | ship | (Board/Unload, holds 2) | | |
 | Special | Performer | Sword | foot | Dance | Footwork | |
 | | Bannerman | Spear | foot | Inspire | | |
+
+Mounted classes are what a unit becomes on a mount (see Mounts); they're shared by every species, which sets their movement, tags and name ("Cavalry" on a pegasus is a "Flier", "Gendarme" a "Whitewing").
 
 Spells are separate from classes: any unit with `"spells"` in its roster entry can cast them.
 

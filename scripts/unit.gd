@@ -21,6 +21,7 @@ const MOVE_TYPE_BADGES := {
 	"swim_climb": Color("8a6fd0"),
 	"rogue_swim_climb": Color("3f8f6a"),
 	"heavy": Color("505860"),
+	"drake": Color("b06030"),
 	"spirit": Color("c070ff"),
 }
 ## Corner pip on units under an Inspire buff.
@@ -60,6 +61,10 @@ var kills := 0
 var biography: Array[String] = []
 ## Mounted units can Rescue allies, and can't Shove, be Shoved or be Rescued.
 var mounted := false
+## The mount it's riding (see Mounts for the record), or {}. Riding reclasses it into
+## its foot class's mounted class; `foot_class` is what it goes back to.
+var mount := {}
+var foot_class := ""
 ## Weapon types the unit can equip (see Weapons). Others can still be carried.
 var weapon_types: Array[String] = []
 ## Class abilities: "ship" (see Classes). Other special commands are skills.
@@ -129,6 +134,8 @@ var base_mov := 5
 var mov_bonus := 0
 var mov: int:
 	get:
+		if not mount.is_empty():
+			return Mounts.species_data(mount.species).mov + Skills.stat_bonus(self, "mov")
 		return base_mov + mov_bonus + Skills.stat_bonus(self, "mov")
 	set(value):
 		base_mov = value
@@ -206,6 +213,11 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.spells.assign(stats.get("spells", []))
 	for item_name in stats.get("items", []).slice(0, MAX_ITEMS):
 		u.items.append(Items.make(item_name))
+	# Roster "mount": {"species", optional "level" (default: half the rider's), "name",
+	# "gender", "skills", "stats"}: it starts the battle riding it.
+	if stats.has("mount"):
+		var m: Dictionary = stats.mount
+		u.mount_up(Mounts.generate(m.species, m.get("level", maxi(1, u.level / 2)), m))
 	# Starting above level 1: it already knows what its learn tables teach by now.
 	for lv in range(1, u.level + 1):
 		for skill in u.skills_learned_at(lv):
@@ -231,9 +243,19 @@ func set_class(class_id: String) -> void:
 	assert(Races.allows(race, class_id), "%s can't be a %s" % [race, class_id])
 	unit_class = class_id
 	move_type = Races.move_type(race, class_id)
+	var class_tag: String = data.move
+	if not mount.is_empty():
+		# The species decides how a mounted unit moves and what it counts as.
+		var species := Mounts.species_data(mount.species)
+		move_type = species.move
+		class_tag = species.tags[0]
 	assert(BattleMap.MOVE_TYPES.has(move_type), "unknown move type: " + move_type)
 	mov_bonus = Races.bonus_mov(race, class_id)
-	tags.assign([data.move])
+	tags.assign([class_tag])
+	if not mount.is_empty():
+		for tag: String in Mounts.species_data(mount.species).tags:
+			if not tags.has(tag):
+				tags.append(tag)
 	for tag: String in Races.get_data(race).get("tags", []):
 		if not tags.has(tag):
 			tags.append(tag)
@@ -241,6 +263,48 @@ func set_class(class_id: String) -> void:
 	weapon_types.assign(data.weapons)
 	abilities.assign(data.get("abilities", []))
 	queue_redraw()
+
+
+## Rides `record` (see Mounts): reclasses into the mounted class for its foot class.
+## Riding another mount first gets off the current one.
+func mount_up(record: Dictionary) -> void:
+	if not mount.is_empty():
+		dismount()
+	var problem := Mounts.ride_problem(unit_class, race, gender, record.species)
+	assert(problem == "", "%s: %s" % [unit_name, problem])
+	foot_class = unit_class
+	mount = record
+	set_class(Mounts.mounted_class(foot_class))
+
+
+## Gets off its mount (back to its foot class) and returns the mount record.
+func dismount() -> Dictionary:
+	var record := mount
+	mount = {}
+	var back := foot_class
+	foot_class = ""
+	if back != "":
+		set_class(back)
+	return record
+
+
+## The class name shown to the player: mounted classes are named by species
+## ("Cavalry" on a pegasus is a "Flier").
+func class_display_name() -> String:
+	return Mounts.display_name(unit_class, mount.species) if not mount.is_empty() else unit_class
+
+
+## The class its promotions come from: its foot class while mounted.
+func promotion_class() -> String:
+	return foot_class if foot_class != "" else unit_class
+
+
+## A stat as it works in combat before skills: while mounted, the rider's own value
+## halved (rounded down) plus the mount's (see Mounts).
+func ridden(value: int, stat: String) -> int:
+	if mount.is_empty():
+		return value
+	return floori(value / 2.0) + mount.stats.get(stat, 0)
 
 
 ## Changes race and reapplies the class, since the race shapes what it gives.
@@ -333,29 +397,29 @@ func can_wield(item: Dictionary) -> bool:
 ## Stats as used in combat: skill bonuses (Skills "stats"), plus an Inspire bonus
 ## for STR and DEF.
 func combat_str() -> int:
-	return strength + Skills.stat_bonus(self, "str") + inspire_bonus
+	return ridden(strength, "str") + Skills.stat_bonus(self, "str") + inspire_bonus
 
 
 func combat_def() -> int:
-	return defense + Skills.stat_bonus(self, "def") + inspire_bonus
+	return ridden(defense, "def") + Skills.stat_bonus(self, "def") + inspire_bonus
 
 
 func combat_int() -> int:
-	return intelligence + Skills.stat_bonus(self, "int")
+	return ridden(intelligence, "int") + Skills.stat_bonus(self, "int")
 
 
 func combat_lck() -> int:
-	return luck + Skills.stat_bonus(self, "lck")
+	return ridden(luck, "lck") + Skills.stat_bonus(self, "lck")
 
 
 ## DEX and AGI are halved while carrying someone (FE5's rescue penalty).
 func combat_dex() -> int:
-	var dex := dexterity + Skills.stat_bonus(self, "dex")
+	var dex := ridden(dexterity, "dex") + Skills.stat_bonus(self, "dex")
 	return floori(dex / 2.0) if carrying else dex
 
 
 func combat_agi() -> int:
-	var agi := agility + Skills.stat_bonus(self, "agi")
+	var agi := ridden(agility, "agi") + Skills.stat_bonus(self, "agi")
 	return floori(agi / 2.0) if carrying else agi
 
 

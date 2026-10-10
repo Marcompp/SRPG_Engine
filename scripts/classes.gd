@@ -4,6 +4,11 @@ extends RefCounted
 ## wield, how it moves and its special abilities; stats stay per unit.
 ##
 ## weapons:     weapon types the class can equip (see Weapons).
+## Mounted classes (Equestrian, Cavalry, Raider, Nomad, Battlemage and their
+## promotions) are what a unit becomes on a mount (see Mounts): shared by every
+## species, which supplies their move type, tags and display name ("Cavalry" on a
+## pegasus is a "Flier"). Their own "move" only applies to a unit placed in one
+## without a mount.
 ## move:        one of BattleMap.MOVE_TYPES. Also the class's effectiveness tag
 ##              (see Unit.tags); the unit's race may change how it moves. Scouts,
 ##              climbers and swimmers are "foot" with a terrain skill (Forester,
@@ -58,9 +63,10 @@ const DATA := {
 	"Gendarme": {"weapons": ["sword", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
 	"Nomad": {"weapons": ["bow"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Hussar"]},
 	"Hussar": {"weapons": ["bow", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
-	# Flying
-	"Flier": {"weapons": ["spear"], "move": "flying", "mounted": true, "skills": ["Canto"], "promotes_to": ["Whitewing"]},
-	"Whitewing": {"weapons": ["spear", "sword"], "move": "flying", "mounted": true, "skills": ["Canto"], "promoted": true},
+	"Raider": {"weapons": ["axe"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Warlord"]},
+	"Warlord": {"weapons": ["axe", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
+	"Battlemage": {"weapons": ["staff"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Spellknight"]},
+	"Spellknight": {"weapons": ["staff", "sword"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
 	# Ships
 	"Galley": {"weapons": ["bow"], "move": "ship", "abilities": ["ship"], "capacity": 2},
 	# Spirits (pass through any terrain, even walls, for 1 MOV; no terrain bonuses)
@@ -94,7 +100,6 @@ const PROMOTION_BONUS := {
 	"Bishop": {"hp": 3, "int": 2, "agi": 1, "lck": 2, "mp": 4},
 	"Gendarme": {"hp": 3, "str": 2, "dex": 1, "agi": 1, "def": 2},
 	"Hussar": {"hp": 3, "str": 1, "dex": 2, "agi": 2, "def": 1},
-	"Whitewing": {"hp": 3, "str": 1, "dex": 2, "agi": 2, "lck": 1, "def": 1},
 }
 
 
