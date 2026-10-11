@@ -82,7 +82,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				move_cursor(dir)
 			elif accept:
 				var u := battle.unit_at(battle.cursor.cell)
-				if u and u.team == Unit.Team.PLAYER and not u.has_acted and not Statuses.restricts(u, "act"):
+				if u and u.team == Unit.Team.PLAYER and not u.has_acted and not Statuses.restricts(u, "act") \
+						and not Statuses.is_berserk(u):
 					select(u)
 				elif u and u.team != Unit.Team.PLAYER:
 					toggle_mark(u)

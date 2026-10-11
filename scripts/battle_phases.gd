@@ -32,6 +32,9 @@ func start_player_phase() -> void:
 	await battle.events.on_turn(battle.turn, "player")
 	if check_game_over():
 		return
+	await run_berserk(Unit.Team.PLAYER)
+	if check_game_over():
+		return
 	var players := battle.units_of(Unit.Team.PLAYER)
 	if not players.is_empty():
 		battle.cursor.cell = players[0].cell
@@ -93,6 +96,17 @@ func tick_statuses(team: Unit.Team) -> void:
 		await get_tree().create_timer(0.5).timeout
 	if not dead.is_empty():
 		await battle.actions.remove_dead(dead, "Succumbed to poison")
+
+
+## Berserk units of `team` take their turn under AI control (see EnemyAI); the
+## enemy phase does this for enemies as part of their normal turns.
+func run_berserk(team: Unit.Team) -> void:
+	for u in battle.units_of(team):
+		if not is_instance_valid(u) or u.hp <= 0 or u.has_acted or not Statuses.is_berserk(u):
+			continue
+		await EnemyAI.take_turn(u, battle)
+		if check_game_over():
+			return
 
 
 ## End of `team`'s phase: its units' statuses count down a turn (see Statuses).

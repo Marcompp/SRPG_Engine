@@ -16,6 +16,8 @@ extends RefCounted
 ##              and racial attacks), "items".
 ## cure_on_hit: ends when the unit takes damage (popup: `cured_text`, or "<name> ended").
 ## no_avoid:    its Avoid is 0 (terrain and skills included).
+## control:     "berserk": the AI plays its turn at the start of its side's phase (player
+##              units too), attacking the nearest unit of any side it can reach.
 ## lingers:     kept when the chapter ends (others are cleared).
 ## effects:     skill keys (see Skills) that apply while it lasts.
 
@@ -29,13 +31,15 @@ const DATA := {
 		"cured_text": "Woke up"},
 	"Paralyse": {"description": "Can't move, but can still act where it stands.",
 		"color": Color("e0c040"), "duration": 1, "restrict": ["move"]},
+	"Berserk": {"description": "Out of control: at the start of its phase it attacks the nearest unit it can reach, friend or foe.",
+		"color": Color("e05030"), "duration": 3, "control": "berserk"},
 	"Petrify": {"description": "Turned to stone: can't move, act or counterattack, and has no Avoid, but DEF +10. Lasts until cured, even between chapters.",
 		"color": Color("909090"), "duration": -1, "restrict": ["move", "act"], "no_avoid": true, "lingers": true,
 		"effects": {"stats": {"def": 10}}},
 }
 
 const KEYS: Array[String] = ["description", "color", "duration", "tick", "restrict", "cure_on_hit", "cured_text",
-	"no_avoid", "lingers", "effects"]
+	"no_avoid", "control", "lingers", "effects"]
 const RESTRICTIONS: Array[String] = ["move", "act", "magic", "items"]
 const TICK_KEYS: Array[String] = ["damage"]
 
@@ -64,6 +68,14 @@ static func restricts(u: Unit, what: String) -> bool:
 static func has_flag(u: Unit, key: String) -> bool:
 	for s: String in u.statuses:
 		if get_data(s).get(key, false):
+			return true
+	return false
+
+
+## Whether a status (Berserk) has the AI play `u`'s turns, against every side.
+static func is_berserk(u: Unit) -> bool:
+	for s: String in u.statuses:
+		if get_data(s).get("control", "") == "berserk":
 			return true
 	return false
 

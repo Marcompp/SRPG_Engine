@@ -34,6 +34,8 @@ const DATA := {
 		"inflict": {"status": "Sleep", "chance": 100}},
 	"Bind": {"mp": 4, "target": "enemy", "min_rng": 1, "max_rng": 2, "power": 0, "hit": 80, "status_only": true,
 		"inflict": {"status": "Paralyse", "chance": 100}},
+	"Berserk": {"mp": 7, "target": "enemy", "min_rng": 1, "max_rng": 2, "power": 0, "hit": 60, "status_only": true,
+		"inflict": {"status": "Berserk", "chance": 100}},
 	"Stone": {"mp": 10, "target": "enemy", "min_rng": 1, "max_rng": 2, "power": 0, "hit": 50, "status_only": true,
 		"inflict": {"status": "Petrify", "chance": 100}},
 	"Earth Spike": {"mp": 5, "target": "area", "element": "earth", "min_rng": 1, "max_rng": 2, "radius": 0, "power": 6, "hit": 85,

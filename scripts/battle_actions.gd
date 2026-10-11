@@ -611,6 +611,10 @@ func _note(u: Unit, text: String) -> void:
 ## Kill counts (unit and weapon) and kill biography moments: a boss (noting a
 ## critical finishing blow) or a unit's first kill.
 func _record_kill(a: Unit, d: Unit, result: Dictionary) -> void:
+	if a.team == d.team:
+		var how := "%s, an ally, while berserk" if Statuses.is_berserk(a) else "%s, an ally gone berserk,"
+		_note(a, ("Struck down " + how + " at %s.") % [foe_label(d), map_title()])
+		return
 	a.kills += 1
 	if not result.get("spell", false) and not a.weapon.is_empty():
 		a.weapon["kills"] = a.weapon.get("kills", 0) + 1
@@ -636,7 +640,8 @@ func _finish_exchange(attacker: Unit, defender: Unit, dealt: Array[Unit]) -> voi
 	for pair in [[attacker, defender], [defender, attacker]]:
 		var u: Unit = pair[0]
 		var foe: Unit = pair[1]
-		if u.team == Unit.Team.PLAYER and u.hp > 0 and earns_exp(u):
+		# No EXP for fighting your own side (Berserk).
+		if u.team == Unit.Team.PLAYER and u.team != foe.team and u.hp > 0 and earns_exp(u):
 			var mount_exp := 0 if u.mount.is_empty() \
 				else Experience.mount_combat_exp(u.mount, foe, dealt.has(u), foe.hp <= 0)
 			awards.append([u, Experience.combat_exp(u, foe, dealt.has(u), foe.hp <= 0), mount_exp])

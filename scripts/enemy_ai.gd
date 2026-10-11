@@ -162,6 +162,10 @@ static func _counter_risk(enemy: Unit, target: Unit, map: BattleMap) -> float:
 # --- Turn ---------------------------------------------------------------------------
 
 static func take_turn(enemy: Unit, battle: Battle) -> void:
+	if Statuses.is_berserk(enemy):
+		await _berserk_turn(enemy, battle)
+		_finish(enemy)
+		return
 	var map: BattleMap = battle.map
 	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
 	if players.is_empty():
@@ -215,6 +219,29 @@ static func take_turn(enemy: Unit, battle: Battle) -> void:
 	_finish(enemy)
 
 
+## Berserk (either side): attacks the nearest unit of any side it can reach (by
+## distance; the best way to attack that one), else walks toward the nearest unit.
+## No healing, looting or retreating.
+static func _berserk_turn(u: Unit, battle: Battle) -> void:
+	var map: BattleMap = battle.map
+	var others: Array[Unit] = battle.units().filter(func(o: Unit) -> bool: return o != u)
+	if others.is_empty():
+		return
+	battle.cursor.cell = u.cell
+	battle.camera.follow(u.cell)
+	await battle.camera.settle()
+	await battle.get_tree().create_timer(0.2).timeout
+	others.sort_custom(func(a: Unit, b: Unit) -> bool:
+		return BattleMap.distance(u.cell, a.cell) < BattleMap.distance(u.cell, b.cell))
+	var reach: Dictionary = map.get_reachable(u, battle.units())
+	for target in others:
+		var plan := _best_attack(u, battle, reach.cells, [target])
+		if not plan.is_empty():
+			await _execute_attack(u, battle, plan, reach.parents)
+			return
+	await _move_toward(u, battle, reach, others[0].cell)
+
+
 ## Untyped on purpose: the enemy may have died (and been freed) during its own
 ## attack, and a typed parameter rejects freed objects before the check below runs.
 static func _finish(enemy) -> void:
@@ -225,10 +252,11 @@ static func _finish(enemy) -> void:
 ## Best attack from any of `cells`: every (weapon, cell, target) and every (spell,
 ## cell, target or blast center). Range affects the triangle and whether the target
 ## can counter, so each candidate is scored with the enemy standing on that cell.
-## Returns {} if nothing can be attacked.
-static func _best_attack(enemy: Unit, battle: Battle, cells: Dictionary) -> Dictionary:
+## Returns {} if nothing can be attacked. `foes`: who it may attack (default: the
+## player's units).
+static func _best_attack(enemy: Unit, battle: Battle, cells: Dictionary, foes: Array[Unit] = []) -> Dictionary:
 	var map: BattleMap = battle.map
-	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
+	var players: Array[Unit] = foes if not foes.is_empty() else battle.units_of(Unit.Team.PLAYER)
 	var all_units: Array[Unit] = battle.units()
 	var best := {}
 	var best_score := -INF

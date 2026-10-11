@@ -1,9 +1,10 @@
 # Status effects (design notes)
 
-Design notes. Steps 1 to 3 of the build order are built (`scripts/statuses.gd`):
-the core, Poison, Silence, Sleep, Paralyse, Petrify, Antitoxin, Panacea, Restore,
-the `@status` / `@cure` event commands, `inflict` on weapons and spells (Venom Edge;
-the Silence, Sleep, Bind and Stone spells) and the Envenom skill. Berserk is next.
+Design notes. The whole build order is built (`scripts/statuses.gd`): the core,
+Poison, Silence, Sleep, Paralyse, Petrify, Berserk, Antitoxin, Panacea, Restore, the
+`@status` / `@cure` event commands, `inflict` on weapons and spells (Venom Edge; the
+Silence, Sleep, Bind, Berserk and Stone spells) and the Envenom skill. What's left
+is under AI ("Later") and the UI pass (icons).
 A **status** is a temporary condition on a unit
 (Poison, Silence, Sleep...) that changes what it can do or how it fights, until it
 runs out or is cured.
@@ -69,8 +70,20 @@ EXP for it, and it counts as a death for defeat conditions and events.
   poison swamp).
 - **Status spells** (`status_only`): enemy-target spells with no damage and no
   counter, using the normal spell hit chance; a hit inflicts. Silence (Silence),
-  Sleep (Sleep), Bind (Paralyse), Stone (Petrify). Berserk comes with step 4. Venom
-  Edge is a weak sword that always poisons on a hit.
+  Sleep (Sleep), Bind (Paralyse), Berserk (Berserk), Stone (Petrify). Venom Edge is
+  a weak sword that always poisons on a hit.
+
+### Berserk
+
+- The AI plays the unit's turn at the start of its side's phase (player units: after
+  the turn's events, before the player gets control; enemies: in their usual turn
+  order). It can't be selected.
+- It attacks the nearest unit it can reach, of any side (the best way to attack
+  that one); if it can't reach anyone, it walks toward the nearest unit. No healing,
+  looting or retreating. Other units don't treat it as a foe, but counter it.
+- No EXP for fighting your own side. Killing an ally goes in the biography: "Struck
+  down X, an ally, while berserk at ..." (or "an ally gone berserk" for the one who
+  killed the berserk unit on the counter).
 - **Cures:** the turn count running out; a Restore spell (ally target, cures every
   status, heals nothing; the enemy AI doesn't cast it yet); items: Antitoxin
   (Poison), Panacea (everything).

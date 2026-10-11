@@ -268,3 +268,49 @@ func test_envenom_after_combat() -> void:
 	lord.personal_skills.assign(["Envenom"])
 	await b.actions.do_combat(lord, brig)
 	check(brig.hp > 0 and brig.statuses.has("Poison"), "Envenom: the foe it attacked is poisoned after combat")
+
+
+func test_berserk_player_unit() -> void:
+	var lord := unit_named("Lord")
+	var fighter := unit_named("Fighter")
+	var archer := unit_named("Archer")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([lord, fighter, archer, brig])
+	await process_frame
+	lord.set_cell(Vector2i(0, 0))
+	fighter.set_cell(Vector2i(5, 6))
+	archer.set_cell(Vector2i(6, 6))
+	brig.set_cell(Vector2i(14, 9))
+	fighter.dexterity = 60
+	archer.agility = 0
+	archer.luck = 0
+	archer.hp = 1
+	var exp_before := fighter.exp_points
+	Statuses.inflict(fighter, "Berserk")
+	b.cursor.cell = fighter.cell
+	await press(KEY_Z)
+	check(b.state != b.State.SELECTED, "a berserk unit can't be selected")
+	b.input.browse()
+	await b.phases.run_berserk(Unit.Team.PLAYER)
+	check(not b.units().has(archer), "at its phase start it attacks the nearest unit, an ally")
+	check(fighter.has_acted, "and that's its turn")
+	check_eq(fighter.exp_points, exp_before, "no EXP for it")
+	check(fighter.biography[-1].begins_with("Struck down Archer, an ally, while berserk"),
+		"remembered (%s)" % fighter.biography[-1])
+
+
+func test_berserk_enemy() -> void:
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([lord, brig])
+	await process_frame
+	var other := _spawn_enemy(Vector2i(13, 9), 40)
+	lord.set_cell(Vector2i(0, 0))
+	brig.set_cell(Vector2i(14, 9))
+	Statuses.inflict(brig, "Berserk")
+	b.phases.end_player_phase()
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+	check(other.was_attacked, "a berserk enemy attacks its own side")
+	check_eq(brig.statuses.Berserk, 2, "counting down on its phases")
+	check(Spells.DATA.Berserk.inflict.status == "Berserk", "the Berserk spell inflicts it")
