@@ -305,20 +305,16 @@ func test_campaign_suspend_resume() -> void:
 
 func test_chapters_enemy_phases_run() -> void:
 	# Three full rounds of enemy phases on every chapter (looting, reinforcements,
-	# goto/defend AI...), sped up. Runtime errors here fail the run via run_tests.sh.
+	# goto/defend AI...). Runtime errors here fail the run via run_tests.sh.
 	for i in Chapters.ORDER.size():
 		await start_chapter(i)
-		Settings.set_value("game_speed", 2.0)
 		for round in 3:
 			if b.state == b.State.GAME_OVER:
 				break
 			b.phases.end_player_phase()
 			while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
-				Engine.time_scale = 8.0
 				await process_frame
 		check(b.state == b.State.IDLE or b.state == b.State.GAME_OVER, "%s: enemy phases settle" % Chapters.ORDER[i])
-	reset_settings()
-	Engine.time_scale = 1.0
 
 
 func test_marked_enemy_freed() -> void:

@@ -268,13 +268,18 @@ func refresh_threat() -> void:
 
 # --- Game speed ---------------------------------------------------------------
 
+## Extra speed multiplier on top of the game speed. Only the test runner changes it,
+## so animations and pauses go by quickly.
+static var speed_boost := 1.0
+
+
 ## Game speed comes from Options; holding cancel during the enemy phase multiplies
 ## it by the fast-forward speed (also from Options).
 func _process(_delta: float) -> void:
 	camera.follow(camera_focus())
 	ui.view_origin = camera.origin
 	var ff: float = Settings.value("fast_forward_speed") if enemy_phase and Input.is_action_pressed("cancel") else 1.0
-	var speed: float = Settings.value("game_speed") * ff
+	var speed: float = Settings.value("game_speed") * ff * speed_boost
 	if Engine.time_scale != speed:
 		Engine.time_scale = speed
 		ui.show_fast_forward(ff)

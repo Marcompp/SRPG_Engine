@@ -53,7 +53,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 
 ## Tests
 
-Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills`, `events`, `mounts` and `statuses`. Every method named `test_*` in a suite runs on a fresh battle; there's no list to update.
+Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills`, `events`, `mounts` and `statuses`. Every method named `test_*` in a suite runs on a fresh battle; there's no list to update. Battles run 60x faster than normal in tests (`SPEED_BOOST` in `tests/run_tests.gd`, via `Battle.speed_boost`); tests that check the game speed itself set it back to 1. The whole suite takes about a minute.
 
 ```
 GODOT=/path/to/godot tests/run_tests.sh            # everything

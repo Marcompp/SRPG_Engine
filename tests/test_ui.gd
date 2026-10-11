@@ -122,6 +122,7 @@ func test_pick_ally_to_heal_from_map() -> void:
 
 
 func test_fast_forward_enemy_phase() -> void:
+	Battle.speed_boost = 1.0  # this test checks the real game speed
 	Input.action_press("cancel")
 	await process_frame
 	check_eq(Engine.time_scale, 1.0, "holding X on the player phase does nothing")
@@ -332,6 +333,7 @@ func test_restart_asks_first() -> void:
 
 
 func test_options_screen_saves() -> void:
+	Battle.speed_boost = 1.0  # this test checks the real game speed
 	b.cursor.cell = Vector2i(5, 5)
 	await press(KEY_Z)
 	await pick("Options")

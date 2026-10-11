@@ -10,6 +10,9 @@ extends SceneTree
 
 const SUITES: Array[String] = ["core", "ai", "units", "ui", "campaign", "maps", "skills", "events", "mounts", "statuses", "factions"]
 
+## How much faster than normal the battle runs in tests (see Battle.speed_boost).
+const SPEED_BOOST := 60.0
+
 var b: Node
 var failures: Array[String] = []
 var current_test := ""
@@ -43,6 +46,8 @@ func _run_all() -> void:
 			current_test = t
 			# Every test starts on the default test map, outside the campaign.
 			Levels.selected = "river_crossing"
+			# Animations and pauses run sped up (tests about game speed set it back to 1).
+			Battle.speed_boost = SPEED_BOOST
 			Campaign.active = false
 			Campaign.clear_deployment()
 			await suite._fresh_battle()
