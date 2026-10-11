@@ -26,6 +26,43 @@ const CONSUMABLES := {
 }
 
 
+## Price of a fresh one, in gold (docs/economy.md). Items not listed have no price:
+## they can't be bought or sold.
+const PRICES := {
+	"Iron Sword": 460, "Killing Edge": 1300, "Knife": 400, "Iron Spear": 360, "Javelin": 450,
+	"Iron Axe": 270, "Steel Axe": 600, "Hatchet": 400, "Iron Bow": 540, "Pike": 800, "Hammer": 800,
+	"Woodcutter": 600, "Silver Sword": 1500, "Silver Spear": 1200, "Silver Axe": 1000, "Silver Bow": 1600,
+	"Venom Edge": 900, "Quarterstaff": 400,
+	"Potion": 300, "Ether": 500, "Antitoxin": 450, "Panacea": 800, "Chest Key": 300, "Repair Kit": 800,
+	"Celerity Scroll": 3000, "Vigor Scroll": 3000, "Power Ring": 2500, "Speed Ring": 2500,
+}
+
+
+static func cost(item_name: String) -> int:
+	return PRICES.get(item_name, 0)
+
+
+## What an item is worth now: its price, times uses left over max uses (a broken
+## weapon is worth nothing). Items that never run out are worth their price.
+static func value(item: Dictionary) -> int:
+	var price := cost(item.name)
+	if not item.has("uses"):
+		return price
+	var most: int = Weapons.max_uses(item) if is_weapon(item) else CONSUMABLES[item.name].uses
+	return floori(price * float(item.uses) / most)
+
+
+## What a shop pays for it: half its value. 0: it can't be sold.
+static func sell_price(item: Dictionary) -> int:
+	return floori(value(item) / 2.0)
+
+
+## Gold to restore a weapon to full uses: the price of the uses it's missing.
+static func repair_cost(weapon: Dictionary) -> int:
+	var most := Weapons.max_uses(weapon)
+	return ceili(cost(weapon.name) * float(most - weapon.uses) / most)
+
+
 ## Returns a fresh copy of a weapon or consumable (so each unit tracks its own uses).
 static func make(item_name: String) -> Dictionary:
 	if Weapons.DATA.has(item_name):

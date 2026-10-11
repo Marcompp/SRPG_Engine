@@ -116,7 +116,9 @@ func do_visit(u: Unit) -> void:
 	var village := battle.map.object_at(u.cell)
 	village.state = "visited"
 	battle.map.queue_redraw()
-	u.popup(give_item(u, village.item), Color.GOLD)
+	if village.has("item"):
+		u.popup(give_item(u, village.item), Color.GOLD)
+	battle.add_gold(village.get("gold", 0), u)
 	await get_tree().create_timer(0.7).timeout
 
 
@@ -130,7 +132,9 @@ func do_open(u: Unit) -> void:
 	_spend_key(u)
 	chest.state = "opened"
 	battle.map.queue_redraw()
-	u.popup(give_item(u, chest.item), Color.GOLD)
+	if chest.has("item"):
+		u.popup(give_item(u, chest.item), Color.GOLD)
+	battle.add_gold(chest.get("gold", 0), u)
 	await get_tree().create_timer(0.7).timeout
 
 
@@ -156,16 +160,20 @@ func give_item(u: Unit, item_name: String) -> String:
 	return tr("No room: {item}").format({"item": item_name})
 
 
-## An enemy on a village burns it (its reward is lost); on a chest, takes the item.
+## An enemy on a village burns it (its reward is lost); on a chest, takes the item
+## and the gold.
 func loot(enemy: Unit, object: Dictionary) -> void:
 	if object.type == "village":
 		object.state = "looted"
 		enemy.popup(tr("Looted!"), Color.ORANGE_RED)
 	else:
 		object.state = "opened"
-		if enemy.items.size() < Unit.MAX_ITEMS:
-			enemy.items.append(Items.make(object.item))
-		enemy.popup(tr("Stole {item}").format({"item": object.item}), Color.ORANGE_RED)
+		if object.has("item"):
+			if enemy.items.size() < Unit.MAX_ITEMS:
+				enemy.items.append(Items.make(object.item))
+			enemy.popup(tr("Stole {item}").format({"item": object.item}), Color.ORANGE_RED)
+		# The chest's gold goes with the looter: defeat it to get it back.
+		enemy.gold += object.get("gold", 0)
 	battle.map.queue_redraw()
 	await get_tree().create_timer(0.6).timeout
 
@@ -212,13 +220,22 @@ func steal_targets(u: Unit) -> Array[Unit]:
 		return result
 	for foe in battle.units():
 		if Factions.hostile(u.team, foe.team) and BattleMap.distance(u.cell, foe.cell) == 1 \
-				and u.combat_agi() > foe.combat_agi() and not stealable_items(foe).is_empty():
+				and u.combat_agi() > foe.combat_agi() and (not stealable_items(foe).is_empty() or foe.gold > 0):
 			result.append(foe)
 	return result
 
 
+## `index`: the item in foe.items, or -1 for its gold.
 func do_steal(u: Unit, foe: Unit, index: int) -> void:
 	provoke(u, foe)
+	if index < 0:
+		await u.lunge(foe.cell)
+		battle.add_gold(foe.gold, u)
+		foe.gold = 0
+		await get_tree().create_timer(0.5).timeout
+		if gains_exp(u):
+			await gain_exp(u, Experience.STEAL_EXP)
+		return
 	var item: Dictionary = foe.items[index]
 	foe.items.remove_at(index)
 	await u.lunge(foe.cell)
@@ -674,6 +691,10 @@ func _note(u: Unit, entry: Dictionary) -> void:
 ## Kill counts (unit and weapon) and kill biography moments: a boss (noting a
 ## critical finishing blow) or a unit's first kill.
 func _record_kill(a: Unit, d: Unit, result: Dictionary) -> void:
+	# The player's side takes the gold a defeated unit carried.
+	if a.team == Unit.Team.PLAYER and d.gold > 0:
+		battle.add_gold(d.gold, a)
+		d.gold = 0
 	if a.team == d.team:
 		var text := "Struck down {foe}, an ally, while berserk at {map}." if Statuses.is_berserk(a) \
 			else "Struck down {foe}, an ally gone berserk, at {map}."  # i18n

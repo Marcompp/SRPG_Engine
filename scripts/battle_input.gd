@@ -594,6 +594,7 @@ func open_objective() -> void:
 		tr("Defeat: {text}").format({"text": Objectives.defeat_text(objective)}),
 		battle.turn_text(),
 		_side_counts(),
+		tr("Gold %d") % battle.gold,
 		tr("Z/X: close"),
 	]
 	battle.state = Battle.State.OBJECTIVE

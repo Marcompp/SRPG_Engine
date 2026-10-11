@@ -39,12 +39,18 @@ static var checking_map := false
 static var stable: Array = []
 
 
+## The army's funds (docs/economy.md); a new campaign starts with START_GOLD.
+static var gold := 0
+const START_GOLD := 1000
+
+
 static func has_save() -> bool:
 	return FileAccess.file_exists(path)
 
 
 static func start_new() -> void:
 	chapter = 0
+	gold = START_GOLD
 	army = []
 	convoy = []
 	fallen = []
@@ -57,7 +63,7 @@ static func start_new() -> void:
 
 static func save() -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
-	file.store_var({"version": SaveGame.VERSION, "chapter": chapter, "army": army, "convoy": convoy,
+	file.store_var({"version": SaveGame.VERSION, "chapter": chapter, "gold": gold, "army": army, "convoy": convoy,
 		"fallen": fallen, "recruited": recruited, "stable": stable})
 
 
@@ -70,6 +76,7 @@ static func load_save() -> bool:
 	if not data is Dictionary or data.get("version", 0) != SaveGame.VERSION:
 		return false
 	chapter = data.chapter
+	gold = data.get("gold", START_GOLD)
 	army = data.army
 	convoy = data.convoy
 	fallen = data.fallen
@@ -216,6 +223,8 @@ static func finish_chapter(battle: Battle) -> void:
 		else:
 			# Recruited during the chapter (see BattleEvents.recruit).
 			army.append(SaveGame.unit_to_dict(u))
+	# The funds as the battle left them, plus the chapter's reward.
+	gold = battle.gold + chapter_data().get("reward", 0)
 	chapter += 1
 	clear_deployment()
 	if not is_complete():

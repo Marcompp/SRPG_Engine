@@ -2,8 +2,8 @@ extends Control
 ## Battle preparations for the next campaign chapter (see Campaign):
 ##   Pick Units: who deploys (the Lord always does; up to the chapter's slots).
 ##   Items:      move items between a unit and the convoy (also how units swap items).
-##   Repair:     restore any worn weapon in the army or convoy to full uses (free
-##               for now; it will cost gold once there is gold).
+##   Repair:     restore any worn weapon in the army or convoy to full uses, for the
+##               price of the uses it restores (Items.repair_cost).
 ##   Stable:     every mount: Z on a ridden one takes its rider off; Z on a free one
 ##               picks a rider (riding reclasses the unit; see Mounts). D: rename.
 ##   Promote:    units at Classes.PROMOTION_LEVEL+ change into a promoted class.
@@ -278,9 +278,15 @@ func _repair() -> void:
 	if index >= list.size():
 		return
 	var it: Dictionary = list[index][1]
+	var price := Items.repair_cost(it)
+	if price > Campaign.gold:
+		message = tr("Not enough gold: {item} costs {price} to repair.").format({"item": it.name, "price": price})
+		return
+	Campaign.gold -= price
 	it.uses = Weapons.max_uses(it)
 	Campaign.save()
-	message = tr("{owner}'s {item} repaired.").format({"owner": tr(list[index][0]), "item": it.name})
+	message = tr("{owner}'s {item} repaired for {price} gold.").format({"owner": tr(list[index][0]), "item": it.name,
+		"price": price})
 	index = clampi(index, 0, maxi(0, _row_count() - 1))
 
 
@@ -373,6 +379,7 @@ func _render() -> void:
 		"menu":
 			for i in MENU.size():
 				lines.append(_row(i, tr(MENU[i])))
+			side.append(tr("Gold %d") % Campaign.gold)
 			side.append(tr("Deployed %d/%d") % [picked.size(), chapter.deploy.size()])
 			for unit_name in picked:
 				side.append("  " + unit_name)
@@ -407,10 +414,9 @@ func _render() -> void:
 				lines.append(tr("Every weapon is in good repair."))
 			for i in list.size():
 				var it: Dictionary = list[i][1]
-				lines.append(_row(i, "%s: %s  %s/%d" % [tr(list[i][0]), it.name,
-					tr("broken") if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it)]))
-			side.append(tr("Repairs are free"))
-			side.append(tr("for now."))
+				lines.append(_row(i, "%s: %s  %s/%d  %dG" % [tr(list[i][0]), it.name,
+					tr("broken") if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it), Items.repair_cost(it)]))
+			side.append(tr("Gold %d") % Campaign.gold)
 		"stable":
 			var mounts := Campaign.all_mounts()
 			if mounts.is_empty():

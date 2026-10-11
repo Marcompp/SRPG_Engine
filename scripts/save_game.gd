@@ -63,6 +63,7 @@ static func capture(battle: Battle, with_history := true) -> Dictionary:
 		"events_fired": battle.events.fired.duplicate(),
 		"event_flags": battle.events.flags.duplicate(),
 		"relations": Factions.to_save(),
+		"gold": battle.gold,
 	}
 	if with_history:
 		data["history"] = battle.turn_history.duplicate()
@@ -90,6 +91,7 @@ static func restore(battle: Battle, data: Dictionary) -> void:
 	battle.rewinds_left = data.get("rewinds_left", battle.rewinds_left)
 	battle.events.fired = data.get("events_fired", []).duplicate()
 	battle.events.flags = data.get("event_flags", {}).duplicate()
+	battle.gold = data.get("gold", battle.gold)
 	if data.has("relations"):
 		Factions.from_save(data.relations)
 	else:

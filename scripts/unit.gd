@@ -94,6 +94,9 @@ var inspire_bonus := 0:
 	set(value):
 		inspire_bonus = value
 		queue_redraw()
+## Gold it carries (roster "gold"): the player's side takes it by defeating the
+## unit, or Steal (docs/economy.md).
+var gold := 0
 ## Active status effects: {name: turns left} (-1: until cured). See Statuses.
 var statuses := {}
 ## Enemy behavior (see AIProfiles), resolved from the roster's "ai" entry.
@@ -190,6 +193,7 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.is_lord = stats.get("lord", false)
 	u.race = stats.get("race", "Human")
 	assert(Races.DATA.has(u.race), "unknown race: " + u.race)
+	u.gold = stats.get("gold", 0)
 	u.gender = stats.get("gender", u.gender)
 	assert(GENDERS.has(u.gender), "unknown gender: " + u.gender)
 	u.generic = stats.get("generic", false)

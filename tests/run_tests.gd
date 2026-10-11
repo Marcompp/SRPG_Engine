@@ -9,7 +9,7 @@ extends SceneTree
 ## suite names as extra arguments to run only those (e.g. "-- skills events").
 
 const SUITES: Array[String] = ["core", "ai", "units", "ui", "campaign", "maps", "skills", "events", "mounts", "statuses", "factions",
-	"text"]
+	"text", "economy"]
 
 ## How much faster than normal the battle runs in tests (see Battle.speed_boost).
 const SPEED_BOOST := 60.0

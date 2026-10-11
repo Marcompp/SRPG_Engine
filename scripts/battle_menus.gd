@@ -167,6 +167,9 @@ func open_steal_menu(foe: Unit) -> void:
 	var options: Array[String] = []
 	for i in steal_choices:
 		options.append(Items.label(foe.items[i]))
+	if foe.gold > 0:
+		steal_choices.append(-1)
+		options.append(tr("%d gold") % foe.gold)
 	battle.map.clear_ranges()
 	battle.cursor.cell = selected.cell
 	open("steal", options, tr("Steal from {unit}").format({"unit": foe.unit_name}))

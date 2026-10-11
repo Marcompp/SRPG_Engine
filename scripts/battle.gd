@@ -67,6 +67,7 @@ func _ready() -> void:
 	rewinds_left = Settings.value("rewinds")
 	var level := Levels.get_level(Levels.selected)
 	Factions.reset(level)
+	gold = Campaign.gold if Campaign.active else level.get("gold", 0)
 	map.load_layout(level.layout)
 	map.load_objects(level.get("objects", []), Objectives.of(level))
 	if level.has("deploy"):
@@ -158,6 +159,19 @@ func units() -> Array[Unit]:
 		if child is Unit and child.hp > 0 and child.carried_by == null and not child.escaped:
 			result.append(child)
 	return result
+
+
+## The army's funds during this battle (docs/economy.md): the campaign's when the
+## battle starts, written back to it when the chapter is won.
+var gold := 0
+
+
+## Adds `amount` to the funds, with a popup on `at`.
+func add_gold(amount: int, at: Unit) -> void:
+	if amount <= 0:
+		return
+	gold += amount
+	at.popup(tr("+%d gold") % amount, Color.GOLD, 10.0)
 
 
 ## Units `u`'s side is hostile to (see Factions): who it may attack.
