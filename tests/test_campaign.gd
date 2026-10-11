@@ -38,7 +38,11 @@ func test_all_chapters_are_valid() -> void:
 			taken[data.cell] = true
 		for o in level.get("objects", []):
 			check(inside.call(o.cell), "%s: object at %s on the map" % [id, o.cell])
-			check(Items.CONSUMABLES.has(o.item) or Weapons.DATA.has(o.item), "%s: reward %s exists" % [id, o.item])
+			if o.has("item"):
+				check(Items.CONSUMABLES.has(o.item) or Weapons.DATA.has(o.item), "%s: reward %s exists" % [id, o.item])
+			for item_name: String in o.get("stock", []):
+				check(Items.CONSUMABLES.has(item_name) or Weapons.DATA.has(item_name), "%s: shop item %s exists" % [id, item_name])
+			check(o.type == "shop" or o.has("item") or o.has("gold"), "%s: object at %s gives something" % [id, o.cell])
 		var obj := Objectives.of(level)
 		for c in Objectives.marked_cells(obj):
 			check(inside.call(c) and BattleMap.cost_for(at.call(c), "foot") >= 0, "%s: objective tile %s reachable" % [id, c])

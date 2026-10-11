@@ -6,7 +6,10 @@ extends RefCounted
 ##                    its size is the number of units the chapter allows.
 ##   recruits:        units (roster format) that join the army at this chapter.
 ##   objective:       see Objectives.
-##   objects:         villages and chests (see BattleMap.objects).
+##   objects:         villages, chests and shops (see BattleMap.objects).
+##   reward:          gold for winning the chapter (docs/economy.md).
+##   shop:            what the prep screen's Shop sells before it (default:
+##                    Shop.DEFAULT_STOCK).
 ##   reinforcements:  [{"turn": N, "units": [enemy roster entries]}]; they appear at
 ##                    the start of enemy phase N and act from the next one.
 ## Chapters have no "players": the army is deployed from the prep screen.
@@ -16,6 +19,7 @@ const ORDER: Array[String] = ["ch1", "ch2", "ch3", "ch4", "ch5"]
 const DATA := {
 	"ch1": {
 		"name": "Chapter 1: Border Village",
+		"reward": 1000,
 		"description": "Bandits raid the border. Visit the villages before\nthe thief burns them, and rout the raiders.",
 		"objective": {"type": "rout"},
 		"layout": [
@@ -32,7 +36,7 @@ const DATA := {
 		],
 		"deploy": [Vector2i(1, 8), Vector2i(3, 8), Vector2i(1, 9), Vector2i(3, 9), Vector2i(4, 8), Vector2i(4, 9)],
 		"objects": [
-			{"type": "village", "cell": Vector2i(5, 0), "item": "Potion"},
+			{"type": "village", "cell": Vector2i(5, 0), "item": "Potion", "gold": 300},
 			{"type": "village", "cell": Vector2i(11, 3), "item": "Chest Key"},
 		],
 		"recruits": [
@@ -54,7 +58,7 @@ const DATA := {
 				"growths": {"hp": 50, "str": 10, "int": 55, "dex": 40, "agi": 45, "lck": 55, "def": 10, "mp": 40}},
 		],
 		"enemies": [
-			{"name": "Thief", "generic": true, "cell": Vector2i(14, 1), "class": "Rogue", "items": ["Knife"], "lv": 1,
+			{"name": "Thief", "generic": true, "cell": Vector2i(14, 1), "class": "Rogue", "items": ["Knife"], "lv": 1, "gold": 300,
 				"hp": 16, "str": 3, "dex": 5, "agi": 9, "lck": 2, "def": 1, "mov": 6, "mp": 1,
 				"ai": {"preset": "thief"}},
 			{"name": "Bandit", "generic": true, "cell": Vector2i(9, 1), "class": "Brigand", "items": ["Iron Axe"], "lv": 1,
@@ -73,6 +77,7 @@ const DATA := {
 	},
 	"ch2": {
 		"name": "Chapter 2: Hill Fort",
+		"reward": 1500,
 		"description": "The bandits hold an old hill fort. Break in and seize\nthe throne. Chests inside; a thief is after them too.",
 		"objective": {"type": "seize", "cell": Vector2i(7, 0)},
 		"layout": [
@@ -99,10 +104,10 @@ const DATA := {
 				"bio": ["A lockpick who knows the old fort's chests."]},
 		],
 		"enemies": [
-			{"name": "Commander", "cell": Vector2i(7, 0), "class": "Hoplite", "items": ["Iron Spear", "Javelin"], "lv": 5,
+			{"name": "Commander", "cell": Vector2i(7, 0), "class": "Hoplite", "items": ["Iron Spear", "Javelin"], "lv": 5, "gold": 1000,
 				"hp": 28, "str": 8, "dex": 6, "agi": 5, "lck": 2, "def": 8, "mov": 5, "mp": 2,
 				"ai": {"preset": "boss"}},
-			{"name": "Thief", "generic": true, "cell": Vector2i(1, 2), "class": "Rogue", "items": ["Knife"], "lv": 2,
+			{"name": "Thief", "generic": true, "cell": Vector2i(1, 2), "class": "Rogue", "items": ["Knife"], "lv": 2, "gold": 400,
 				"hp": 17, "str": 3, "dex": 6, "agi": 10, "lck": 3, "def": 1, "mov": 6, "mp": 1,
 				"ai": {"preset": "thief"}},
 			{"name": "Archer", "generic": true, "cell": Vector2i(5, 2), "class": "Archer", "items": ["Iron Bow"], "lv": 2,
@@ -127,6 +132,9 @@ const DATA := {
 	},
 	"ch3": {
 		"name": "Chapter 3: The Bandit King",
+		"shop": ["Iron Sword", "Iron Spear", "Iron Axe", "Iron Bow", "Javelin", "Hatchet", "Quarterstaff", "Potion", "Ether", "Antitoxin", "Chest Key",
+			"Steel Axe", "Pike", "Repair Kit"],
+		"reward": 2000,
 		"description": "The bandit king watches from his hilltop fort.\nDefeat him and the raids end.",
 		"objective": {"type": "boss", "boss": "Bandit King"},
 		"layout": [
@@ -143,7 +151,8 @@ const DATA := {
 		],
 		"deploy": [Vector2i(1, 9), Vector2i(3, 9), Vector2i(4, 9), Vector2i(5, 9), Vector2i(1, 8), Vector2i(0, 8), Vector2i(6, 9)],
 		"objects": [
-			{"type": "village", "cell": Vector2i(11, 9), "item": "Ether"},
+			{"type": "village", "cell": Vector2i(11, 9), "item": "Ether", "gold": 1000},
+			{"type": "shop", "cell": Vector2i(6, 7), "stock": ["Steel Axe", "Javelin", "Potion", "Antitoxin", "Repair Kit"]},
 		],
 		"recruits": [
 			{"name": "Pegasus", "class": "Footman", "mount": {"species": "Pegasus"}, "gender": "female", "items": ["Iron Spear", "Javelin"], "lv": 4,
@@ -152,7 +161,7 @@ const DATA := {
 				"bio": ["A knight of the sky, scouting for the march."]},
 		],
 		"enemies": [
-			{"name": "Bandit King", "cell": Vector2i(12, 2), "class": "Berserker", "items": ["Steel Axe", "Hatchet"], "lv": 7,
+			{"name": "Bandit King", "cell": Vector2i(12, 2), "class": "Berserker", "items": ["Steel Axe", "Hatchet"], "lv": 7, "gold": 2500,
 				"hp": 32, "str": 10, "dex": 5, "agi": 6, "lck": 2, "def": 6, "mov": 5, "mp": 1,
 				"ai": {"preset": "boss"}},
 			{"name": "Brigand", "generic": true, "cell": Vector2i(10, 2), "class": "Brigand", "items": ["Iron Axe"], "lv": 3,
@@ -174,6 +183,9 @@ const DATA := {
 	},
 	"ch4": {
 		"name": "Chapter 4: The Siege",
+		"shop": ["Iron Sword", "Iron Spear", "Iron Axe", "Iron Bow", "Javelin", "Hatchet", "Quarterstaff", "Potion", "Ether", "Antitoxin", "Chest Key",
+			"Steel Axe", "Pike", "Hammer", "Killing Edge", "Repair Kit", "Panacea"],
+		"reward": 2500,
 		"description": "An army besieges the town. Hold the town hall for\n7 turns; if any enemy reaches it, the town falls.",
 		"objective": {"type": "defend", "turns": 7, "cell": Vector2i(6, 3)},
 		"layout": [
@@ -241,6 +253,9 @@ const DATA := {
 	},
 	"ch5": {
 		"name": "Chapter 5: Flight from the Keep",
+		"shop": ["Iron Sword", "Iron Spear", "Iron Axe", "Iron Bow", "Javelin", "Hatchet", "Quarterstaff", "Potion", "Ether", "Antitoxin", "Chest Key",
+			"Steel Axe", "Pike", "Hammer", "Killing Edge", "Silver Sword", "Repair Kit", "Panacea"],
+		"reward": 3000,
 		"description": "Betrayed inside the castle. Get your Lord out\nthrough the gate to the south.",
 		"objective": {"type": "escape", "cells": [Vector2i(6, 9), Vector2i(7, 9), Vector2i(8, 9)]},
 		"layout": [
@@ -257,7 +272,7 @@ const DATA := {
 		],
 		"deploy": [Vector2i(7, 1), Vector2i(6, 1), Vector2i(8, 1), Vector2i(5, 1), Vector2i(9, 1), Vector2i(6, 2), Vector2i(8, 2)],
 		"objects": [
-			{"type": "chest", "cell": Vector2i(1, 1), "item": "Silver Bow"},
+			{"type": "chest", "cell": Vector2i(1, 1), "item": "Silver Bow", "gold": 1500},
 		],
 		"recruits": [
 			{"name": "Dancer", "class": "Performer", "items": ["Iron Sword", "Potion"], "lv": 5,

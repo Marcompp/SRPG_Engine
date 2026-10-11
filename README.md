@@ -42,7 +42,8 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | 4. The Siege | Defend the town hall 7 turns | Reinforcement waves; losing if an enemy reaches the tile | Guard, Mage |
 | 5. Flight from the Keep | Escape (Lord through the gate) | Escape command; other units can leave early | Dancer |
 
-- **Carried over:** levels, EXP, items and promotions. Survivors are healed between chapters.
+- **Carried over:** levels, EXP, items, promotions and the army's gold. Survivors are healed between chapters.
+- **Gold:** each chapter pays a reward when won (1000 for chapter 1, up to 3000); thieves and bosses carry gold (defeat them or Steal it), some villages and chests hold gold, and chapter 3 has a shop on the map. The prep screen's Shop stocks more from chapter 3 on.
 - **Permadeath:** fallen units leave the army for good. They're kept in `Campaign.fallen` (with chapter and turn) for future mechanics, and "Fell in …" is added to their biography.
 - **Defeat** retries the chapter with the army as it was before it.
 - **Prep screen** before each chapter: Pick Units (the Lord always deploys), Items (unit ↔ convoy), Shop (buy into the convoy, sell from it), Repair (any worn or broken weapon in the army or convoy, for the price of the uses it restores), Stable (assign, unassign and rename mounts; riders a mount refuses say why), Promote (Lv 15+, class-dependent stat bonus, level kept), Status, Check Map, Fight!

@@ -148,3 +148,20 @@ func test_map_shop() -> void:
 	await press(KEY_X)
 	await press(KEY_X)
 	check(lord.has_acted, "shopping ends the turn")
+
+
+func test_campaign_economy_data() -> void:
+	for id in Chapters.ORDER:
+		var ch: Dictionary = Chapters.DATA[id]
+		check(ch.get("reward", 0) > 0, "%s has a reward" % id)
+		for item_name: String in Shop.stock_for(ch):
+			check(Items.cost(item_name) > 0, "%s's shop: %s has a price" % [id, item_name])
+		for o: Dictionary in ch.get("objects", []):
+			for item_name: String in o.get("stock", []):
+				check(Items.cost(item_name) > 0, "%s's map shop: %s has a price" % [id, item_name])
+	await start_chapter(2)
+	var lord := unit_named("Lord")
+	lord.set_cell(Vector2i(6, 7))
+	await open_menu_in_place(lord)
+	check(b.ui.menu_options.has("Shop"), "chapter 3 has a shop on the map")
+	check_eq(unit_named("Bandit King", Unit.Team.ENEMY).gold, 2500, "and a Bandit King worth robbing")
