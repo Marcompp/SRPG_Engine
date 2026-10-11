@@ -8,6 +8,12 @@ extends RefCounted
 ## Saved to `path` when a campaign starts and after each completed chapter, so a
 ## lost chapter is retried with the army as it was before it.
 
+## Biography line for each way a unit can fall (Battle.campaign_deaths "how").
+const DEATH_TEXTS := {  # i18n
+	"Fell": "Fell in {map}, turn {turn}.",
+	"Succumbed to poison": "Succumbed to poison in {map}, turn {turn}.",
+}
+
 static var path := "user://campaign.save"
 ## True while the battle being played is a campaign chapter.
 static var active := false
@@ -160,7 +166,7 @@ static func add_recruits() -> void:
 	recruited.append(id)
 	for data in chapter_data().get("recruits", []):
 		var u := Unit.create(data.name, Unit.Team.PLAYER, Vector2i.ZERO, data)
-		u.biography.append("Joined the army in %s." % chapter_data().name)
+		u.biography.append(Text.entry("Joined the army in {map}.", {"map": chapter_data().name}))
 		army.append(SaveGame.unit_to_dict(u))
 		u.free()
 
@@ -198,7 +204,7 @@ static func finish_chapter(battle: Battle) -> void:
 		var d := army_unit(death.name)
 		if d.is_empty():
 			continue
-		d.biography.append("%s in %s, turn %d." % [death.get("how", "Fell"), name, death.turn])
+		d.biography.append(Text.entry(DEATH_TEXTS[death.get("how", "Fell")], {"map": name, "turn": death.turn}))
 		fallen.append({"unit": d, "chapter": name, "turn": death.turn})
 		army.erase(d)
 	for unit_name in survivors:
@@ -247,7 +253,7 @@ static func promote(unit_name: String, new_class: String) -> Dictionary:
 		gains[key] = u.get(prop) - before
 	u.hp = u.max_hp
 	u.mp = u.max_mp
-	u.biography.append("Promoted to %s before %s." % [new_class, chapter_data().name])
+	u.biography.append(Text.entry("Promoted to {class} before {map}.", {"class": new_class, "map": chapter_data().name}))
 	army[i] = SaveGame.unit_to_dict(u)
 	u.free()
 	return gains

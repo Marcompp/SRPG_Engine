@@ -157,10 +157,10 @@ func show_target() -> void:
 		battle.map.show_area([], [cell])
 		var tile_name: String = battle.map.terrain_at(cell).name
 		if mode == "door":
-			battle.ui.show_cell_forecast("Open Door", battle.cursor.cell)
+			battle.ui.show_cell_forecast(tr("Open Door"), battle.cursor.cell)
 		else:
 			var hp: int = battle.map.tile_hp.get(cell, 0)
-			battle.ui.show_cell_forecast("%s  HP %d -> %d" % [tile_name, hp, maxi(0, hp - battle.actions.tile_damage(selected))], battle.cursor.cell)
+			battle.ui.show_cell_forecast(tr("%s  HP %d -> %d") % [tile_name, hp, maxi(0, hp - battle.actions.tile_damage(selected))], battle.cursor.cell)
 		return
 	if mode in ["drop", "unload"]:
 		var cell := cells[index]
@@ -168,7 +168,7 @@ func show_target() -> void:
 		battle.map.show_area([], [cell])
 		var passenger := selected.carrying if mode == "drop" else unload_passenger
 		battle.ui.show_drop_forecast(passenger, battle.map.terrain_at(cell).name, battle.cursor.cell,
-			"Drop" if mode == "drop" else "Unload")
+			"Drop {unit}" if mode == "drop" else "Unload {unit}")  # i18n
 		return
 	if mode == "inspire":
 		var allies := battle.actions.inspire_targets(selected)
@@ -197,12 +197,13 @@ func show_target() -> void:
 		battle.ui.show_trade_preview(target, battle.cursor.cell)
 	elif mode == "talk":
 		battle.map.show_area([], [target.cell])
-		battle.ui.show_cell_forecast("Talk to %s" % target.unit_name, battle.cursor.cell)
+		battle.ui.show_cell_forecast(tr("Talk to {unit}").format({"unit": target.unit_name}), battle.cursor.cell)
 	elif mode == "steal":
 		var names: Array[String] = []
 		for i in battle.actions.stealable_items(target):
 			names.append(target.items[i].name)
-		battle.ui.show_cell_forecast("Steal from %s\n%s" % [target.unit_name, ", ".join(names)], battle.cursor.cell)
+		battle.ui.show_cell_forecast(tr("Steal from {unit}").format({"unit": target.unit_name}) + "\n" + ", ".join(names),
+			battle.cursor.cell)
 	elif active_spell and Spells.is_support(active_spell):
 		var spell := Spells.get_spell(active_spell)
 		battle.ui.show_heal_forecast(selected, target, active_spell, Spells.heal_amount(selected, spell, target), battle.cursor.cell)

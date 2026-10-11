@@ -48,6 +48,7 @@ const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 # --- Setup --------------------------------------------------------------------
 
 func _ready() -> void:
+	Text.manual(self)  # the code translates what it shows
 	Skills.field = units  # auras and adjacency conditions look at the units on the map
 	input = _add_part(BattleInput.new(), "Input")
 	actions = _add_part(BattleActions.new(), "Actions")
@@ -230,8 +231,8 @@ func offense_ranges(u: Unit, affordable_only := false) -> Array[Vector2i]:
 func turn_text() -> String:
 	var objective := Objectives.of(Levels.get_level(Levels.selected))
 	if objective.type in ["survive", "defend"]:
-		return "Turn %d / %d" % [turn, objective.turns]
-	return "Turn %d" % turn
+		return tr("Turn %d / %d") % [turn, objective.turns]
+	return tr("Turn %d") % turn
 
 
 # --- Enemy threat (danger zone and marked enemies) ----------------------------

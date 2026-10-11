@@ -179,7 +179,7 @@ static func take_turn(enemy: Unit, battle: Battle) -> void:
 
 	update_wake(enemy, battle)
 	if update_retreat(enemy):
-		enemy.popup("Retreat!", Color.LIGHT_GRAY)
+		enemy.popup(TranslationServer.translate("Retreat!"), Color.LIGHT_GRAY)
 
 	var reach: Dictionary = map.get_reachable(enemy, battle.units())
 	var mode := current_move(enemy)

@@ -76,7 +76,7 @@ Thief: Ugh...
 	check(lord.has_acted, "talking ends the turn")
 	check(b.events.flags.has("talked"), "flag set")
 	check(b.events.talk_targets(lord).is_empty(), "the talk runs once")
-	check(brig.biography[-1].begins_with("Joined the army"), "biography entry")
+	check(Text.render(brig.biography[-1]).begins_with("Joined the army"), "biography entry")
 	# Battle quote, once.
 	var other := unit_named("Brigand", Unit.Team.ENEMY)
 	await b.events.before_battle(lord, other)

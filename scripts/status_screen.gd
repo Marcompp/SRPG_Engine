@@ -16,8 +16,9 @@ const HP_FILL := Color("5ee05e")
 const MP_FILL := Color("5aa0ff")
 ## Stats raised by skills.
 const BOOSTED := Color(1.0, 0.85, 0.4)
-const PAGES: Array[String] = ["Stats", "Items", "Skills", "Bio"]
-const STAT_ROWS := [["str", "STR"], ["int", "INT"], ["dex", "DEX"], ["agi", "AGI"],
+## Page ids, translated where shown.
+const PAGES: Array[String] = ["Stats", "Items", "Skills", "Bio"]  # i18n
+const STAT_ROWS := [["str", "STR"], ["int", "INT"], ["dex", "DEX"], ["agi", "AGI"],  # i18n
 	["lck", "LCK"], ["def", "DEF"]]
 const LEFT_WIDTH := 80
 const PAGE_ORIGIN := Vector2(86, 17)
@@ -65,7 +66,7 @@ func _ready() -> void:
 	_page.position = PAGE_ORIGIN
 	add_child(_page)
 	for i in PAGES.size():
-		var tab := _label(self, PAGES[i], Vector2(PAGE_ORIGIN.x + i * 37, 3))
+		var tab := _label(self, tr(PAGES[i]), Vector2(PAGE_ORIGIN.x + i * 37, 3))
 		_tabs.append(tab)
 	_hint = _label(self, "", Vector2(4, 148), DIM)
 
@@ -180,7 +181,7 @@ func _render() -> void:
 	for i in _tabs.size():
 		_tabs[i].visible = i < page_count()
 		_tabs[i].add_theme_color_override("font_color", Color.WHITE if i == page else DIM)
-		_tabs[i].text = ("[%s]" if i == page else " %s ") % PAGES[i]
+		_tabs[i].text = ("[%s]" if i == page else " %s ") % tr(PAGES[i])
 	_update_detail()
 
 
@@ -215,13 +216,13 @@ func _render_left() -> void:
 
 	_entry(_label(_left, unit.class_display_name(), Vector2(6, 70)), Glossary.unit_class(unit))
 	_entry(_label(_left, unit.race, Vector2(6, 80)), Glossary.race(unit))
-	_entry(_label(_left, "Lv %d" % unit.level, Vector2(6, 91)), Glossary.stat("lv", unit))
+	_entry(_label(_left, tr("Lv %d") % unit.level, Vector2(6, 91)), Glossary.stat("lv", unit))
 	if unit.team == Unit.Team.PLAYER:
-		_entry(_label(_left, "Exp %d" % unit.exp_points, Vector2(40, 91)), Glossary.stat("exp", unit))
-	_entry(_label(_left, "HP %d/%d" % [unit.hp, unit.max_hp], Vector2(6, 103)), Glossary.stat("hp", unit))
+		_entry(_label(_left, tr("Exp %d") % unit.exp_points, Vector2(40, 91)), Glossary.stat("exp", unit))
+	_entry(_label(_left, tr("HP %d/%d") % [unit.hp, unit.max_hp], Vector2(6, 103)), Glossary.stat("hp", unit))
 	_bar(_left, Vector2(6, 114), 68, float(unit.hp) / unit.max_hp, HP_FILL)
 	var max_mp := maxi(unit.max_mp, 1)
-	_entry(_label(_left, "MP %d/%d" % [unit.mp, unit.max_mp], Vector2(6, 119)), Glossary.stat("mp", unit))
+	_entry(_label(_left, tr("MP %d/%d") % [unit.mp, unit.max_mp], Vector2(6, 119)), Glossary.stat("mp", unit))
 	_bar(_left, Vector2(6, 130), 68, float(unit.mp) / max_mp, MP_FILL)
 
 
@@ -233,30 +234,30 @@ func _render_stats() -> void:
 		var own: int = unit.get(Experience.STATS[key])
 		var value: int = unit.ridden(own, key) + bonus
 		var capped := unit.is_capped(key)
-		_label(_page, STAT_ROWS[i][1], Vector2(0, row_y), DIM)
+		_label(_page, tr(STAT_ROWS[i][1]), Vector2(0, row_y), DIM)
 		var color := CAPPED if capped else (BOOSTED if bonus > 0 else Color.WHITE)
 		var value_label := _label(_page, str(value), Vector2(30, row_y), color)
 		var text := Glossary.stat(key, unit)
 		if bonus != 0:
-			text += " Skills: %+d." % bonus
+			text += " " + tr("Skills: %+d.") % bonus
 		if not unit.mount.is_empty():
-			text += " Mounted: rider %d / 2 + %s %d." % [own, unit.mount.name, unit.mount.stats.get(key, 0)]
+			text += " " + tr("Mounted: rider %d / 2 + %s %d.") % [own, unit.mount.name, unit.mount.stats.get(key, 0)]
 		_entry(value_label, text)
 		var fill := _bar(_page, Vector2(50, row_y + 5), 90, float(value) / unit.stat_cap(key), CAPPED if capped else BAR_FILL)
 		if capped:
 			_glow.append(value_label)
 			_glow.append(fill)
 	var y := STAT_ROWS.size() * 13.0
-	_label(_page, "MOV", Vector2(0, y), DIM)
+	_label(_page, tr("MOV"), Vector2(0, y), DIM)
 	var mov_color := BOOSTED if Skills.stat_bonus(unit, "mov") > 0 else Color.WHITE
 	_entry(_label(_page, "%d  %s" % [unit.mov, unit.move_type.capitalize()], Vector2(30, y), mov_color),
-		Glossary.STATS.mov + " " + Glossary.MOVE_TYPES.get(unit.move_type, ""))
+		tr(Glossary.STATS.mov) + " " + (tr(Glossary.MOVE_TYPES[unit.move_type]) if Glossary.MOVE_TYPES.has(unit.move_type) else ""))
 	if not unit.mount.is_empty():
 		var m := unit.mount
-		_entry(_label(_page, "%s: %s Lv %d (%s)" % [m.species, m.name, m.level, m.gender.capitalize()],
+		_entry(_label(_page, tr("%s: %s Lv %d (%s)") % [m.species, m.name, m.level, m.gender.capitalize()],
 			Vector2(0, y + 13), DIM), Mounts.species_data(m.species).description)
 	if unit.carrying:
-		_label(_page, "Carrying %s (DEX/AGI halved)" % unit.carrying.unit_name, Vector2(0, y + 24), DIM)
+		_label(_page, tr("Carrying %s (DEX/AGI halved)") % unit.carrying.unit_name, Vector2(0, y + 24), DIM)
 	_render_statuses(Vector2(0, y + 37))
 
 
@@ -265,7 +266,7 @@ func _render_stats() -> void:
 func _render_statuses(pos: Vector2) -> void:
 	if unit.statuses.is_empty():
 		return
-	_label(_page, "Status", pos, DIM)
+	_label(_page, tr("Status"), pos, DIM)
 	var x := 30.0
 	for status: String in unit.statuses:
 		var square := ColorRect.new()
@@ -284,13 +285,13 @@ func _render_statuses(pos: Vector2) -> void:
 
 func _render_items() -> void:
 	if unit.items.is_empty():
-		_label(_page, "No items", Vector2(0, 0), DIM)
+		_label(_page, tr("No items"), Vector2(0, 0), DIM)
 	var equipped := unit.equipped_index()
 	for i in unit.items.size():
 		var it := unit.items[i]
 		var y := i * 10.0
 		if i == equipped:
-			_label(_page, "E", Vector2(0, y), Color(1.0, 0.85, 0.25))
+			_label(_page, tr("E"), Vector2(0, y), Color(1.0, 0.85, 0.25))
 		_entry(_label(_page, it.name, Vector2(10, y)), Glossary.item(it))
 		_label(_page, str(it.get("uses", "")), Vector2(120, y))
 
@@ -300,7 +301,7 @@ func _render_items() -> void:
 	if armed:
 		rng = str(unit.min_range) if unit.min_range == unit.max_range \
 			else "%d-%d" % [unit.min_range, unit.max_range]
-	var numbers := [
+	var numbers := [  # i18n
 		["Atk", Combat.base_attack(unit) if armed else "--", "atk"],
 		["Hit", Combat.base_hit(unit) if armed else "--", "hit"],
 		["Avo", Combat.base_avoid(unit), "avo"],
@@ -310,38 +311,39 @@ func _render_items() -> void:
 	]
 	for i in numbers.size():
 		var pos := Vector2((i % 3) * 50.0, 56.0 + floorf(i / 3.0) * 11.0)
-		_label(_page, numbers[i][0], pos, DIM)
-		_entry(_label(_page, str(numbers[i][1]), pos + Vector2(22, 0)), Glossary.COMBAT[numbers[i][2]])
+		_label(_page, tr(numbers[i][0]), pos, DIM)
+		_entry(_label(_page, str(numbers[i][1]), pos + Vector2(22, 0)), tr(Glossary.COMBAT[numbers[i][2]]))
 
 	if not unit.spells.is_empty():
-		_label(_page, "Spells", Vector2(0, 82), DIM)
+		_label(_page, tr("Spells"), Vector2(0, 82), DIM)
 		for i in unit.spells.size():
 			var s: String = unit.spells[i]
 			var spell := Spells.get_spell(s)
 			var y := 93.0 + i * 10.0
 			_entry(_label(_page, s, Vector2(10, y)), Glossary.spell(s))
-			_label(_page, "%dMP" % spell.mp, Vector2(120, y))
+			_label(_page, tr("%dMP") % spell.mp, Vector2(120, y))
 
 
 ## Every visible skill with where it comes from; learned skills count toward the cap.
 func _render_skills() -> void:
 	var shown := Skills.visible_sources(unit)
 	if shown.is_empty():
-		_label(_page, "No skills.", Vector2(0, 2), DIM)
+		_label(_page, tr("No skills."), Vector2(0, 2), DIM)
 	for i in shown.size():
 		var skill: String = shown[i][0]
 		var y := i * 10.0
 		_entry(_label(_page, skill, Vector2(0, y)), "%s: %s" % [skill, Skills.get_data(skill).description])
-		_label(_page, shown[i][1], Vector2(90, y), DIM)
-	_label(_page, "Learned %d/%d" % [unit.learned.size(), Skills.LEARNED_CAP], Vector2(0, 118), DIM)
+		_label(_page, tr(shown[i][1]), Vector2(90, y), DIM)
+	_label(_page, tr("Learned %d/%d") % [unit.learned.size(), Skills.LEARNED_CAP], Vector2(0, 118), DIM)
 
 
 func _render_bio() -> void:
 	if unit.biography.is_empty():
-		_label(_page, "No notable events yet.", Vector2(0, 2), DIM)
+		_label(_page, tr("No notable events yet."), Vector2(0, 2), DIM)
 		return
 	var y := 0.0
-	for event in unit.biography:
+	for entry in unit.biography:
+		var event := Text.render(entry)
 		# Wrapping must be set up before the text, or the label keeps its one-line width.
 		var line := Label.new()
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -357,8 +359,8 @@ func _render_bio() -> void:
 # --- Detail mode ------------------------------------------------------------------
 
 func _update_detail() -> void:
-	_hint.text = "Arrows: select   D/X: back" if detail \
-		else "L/R: page  U/D: unit  D: info  X: close"
+	_hint.text = tr("Arrows: select   D/X: back") if detail \
+		else tr("L/R: page  U/D: unit  D: info  X: close")
 	var active := detail and not _entries.is_empty()
 	_highlight.visible = active
 	_desc_panel.visible = active

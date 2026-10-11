@@ -20,7 +20,7 @@ func _ready() -> void:
 	add_child(bg)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var title := Label.new()
-	title.text = "Options"
+	title.text = tr("Options")
 	title.add_theme_font_size_override("font_size", 14)
 	title.position = Vector2(12, 8)
 	add_child(title)
@@ -28,7 +28,7 @@ func _ready() -> void:
 	_rows.position = Vector2(12, 34)
 	add_child(_rows)
 	_hint = Label.new()
-	_hint.text = "Up/Down: choose  Left/Right: change  Z/X: close"
+	_hint.text = tr("Up/Down: choose  Left/Right: change  Z/X: close")
 	_hint.position = Vector2(12, 146)
 	_hint.add_theme_color_override("font_color", DIM)
 	add_child(_hint)
@@ -62,5 +62,5 @@ func _render() -> void:
 	for i in Settings.OPTIONS.size():
 		var option: Dictionary = Settings.OPTIONS[i]
 		var text: String = option.choices[Settings.choice_index(option)][1]
-		lines.append("%s%s:  < %s >" % ["> " if i == index else "   ", option.label, text])
+		lines.append("%s%s:  < %s >" % ["> " if i == index else "   ", tr(option.label), tr(text)])
 	_rows.text = "\n".join(lines)

@@ -24,7 +24,7 @@ func start_player_phase() -> void:
 	for u in battle.units_of(Unit.Team.PLAYER):
 		u.regen_mp(u.mp_regen())
 	battle.turn += 1
-	await battle.ui.show_banner("Player Phase\n" + battle.turn_text(), Color("2850b0"))
+	await battle.ui.show_banner(tr(Factions.PHASE_BANNERS[Unit.Team.PLAYER]) + "\n" + battle.turn_text(), Color("2850b0"))
 	await heal_on_tiles(Unit.Team.PLAYER)
 	await tick_statuses(Unit.Team.PLAYER)
 	if check_game_over():
@@ -114,7 +114,7 @@ func count_down_statuses(team: Unit.Team) -> void:
 	var shown := false
 	for u in battle.units_of(team):
 		for ended in Statuses.count_down(u):
-			u.popup("%s wore off" % ended, Color.LIGHT_GRAY)
+			u.popup(tr("{status} wore off").format({"status": ended}), Color.LIGHT_GRAY)
 			shown = true
 	if shown:
 		await get_tree().create_timer(0.5).timeout
@@ -143,7 +143,7 @@ func end_player_phase() -> void:
 ## One AI side's phase: start-of-phase effects, then each of its units' turns.
 ## Returns false if the battle ended during it.
 func ai_phase(side: Unit.Team) -> bool:
-	await battle.ui.show_banner("%s Phase" % Factions.NAMES[side], Factions.BANNER_COLORS[side])
+	await battle.ui.show_banner(tr(Factions.PHASE_BANNERS[side]), Factions.BANNER_COLORS[side])
 	clear_inspire(side)
 	for e in battle.units_of(side):
 		e.regen_mp(e.mp_regen())
@@ -194,7 +194,7 @@ func spawn_reinforcements() -> void:
 			arrived = true
 	if arrived:
 		battle.refresh_threat()
-		await battle.ui.show_banner("Reinforcements!", Color("b02828"))
+		await battle.ui.show_banner(tr("Reinforcements!"), Color("b02828"))
 
 
 func _free_cell_near(u: Unit, origin: Vector2i) -> Vector2i:
@@ -222,11 +222,11 @@ func check_game_over(turn_over := false) -> bool:
 	battle.battle_result = result
 	discard_suspend()
 	var won := result == "victory"
-	var hint := "Z: restart   X: level select"
+	var hint := tr("Z: restart   X: level select")
 	if Campaign.active:
 		var last := Campaign.chapter >= Chapters.ORDER.size() - 1
-		hint = ("Z: continue" if not last else "Z: finish the campaign") if won \
-			else "Z: retry the chapter   X: level select"
+		hint = (tr("Z: continue") if not last else tr("Z: finish the campaign")) if won \
+			else tr("Z: retry the chapter   X: level select")
 	_show_end(won, hint)
 	return true
 
@@ -234,7 +234,7 @@ func check_game_over(turn_over := false) -> bool:
 ## The map's victory/defeat scene (if any), then the end screen.
 func _show_end(won: bool, hint: String) -> void:
 	await battle.events.on_end(battle.battle_result)
-	battle.ui.show_end("Victory!" if won else "Defeat...", Color("2850b0") if won else Color("602020"), hint)
+	battle.ui.show_end(tr("Victory!") if won else tr("Defeat..."), Color("2850b0") if won else Color("602020"), hint)
 
 
 # --- Campaign flow (see Campaign) ---------------------------------------------
@@ -297,7 +297,7 @@ func rewind_to(index: int) -> void:
 	var players := battle.units_of(Unit.Team.PLAYER)
 	battle.cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	battle.camera.snap(battle.cursor.cell)
-	await battle.ui.show_banner("Rewound to\n" + battle.turn_text(), Color("4a3a8a"))
+	await battle.ui.show_banner(tr("Rewound to") + "\n" + battle.turn_text(), Color("4a3a8a"))
 	_resume_player_phase()
 
 

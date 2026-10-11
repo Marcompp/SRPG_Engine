@@ -17,7 +17,10 @@ const NEUTRAL := Unit.Team.NEUTRAL
 const PHASE_ORDER: Array[Unit.Team] = [PLAYER, ALLY, ENEMY, OTHER, NEUTRAL]
 ## Keys used in level data and events ("== turn 3, ally ==", "team": "other").
 const KEYS := {PLAYER: "player", ALLY: "ally", ENEMY: "enemy", OTHER: "other", NEUTRAL: "neutral"}
-const NAMES := {PLAYER: "Player", ALLY: "Ally", ENEMY: "Enemy", OTHER: "Other", NEUTRAL: "Neutral"}
+## Shown to the player (translated where shown).
+const NAMES := {PLAYER: "Player", ALLY: "Ally", ENEMY: "Enemy", OTHER: "Other", NEUTRAL: "Neutral"}  # i18n
+const PHASE_BANNERS := {PLAYER: "Player Phase", ALLY: "Ally Phase", ENEMY: "Enemy Phase", OTHER: "Other Phase",  # i18n
+	NEUTRAL: "Neutral Phase"}
 ## Colors work as keys too ("== turn 3, green ==", "@side Varga, purple").
 const ALIASES := {"blue": PLAYER, "green": ALLY, "red": ENEMY, "purple": OTHER, "yellow": NEUTRAL}
 ## Level roster lists for each side.

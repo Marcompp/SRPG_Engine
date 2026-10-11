@@ -23,7 +23,7 @@ const STATS := {
 	"def": "defense",
 	"mp": "base_max_mp",
 }
-const STAT_LABELS := {"hp": "HP", "str": "Str", "int": "Int", "dex": "Dex", "agi": "Agi", "lck": "Lck",
+const STAT_LABELS := {"hp": "HP", "str": "Str", "int": "Int", "dex": "Dex", "agi": "Agi", "lck": "Lck",  # i18n
 	"def": "Def", "mp": "MP"}
 ## Stats only shown/rolled for casters. MP isn't one: it's everyone's magic defense.
 const CASTER_STATS: Array[String] = ["int"]

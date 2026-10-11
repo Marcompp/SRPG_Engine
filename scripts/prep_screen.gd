@@ -16,7 +16,9 @@ extends Control
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 const DIM := Color(0.7, 0.75, 0.95)
-const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!", "Level Select"]
+## Entries are ids, translated where shown.
+const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!",  # i18n
+	"Level Select"]
 
 ## "menu", "pick", "items_unit", "items", "repair", "promote_unit", "promote_class", "status_unit", "status"
 var mode := "menu"
@@ -40,6 +42,7 @@ var _rename: LineEdit
 
 
 func _ready() -> void:
+	Text.manual(self)  # the code translates what it shows
 	var theme := Theme.new()
 	theme.default_font_size = 8
 	self.theme = theme
@@ -168,7 +171,7 @@ func _accept() -> void:
 				if mounts[index].rider != "":
 					Campaign.unassign_mount(mounts[index].rider)
 					Campaign.save()
-					message = "%s is back in the stable." % mounts[index].mount.name
+					message = tr("{mount} is back in the stable.").format({"mount": mounts[index].mount.name})
 				else:
 					_mount = mounts[index].mount
 					_enter("stable_rider")
@@ -180,7 +183,7 @@ func _accept() -> void:
 			else:
 				Campaign.assign_mount(names[index], _mount)
 				Campaign.save()
-				message = "%s now rides %s." % [names[index], _mount.name]
+				message = tr("{unit} now rides {mount}.").format({"unit": names[index], "mount": _mount.name})
 				_enter("stable")
 		"promote_unit":
 			var eligible := _promotable()
@@ -191,7 +194,7 @@ func _accept() -> void:
 			var options := Campaign.promotion_options(Campaign.army_unit(current_unit))
 			var gains := Campaign.promote(current_unit, options[index])
 			Campaign.save()
-			message = "%s is now a %s! %s" % [current_unit, options[index], _gains_text(gains)]
+			message = tr("{unit} is now a {class}!").format({"unit": current_unit, "class": options[index]}) + " " + _gains_text(gains)
 			_enter("promote_unit")
 		"status_unit":
 			_show_status(_army_names()[index])
@@ -221,11 +224,11 @@ func _toggle_pick(unit_name: String) -> void:
 	var slots: int = Campaign.chapter_data().deploy.size()
 	if picked.has(unit_name):
 		if d.is_lord:
-			message = "Your Lord must fight."
+			message = tr("Your Lord must fight.")
 		else:
 			picked.erase(unit_name)
 	elif picked.size() >= slots:
-		message = "Only %d units can deploy." % slots
+		message = tr("Only %d units can deploy.") % slots
 	else:
 		picked.append(unit_name)
 
@@ -236,7 +239,7 @@ func _move_item() -> void:
 		Campaign.store_item(current_unit, index)
 	elif column == 1 and index < Campaign.convoy.size():
 		if not Campaign.take_item(current_unit, index):
-			message = "%s can't carry more." % current_unit
+			message = tr("{unit} can't carry more.").format({"unit": current_unit})
 	Campaign.save()
 	index = clampi(index, 0, maxi(0, _row_count() - 1))
 
@@ -277,7 +280,7 @@ func _repair() -> void:
 	var it: Dictionary = list[index][1]
 	it.uses = Weapons.max_uses(it)
 	Campaign.save()
-	message = "%s's %s repaired." % [list[index][0], it.name]
+	message = tr("{owner}'s {item} repaired.").format({"owner": tr(list[index][0]), "item": it.name})
 	index = clampi(index, 0, maxi(0, _row_count() - 1))
 
 
@@ -356,75 +359,75 @@ func _gains_text(gains: Dictionary) -> String:
 	var parts := []
 	for key in gains:
 		if gains[key] > 0:
-			parts.append("%s+%d" % [Experience.STAT_LABELS[key], gains[key]])
+			parts.append("%s+%d" % [tr(Experience.STAT_LABELS[key]), gains[key]])
 	return " ".join(parts)
 
 
 func _render() -> void:
 	var chapter := Campaign.chapter_data()
-	_title.text = chapter.name
-	_objective.text = "Victory: " + Objectives.victory_text(Objectives.of(chapter))
+	_title.text = tr(chapter.name)
+	_objective.text = tr("Victory: {text}").format({"text": Objectives.victory_text(Objectives.of(chapter))})
 	var lines: Array[String] = []
 	var side: Array[String] = []
 	match mode:
 		"menu":
 			for i in MENU.size():
-				lines.append(_row(i, MENU[i]))
-			side.append("Deployed %d/%d" % [picked.size(), chapter.deploy.size()])
+				lines.append(_row(i, tr(MENU[i])))
+			side.append(tr("Deployed %d/%d") % [picked.size(), chapter.deploy.size()])
 			for unit_name in picked:
 				side.append("  " + unit_name)
 			if not Campaign.fallen.is_empty():
-				side.append("Fallen: %s" % ", ".join(Campaign.fallen.map(func(f): return f.unit.unit_name)))
+				side.append(tr("Fallen: %s") % ", ".join(Campaign.fallen.map(func(f): return f.unit.unit_name)))
 		"pick":
 			var names := _army_names()
 			for i in names.size():
 				lines.append(_row(i, "[%s] %s" % ["x" if picked.has(names[i]) else " ", names[i]]))
 			var d := Campaign.army_unit(names[index])
-			side.append("%s  Lv %d" % [Campaign.class_label(d), d.level])
-			side.append("Deployed %d/%d" % [picked.size(), chapter.deploy.size()])
+			side.append(tr("%s  Lv %d") % [Campaign.class_label(d), d.level])
+			side.append(tr("Deployed %d/%d") % [picked.size(), chapter.deploy.size()])
 		"items_unit", "status_unit":
 			var names := _army_names()
 			for i in names.size():
 				var d := Campaign.army_unit(names[i])
-				lines.append(_row(i, "%s  Lv %d" % [names[i], d.level]))
-			side.append("Convoy: %d items" % Campaign.convoy.size())
+				lines.append(_row(i, tr("%s  Lv %d") % [names[i], d.level]))
+			side.append(tr("Convoy: %d items") % Campaign.convoy.size())
 		"items":
 			var d := Campaign.army_unit(current_unit)
 			lines.append(current_unit)
 			for i in d.items.size():
 				lines.append(_row(i, Items.label(d.items[i], " "), column == 0))
-			side.append("Convoy")
+			side.append(tr("Convoy"))
 			for i in Campaign.convoy.size():
 				side.append(_row(i, Items.label(Campaign.convoy[i], " "), column == 1))
 			if Campaign.convoy.is_empty():
-				side.append("   (empty)")
+				side.append("   " + tr("(empty)"))
 		"repair":
 			var list := _repairables()
 			if list.is_empty():
-				lines.append("Every weapon is in good repair.")
+				lines.append(tr("Every weapon is in good repair."))
 			for i in list.size():
 				var it: Dictionary = list[i][1]
-				lines.append(_row(i, "%s: %s  %s/%d" % [list[i][0], it.name,
-					"broken" if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it)]))
-			side.append("Repairs are free")
-			side.append("for now.")
+				lines.append(_row(i, "%s: %s  %s/%d" % [tr(list[i][0]), it.name,
+					tr("broken") if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it)]))
+			side.append(tr("Repairs are free"))
+			side.append(tr("for now."))
 		"stable":
 			var mounts := Campaign.all_mounts()
 			if mounts.is_empty():
-				lines.append("No mounts yet.")
+				lines.append(tr("No mounts yet."))
 			for i in mounts.size():
 				var m: Dictionary = mounts[i].mount
-				lines.append(_row(i, "%s  %s Lv %d" % [m.name, m.species, m.level]))
+				lines.append(_row(i, tr("%s  %s Lv %d") % [m.name, m.species, m.level]))
 			if index < mounts.size():
 				var m: Dictionary = mounts[index].mount
-				side.append("Rider: %s" % (mounts[index].rider if mounts[index].rider != "" else "none"))
+				side.append(tr("Rider: %s") % (mounts[index].rider if mounts[index].rider != "" else tr("none")))
 				side.append("%s, %s" % [m.species, m.gender])
 				for s in Mounts.STATS:
-					side.append("%s %d" % [Experience.STAT_LABELS[s], m.stats[s]])
+					side.append("%s %d" % [tr(Experience.STAT_LABELS[s]), m.stats[s]])
 				side.append(", ".join(m.get("skills", [])))
 		"stable_rider":
 			var names := _army_names()
-			lines.append("Who rides %s?" % _mount.name)
+			lines.append(tr("Who rides {mount}?").format({"mount": _mount.name}))
 			for i in names.size():
 				var d := Campaign.army_unit(names[i])
 				var mark := " " if Campaign.ride_problem(names[i], _mount) == "" else "x"
@@ -432,20 +435,20 @@ func _render() -> void:
 		"promote_unit":
 			var eligible := _promotable()
 			if eligible.is_empty():
-				lines.append("No unit has reached Lv %d." % Classes.PROMOTION_LEVEL)
+				lines.append(tr("No unit has reached Lv %d.") % Classes.PROMOTION_LEVEL)
 			for i in eligible.size():
 				var d := Campaign.army_unit(eligible[i])
-				lines.append(_row(i, "%s  %s Lv %d" % [eligible[i], Campaign.class_label(d), d.level]))
+				lines.append(_row(i, tr("%s  %s Lv %d") % [eligible[i], Campaign.class_label(d), d.level]))
 		"promote_class":
 			var options := Campaign.promotion_options(Campaign.army_unit(current_unit))
-			lines.append("Promote %s to:" % current_unit)
+			lines.append(tr("Promote {unit} to:").format({"unit": current_unit}))
 			for i in options.size():
 				lines.append(_row(i, options[i]))
 			var bonus := Classes.promotion_bonus(options[index])
 			side.append(_gains_text(bonus))
 	_left.text = "\n".join(lines)
 	_right.text = "\n".join(side)
-	var hints := {
+	var hints := {  # i18n
 		"menu": "Up/Down: choose  Z: select",
 		"pick": "Z: deploy / bench  X: back",
 		"items": "Z: move item  Left/Right: unit/convoy  X: back",
@@ -454,7 +457,7 @@ func _render() -> void:
 		"stable_rider": "Z: ride  X: back",
 		"status": "Left/Right: page  Up/Down: unit  X: back",
 	}
-	_hint.text = message if message != "" else hints.get(mode, "Z: select  X: back")
+	_hint.text = message if message != "" else tr(hints.get(mode, "Z: select  X: back"))
 
 
 func _row(i: int, text: String, active := true) -> String:

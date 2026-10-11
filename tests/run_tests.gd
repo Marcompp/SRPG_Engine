@@ -8,7 +8,8 @@ extends SceneTree
 ## Every method named test_* runs, in order, each on a fresh battle scene. Pass
 ## suite names as extra arguments to run only those (e.g. "-- skills events").
 
-const SUITES: Array[String] = ["core", "ai", "units", "ui", "campaign", "maps", "skills", "events", "mounts", "statuses", "factions"]
+const SUITES: Array[String] = ["core", "ai", "units", "ui", "campaign", "maps", "skills", "events", "mounts", "statuses", "factions",
+	"text"]
 
 ## How much faster than normal the battle runs in tests (see Battle.speed_boost).
 const SPEED_BOOST := 60.0

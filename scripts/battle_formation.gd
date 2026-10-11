@@ -27,7 +27,7 @@ func start(deploy_cells: Array) -> void:
 		shown[c] = true
 	input.battle.map.deploy_cells = shown
 	input.battle.state = Battle.State.BUSY
-	await input.battle.ui.show_banner("Check Map", Color("2850b0"))
+	await input.battle.ui.show_banner(tr("Check Map"), Color("2850b0"))
 	input.browse()
 
 
@@ -50,7 +50,7 @@ func accept() -> void:
 		input.toggle_mark(u)
 	else:
 		input.battle.ui.hide_info()
-		var options: Array[String] = ["Fight!", "Units", "Objective", "Options", "Back to Prep"]
+		var options: Array[String] = ["Fight!", "Units", "Objective", "Options", "Back to Prep"]  # i18n
 		input.menus.open("formation", options)
 
 

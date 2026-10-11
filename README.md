@@ -53,7 +53,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 
 ## Tests
 
-Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills`, `events`, `mounts` and `statuses`. Every method named `test_*` in a suite runs on a fresh battle; there's no list to update. Battles run 60x faster than normal in tests (`SPEED_BOOST` in `tests/run_tests.gd`, via `Battle.speed_boost`); tests that check the game speed itself set it back to 1. The whole suite takes about a minute.
+Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills`, `events`, `mounts`, `statuses`, `factions` and `text` (translation groundwork). Every method named `test_*` in a suite runs on a fresh battle; there's no list to update. Battles run 60x faster than normal in tests (`SPEED_BOOST` in `tests/run_tests.gd`, via `Battle.speed_boost`); tests that check the game speed itself set it back to 1. The whole suite takes about a minute.
 
 ```
 GODOT=/path/to/godot tests/run_tests.sh            # everything
@@ -61,6 +61,10 @@ GODOT=/path/to/godot tests/run_tests.sh skills ui  # just these suites
 ```
 
 Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if Godot printed any runtime script error, because Godot logs those and keeps running, so the GDScript runner can't see them. To run the suite directly: `godot --headless --path . --script res://tests/run_tests.gd [-- suite...]`.
+
+## Translation
+
+Not translated yet, but ready for it: player-facing text goes through `tr()` with the English text as its key, and `tools/extract_strings.gd` collects every key into a gettext template (`godot --headless --path . --script res://tools/extract_strings.gd` writes `locale/messages.pot`). Rules for writing text: `docs/translation.md`.
 
 ## Controls
 

@@ -88,7 +88,7 @@ func test_mount_exp_and_loyal() -> void:
 	b.actions._apply_strike(brig, lord, {"hit": true, "crit": false, "dmg": 50}, dealt)
 	check_eq(lord.hp, 1, "the rider survives at 1 HP")
 	check(lord.mount.is_empty() and lord.unit_class == "Swordsman", "on foot")
-	check(lord.biography[-1].begins_with("Lost Bayard"), "biography entry")
+	check(Text.render(lord.biography[-1]).begins_with("Lost Bayard"), "biography entry")
 	b.actions._apply_strike(brig, lord, {"hit": true, "crit": false, "dmg": 50}, dealt)
 	check(lord.hp <= 0, "only once: no mount left to save it")
 	# Enemy mounts from rosters scale with the rider's level.

@@ -222,22 +222,22 @@ static func sources(u: Unit) -> Array:
 			if not seen.has(skill):
 				seen[skill] = true
 				result.append([skill, source])
-	add.call(u.personal_skills, "Personal")
+	add.call(u.personal_skills, "Personal")  # i18n
 	if Classes.DATA.has(u.unit_class):  # unset while a unit is being built
-		add.call(Classes.get_data(u.unit_class).get("skills", []), "Class")
+		add.call(Classes.get_data(u.unit_class).get("skills", []), "Class")  # i18n
 	# Mounted: the foot class's innate skills stay, except terrain movement (the mount
 	# moves for it). The mount's own skills count too.
 	if Classes.DATA.has(u.foot_class):
 		var kept: Array = Classes.get_data(u.foot_class).get("skills", []).filter(
 			func(s): return not TERRAIN_SKILLS.has(s))
-		add.call(kept, "Class")
+		add.call(kept, "Class")  # i18n
 	if not u.mount.is_empty():
 		add.call(u.mount.get("skills", []), u.mount.name)
-	add.call(Races.get_data(u.race).get("skills", []), "Race")
+	add.call(Races.get_data(u.race).get("skills", []), "Race")  # i18n
 	if Races.get_data(u.race).get("amphibious", false) and Classes.DATA.has(u.unit_class) \
 			and Classes.get_data(u.unit_class).move == "foot" and u.mount.is_empty():
-		add.call(["Swimming", "Climbing"], "Race")
-	add.call(u.learned, "Learned")
+		add.call(["Swimming", "Climbing"], "Race")  # i18n
+	add.call(u.learned, "Learned")  # i18n
 	if not u.weapon.is_empty():
 		add.call(u.weapon.get("skills", []), u.weapon.name)
 	for item in u.items:

@@ -57,7 +57,7 @@ func test_seize_objective() -> void:
 	check(b.ui.menu_options.has("Seize"), "the Lord on the throne can Seize")
 	await pick("Seize")
 	check_eq(b.battle_result, "victory", "seizing wins")
-	check(lord.biography.any(func(e): return e.begins_with("Seized")), "logged in the Lord's biography")
+	check(lord.biography.any(func(e): return Text.render(e).begins_with("Seized")), "logged in the Lord's biography")
 
 
 func test_boss_objective() -> void:
@@ -170,11 +170,11 @@ func test_campaign_army_carries_over() -> void:
 	check_eq(Campaign.chapter, 1, "on to chapter 2")
 	check(Campaign.army_unit("Fighter").is_empty(), "the fallen Fighter left the army (permadeath)")
 	check_eq(Campaign.fallen.size(), 1, "kept among the fallen")
-	check(Campaign.fallen[0].unit.biography[-1].begins_with("Fell in Chapter 1"), "with the event in its biography")
+	check(Text.render(Campaign.fallen[0].unit.biography[-1]).begins_with("Fell in Chapter 1"), "with the event in its biography")
 	check_eq(Campaign.army_unit("Lord").exp_points, 60, "EXP carried over")
 	check(Campaign.army_unit("Lord").items.any(func(it): return it.name == "Chest Key"), "items carried over")
 	check(not Campaign.army_unit("Scout").is_empty(), "chapter 2's recruit joined")
-	check(Campaign.army_unit("Scout").biography[-1].begins_with("Joined the army in Chapter 2"), "and logged it")
+	check(Text.render(Campaign.army_unit("Scout").biography[-1]).begins_with("Joined the army in Chapter 2"), "and logged it")
 	# Saved: a reload gets the same campaign back.
 	var army_before := var_to_str(Campaign.army)
 	Campaign.army = []
@@ -195,7 +195,7 @@ func test_promotion() -> void:
 	check_eq(promoted.level, 15, "level kept")
 	check_eq(promoted.strength, str_before + Classes.promotion_bonus("Swordsmaster").str, "class bonus applied")
 	check_eq(gains.str, Classes.promotion_bonus("Swordsmaster").str, "gains reported")
-	check(promoted.biography[-1].begins_with("Promoted to Swordsmaster"), "logged")
+	check(Text.render(promoted.biography[-1]).begins_with("Promoted to Swordsmaster"), "logged")
 
 
 func test_prep_screen() -> void:

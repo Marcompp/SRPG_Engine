@@ -113,19 +113,20 @@ static func display_name(mounted_class_id: String, species: String) -> String:
 	return DISPLAY.get(mounted_class_id, {}).get(species, mounted_class_id)
 
 
-## Why a unit (foot class, race, hidden gender) can't ride `species`, or "" if it can.
+## Why a unit (foot class, race, hidden gender) can't ride `species` (translated), or "" if it can.
 static func ride_problem(foot_class: String, race: String, gender: String, species: String) -> String:
 	var mounted := mounted_class(foot_class)
 	if mounted == "":
-		return "A %s can't ride." % foot_class
+		return TranslationServer.translate("A {class} can't ride.").format({"class": foot_class})
 	if race == "Centaur":
-		return "Centaurs don't ride: they're mounted already."
+		return TranslationServer.translate("Centaurs don't ride: they're mounted already.")
 	if not Races.allows(race, mounted):
-		return "%ss can't ride." % race
+		return TranslationServer.translate("{race}s can't ride.").format({"race": race})
 	var genders: Array = species_data(species).get("riders", {}).get("gender", [])
 	if not genders.is_empty() and not genders.has(gender):
-		return "%s only accept %s riders." % [species if species.ends_with("s") else species + "s",
-			" or ".join(genders)]
+		return TranslationServer.translate("{species} only accept {genders} riders.").format({
+			"species": species if species.ends_with("s") else species + "s",
+			"genders": TranslationServer.translate(" or ").join(genders)})
 	return ""
 
 

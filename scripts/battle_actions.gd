@@ -65,7 +65,7 @@ func provoke(attacker: Unit, target: Unit) -> void:
 			or Factions.hostile(Unit.Team.NEUTRAL, Unit.Team.PLAYER):
 		return
 	Factions.set_hostile(Unit.Team.NEUTRAL, Unit.Team.PLAYER, true)
-	target.popup("Provoked!", Color.ORANGE_RED, 10.0)
+	target.popup(tr("Provoked!"), Color.ORANGE_RED, 10.0)
 	battle.refresh_threat()
 
 
@@ -95,15 +95,15 @@ func inspire_targets(u: Unit) -> Array[Unit]:
 # --- Map objectives and objects (see Objectives) ------------------------------
 
 func do_seize(u: Unit) -> void:
-	u.popup("Seize!", Color.GOLD)
-	u.biography.append("Seized %s." % map_title())
+	u.popup(tr("Seize!"), Color.GOLD)
+	u.biography.append(Text.entry("Seized {map}.", {"map": map_title()}))
 	battle.objective_done = true
 	await get_tree().create_timer(0.5).timeout
 
 
 ## The unit (and whoever it carries) leaves the map for good; the Lord leaving wins.
 func do_escape(u: Unit) -> void:
-	u.popup("Escape", Color.PALE_GREEN)
+	u.popup(tr("Escape"), Color.PALE_GREEN)
 	await get_tree().create_timer(0.4).timeout
 	u.escaped = true
 	u.visible = false
@@ -149,23 +149,23 @@ func _spend_key(u: Unit) -> void:
 func give_item(u: Unit, item_name: String) -> String:
 	if u.items.size() < Unit.MAX_ITEMS:
 		u.items.append(Items.make(item_name))
-		return "Got " + item_name
+		return tr("Got {item}").format({"item": item_name})
 	if Campaign.active:
 		Campaign.convoy.append(Items.make(item_name))
-		return item_name + " to convoy"
-	return "No room: " + item_name
+		return tr("{item} to convoy").format({"item": item_name})
+	return tr("No room: {item}").format({"item": item_name})
 
 
 ## An enemy on a village burns it (its reward is lost); on a chest, takes the item.
 func loot(enemy: Unit, object: Dictionary) -> void:
 	if object.type == "village":
 		object.state = "looted"
-		enemy.popup("Looted!", Color.ORANGE_RED)
+		enemy.popup(tr("Looted!"), Color.ORANGE_RED)
 	else:
 		object.state = "opened"
 		if enemy.items.size() < Unit.MAX_ITEMS:
 			enemy.items.append(Items.make(object.item))
-		enemy.popup("Stole " + object.item, Color.ORANGE_RED)
+		enemy.popup(tr("Stole {item}").format({"item": object.item}), Color.ORANGE_RED)
 	battle.map.queue_redraw()
 	await get_tree().create_timer(0.6).timeout
 
@@ -186,7 +186,7 @@ func repairable_weapons(u: Unit) -> Array[int]:
 func repair_weapon(u: Unit, kit: int, weapon: int) -> void:
 	var w := u.items[weapon]
 	w.uses = Weapons.max_uses(w)
-	u.popup("Repaired " + w.name, Color.PALE_GREEN)
+	u.popup(tr("Repaired {item}").format({"item": w.name}), Color.PALE_GREEN)
 	u.items[kit].uses -= 1
 	if u.items[kit].uses <= 0:
 		u.items.remove_at(kit)
@@ -224,10 +224,10 @@ func do_steal(u: Unit, foe: Unit, index: int) -> void:
 	await u.lunge(foe.cell)
 	if u.items.size() < Unit.MAX_ITEMS:
 		u.items.append(item)
-		u.popup("Stole " + item.name, Color.GOLD)
+		u.popup(tr("Stole {item}").format({"item": item.name}), Color.GOLD)
 	else:
 		Campaign.convoy.append(item)
-		u.popup(item.name + " to convoy", Color.GOLD)
+		u.popup(tr("{item} to convoy").format({"item": item.name}), Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
 	if gains_exp(u):
 		await gain_exp(u, Experience.STEAL_EXP)
@@ -272,13 +272,13 @@ func do_break(u: Unit, cell: Vector2i) -> void:
 	var amount := tile_damage(u)
 	var tile_name: String = battle.map.terrain_at(cell).name
 	await u.lunge(cell)
-	u.popup("%s -%d" % [tile_name, amount], Color.WHITE)
+	u.popup(tr("{tile} -{damage}").format({"tile": tile_name, "damage": amount}), Color.WHITE)
 	if u.use_weapon():
-		u.popup("Broke!", Color.LIGHT_GRAY)
+		u.popup(tr("Broke!"), Color.LIGHT_GRAY)
 	var broke := battle.map.damage_tile(cell, amount, u.cell)
 	if broke:
 		await get_tree().create_timer(0.3).timeout
-		u.popup(tile_name + " broken!", Color.GOLD)
+		u.popup(tr("{tile} broken!").format({"tile": tile_name}), Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
 
 
@@ -286,7 +286,7 @@ func do_open_door(u: Unit, cell: Vector2i) -> void:
 	battle.map.clear_ranges()
 	_spend_key(u)
 	battle.map.set_terrain(cell, battle.map.breakable_info(cell).becomes)
-	u.popup("Door opened", Color.GOLD)
+	u.popup(tr("Door opened"), Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
 
 
@@ -322,7 +322,7 @@ func shove_targets(u: Unit) -> Array[Unit]:
 func do_shove(shover: Unit, target: Unit) -> void:
 	var dest := shove_destination(shover, target)
 	battle.map.clear_ranges()
-	shover.popup("Shove", Color.WHITE)
+	shover.popup(tr("Shove"), Color.WHITE)
 	await shover.lunge(target.cell)
 	var path: Array[Vector2i] = [target.cell, dest]
 	await target.move_along(path)
@@ -366,7 +366,7 @@ func landing_cells(carrier: Unit, passenger: Unit) -> Array[Vector2i]:
 
 func do_rescue(rescuer: Unit, ally: Unit) -> void:
 	battle.map.clear_ranges()
-	rescuer.popup("Rescue", Color.WHITE)
+	rescuer.popup(tr("Rescue"), Color.WHITE)
 	var path: Array[Vector2i] = [ally.cell, rescuer.cell]
 	await ally.move_along(path)
 	ally.visible = false
@@ -423,7 +423,7 @@ func unloadable(ship: Unit) -> Array[Unit]:
 
 func do_board(u: Unit, ship: Unit) -> void:
 	battle.map.clear_ranges()
-	u.popup("Board", Color.WHITE)
+	u.popup(tr("Board"), Color.WHITE)
 	var path: Array[Vector2i] = [u.cell, ship.cell]
 	await u.move_along(path)
 	u.visible = false
@@ -451,11 +451,11 @@ func do_inspire(u: Unit) -> void:
 	var bonus := Classes.inspire_bonus(u.level)
 	var allies := inspire_targets(u)
 	battle.map.clear_ranges()
-	u.popup("Inspire", Color.GOLD)
+	u.popup(tr("Inspire"), Color.GOLD)
 	await get_tree().create_timer(0.3).timeout
 	for ally in allies:
 		ally.inspire_bonus = maxi(ally.inspire_bonus, bonus)
-		ally.popup("STR/DEF +%d" % bonus, Color.GOLD)
+		ally.popup(tr("STR/DEF +%d") % bonus, Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
 	if gains_exp(u):
 		await gain_exp(u, Experience.INSPIRE_EXP)
@@ -489,18 +489,18 @@ func duet(dancer: Unit, target: Unit) -> Dictionary:
 ## Duet when the target can Dance too.
 func do_dance(dancer: Unit, target: Unit) -> void:
 	var d := duet(dancer, target)
-	dancer.popup("Duet" if d else "Dance", Color.PINK)
+	dancer.popup(tr("Duet") if d else tr("Dance"), Color.PINK)
 	await dancer.lunge(target.cell)
 	if d:
 		for t: Unit in d.troupe:
 			if t != dancer:
-				t.popup("Duet", Color.PINK)
+				t.popup(tr("Duet"), Color.PINK)
 		for ally: Unit in d.refreshed:
 			ally.has_acted = false
-			ally.popup("Refreshed", Color.PINK)
+			ally.popup(tr("Refreshed"), Color.PINK)
 	else:
 		target.has_acted = false
-		target.popup("Refreshed", Color.PINK)
+		target.popup(tr("Refreshed"), Color.PINK)
 	await get_tree().create_timer(0.5).timeout
 	if earns_exp(dancer):
 		await gain_exp(dancer, Experience.DANCE_EXP)
@@ -514,7 +514,7 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 	await caster.lunge(target.cell)
 	if spell.get("cures", false):
 		Statuses.cure(target)
-		target.popup("Cured", Color.PALE_GREEN)
+		target.popup(tr("Cured"), Color.PALE_GREEN)
 	else:
 		target.heal(amount)
 		target.popup("+%d" % amount, Color.PALE_GREEN)
@@ -542,7 +542,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 		await a.lunge(d.cell)
 		_apply_strike(a, d, result, dealt)
 		if result.hit and a.use_weapon():
-			a.popup("Broke!", Color.LIGHT_GRAY)
+			a.popup(tr("Broke!"), Color.LIGHT_GRAY)
 		await get_tree().create_timer(0.45).timeout
 	await _finish_exchange(attacker, defender, dealt)
 
@@ -565,7 +565,7 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 		await target.lunge(caster.cell)
 		_apply_strike(target, caster, counter, dealt)
 		if counter.hit and target.use_weapon():
-			target.popup("Broke!", Color.LIGHT_GRAY)
+			target.popup(tr("Broke!"), Color.LIGHT_GRAY)
 		await get_tree().create_timer(0.45).timeout
 	await _finish_exchange(caster, target, dealt)
 
@@ -625,18 +625,19 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 		d.take_damage(result.dmg)
 		if result.dmg > 0 and not dealt.has(a):
 			dealt.append(a)
-		d.popup(("Crit! %d" if result.crit else "%d") % result.dmg,
+		d.popup((tr("Crit! %d") if result.crit else "%d") % result.dmg,
 			Color.ORANGE if result.crit else Color.WHITE)
 		if d.hp <= 0 and d.mount.get("skills", []).has("Loyal"):
 			_loyal_save(d)
 		elif d.hp <= 0:
 			_record_kill(a, d, result)
 		elif saved_by != "":
-			_note(d, "Survived a lethal blow from %s at %s, thanks to %s." % [foe_label(a), map_title(), saved_by])
+			_note(d, Text.entry("Survived a lethal blow from {foe} at {map}, thanks to {skill}.",
+				{"foe": foe_label(a), "map": map_title(), "skill": saved_by}))
 		elif result.dmg > 0:
 			_record_close_call(d, a)
 	else:
-		d.popup("Miss", Color.LIGHT_GRAY)
+		d.popup(tr("Miss"), Color.LIGHT_GRAY)
 	# After the damage, so a sleep-inducing hit isn't undone by its own damage.
 	if result.hit and result.get("inflict", "") != "" and d.hp > 0:
 		inflict(d, result.inflict)
@@ -646,8 +647,9 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 func _loyal_save(d: Unit) -> void:
 	var lost := d.dismount()
 	d.hp = 1
-	d.popup("%s fell!" % lost.name, Color.LIGHT_GRAY, 10.0)
-	_note(d, "Lost %s, their %s, at %s." % [lost.name, str(lost.species).to_lower(), map_title()])
+	d.popup(tr("{mount} fell!").format({"mount": lost.name}), Color.LIGHT_GRAY, 10.0)
+	_note(d, Text.entry("Lost {mount}, their {species}, at {map}.",
+		{"mount": lost.name, "species": str(lost.species).to_lower(), "map": map_title()}))
 	d.queue_redraw()
 	battle.refresh_threat()
 
@@ -658,32 +660,33 @@ func map_title() -> String:
 	return title.get_slice(": ", 1) if title.contains(": ") else title
 
 
-## How a biography names a foe: "Garret the Brigand" for generics.
-func foe_label(u: Unit) -> String:
-	return "%s the %s" % [u.unit_name, u.unit_class] if u.generic else u.unit_name
+## How a biography names a foe: "Garret the Brigand" for generics (a Text entry).
+func foe_label(u: Unit) -> Variant:
+	return Text.entry("{name} the {class}", {"name": u.unit_name, "class": u.unit_class}) if u.generic else u.unit_name
 
 
-## Adds a biography entry for player units (enemies have no Biography page).
-func _note(u: Unit, text: String) -> void:
+## Adds a biography entry (a Text entry) for player units (enemies have no Biography page).
+func _note(u: Unit, entry: Dictionary) -> void:
 	if u.team == Unit.Team.PLAYER:
-		u.biography.append(text)
+		u.biography.append(entry)
 
 
 ## Kill counts (unit and weapon) and kill biography moments: a boss (noting a
 ## critical finishing blow) or a unit's first kill.
 func _record_kill(a: Unit, d: Unit, result: Dictionary) -> void:
 	if a.team == d.team:
-		var how := "%s, an ally, while berserk" if Statuses.is_berserk(a) else "%s, an ally gone berserk,"
-		_note(a, ("Struck down " + how + " at %s.") % [foe_label(d), map_title()])
+		var text := "Struck down {foe}, an ally, while berserk at {map}." if Statuses.is_berserk(a) \
+			else "Struck down {foe}, an ally gone berserk, at {map}."  # i18n
+		_note(a, Text.entry(text, {"foe": foe_label(d), "map": map_title()}))
 		return
 	a.kills += 1
 	if not result.get("spell", false) and not a.weapon.is_empty():
 		a.weapon["kills"] = a.weapon.get("kills", 0) + 1
 	if d.is_boss:
-		_note(a, ("Defeated %s with a critical hit at %s." if result.crit else "Defeated %s at %s.")
-			% [foe_label(d), map_title()])
+		var text := "Defeated {foe} with a critical hit at {map}." if result.crit else "Defeated {foe} at {map}."  # i18n
+		_note(a, Text.entry(text, {"foe": foe_label(d), "map": map_title()}))
 	elif a.kills == 1:
-		_note(a, "Felled their first foe, %s, at %s." % [foe_label(d), map_title()])
+		_note(a, Text.entry("Felled their first foe, {foe}, at {map}.", {"foe": foe_label(d), "map": map_title()}))
 
 
 ## A player unit left at 10% HP or less (at least 1) by a hit: once per battle.
@@ -691,7 +694,8 @@ func _record_close_call(d: Unit, a: Unit) -> void:
 	if d.team != Unit.Team.PLAYER or _close_calls.has(d) or d.hp > maxi(1, d.max_hp / 10):
 		return
 	_close_calls[d] = true
-	_note(d, "Barely survived %s at %s, with %d HP left." % [foe_label(a), map_title(), d.hp])
+	_note(d, Text.entry("Barely survived {foe} at {map}, with {hp} HP left.",
+		{"foe": foe_label(a), "map": map_title(), "hp": d.hp}))
 
 
 ## EXP for both sides of a one-on-one exchange, then deaths.
@@ -768,7 +772,7 @@ func _after_combat(u, foe, foe_cell: Vector2i, effect: Dictionary) -> void:
 ## "Immune". Returns whether it took.
 func inflict(u: Unit, status: String, turns := 0) -> bool:
 	var took := Statuses.inflict(u, status, turns)
-	u.popup(status if took else "Immune", Statuses.get_data(status).color if took else Color.LIGHT_GRAY)
+	u.popup(status if took else tr("Immune"), Statuses.get_data(status).color if took else Color.LIGHT_GRAY)
 	return took
 
 
@@ -828,7 +832,7 @@ func gain_exp(u: Unit, amount: int, mount_amount := -1) -> void:
 	if u.level >= Experience.LEVEL_CAP:
 		await _mount_exp(u, mount_amount)
 		return
-	u.popup("+%d EXP" % amount, Color.AQUAMARINE)
+	u.popup(tr("+%d EXP") % amount, Color.AQUAMARINE)
 	await get_tree().create_timer(0.5).timeout
 	u.exp_points += amount
 	while u.exp_points >= Experience.EXP_PER_LEVEL and u.level < Experience.LEVEL_CAP:
@@ -841,7 +845,7 @@ func gain_exp(u: Unit, amount: int, mount_amount := -1) -> void:
 		if u.team == Unit.Team.PLAYER:
 			await battle.ui.show_level_up(u, before, gains)
 		else:
-			u.popup("Level %d!" % u.level, Color.AQUAMARINE, 10.0)
+			u.popup(tr("Level %d!") % u.level, Color.AQUAMARINE, 10.0)
 			await get_tree().create_timer(0.5).timeout
 		for skill in u.skills_learned_at(u.level):
 			await learn_skill(u, skill)
@@ -857,9 +861,9 @@ func _mount_exp(u: Unit, amount: int) -> void:
 	for gains in Mounts.gain_exp(u.mount, amount):
 		var parts: Array[String] = []
 		for s in gains:
-			parts.append("%s+1" % Experience.STAT_LABELS[s])
-		battle.ui.show_cell_forecast("%s reached Lv %d!\n%s" % [u.mount.name, u.mount.level,
-			"  ".join(parts) if not parts.is_empty() else "No gains"], u.cell)
+			parts.append("%s+1" % tr(Experience.STAT_LABELS[s]))
+		battle.ui.show_cell_forecast(tr("{mount} reached Lv {level}!").format({"mount": u.mount.name, "level": u.mount.level})
+			+ "\n" + ("  ".join(parts) if not parts.is_empty() else tr("No gains")), u.cell)
 		await get_tree().create_timer(1.2).timeout
 		battle.ui.hide_forecast()
 
@@ -875,15 +879,16 @@ func learn_skill(u: Unit, skill: String) -> bool:
 			return false
 		var options: Array[String] = []
 		options.assign(u.learned)
-		options.append("Don't learn")
-		var index: int = await battle.input.choose(options, "%s: learn %s? Forget:" % [u.unit_name, skill])
+		options.append("Don't learn")  # i18n
+		var index: int = await battle.input.choose(options,
+			tr("{unit}: learn {skill}? Forget:").format({"unit": u.unit_name, "skill": skill}))
 		if index >= u.learned.size():
 			return false
-		u.popup("Forgot " + u.learned[index], Color.LIGHT_GRAY)
+		u.popup(tr("Forgot {skill}").format({"skill": u.learned[index]}), Color.LIGHT_GRAY)
 		u.learned.remove_at(index)
 		await get_tree().create_timer(0.4).timeout
 	u.learned.append(skill)
 	if not Skills.is_hidden(skill):
-		u.popup("Learned " + skill, Color.GOLD)
+		u.popup(tr("Learned {skill}").format({"skill": skill}), Color.GOLD)
 		await get_tree().create_timer(0.6).timeout
 	return true

@@ -112,7 +112,7 @@ func _make_panel(label: Label) -> PanelContainer:
 
 ## The MP row is only shown for spells, where current MP is the magic defense; the
 ## Status row only when a side's hits can inflict a status.
-const FORECAST_ROWS: Array[String] = ["", "", "HP", "MP", "Dmg", "Hit", "Crit", "Status"]
+const FORECAST_ROWS: Array[String] = ["", "", "HP", "MP", "Dmg", "Hit", "Crit", "Status"]  # i18n
 const DIM := Color(0.7, 0.75, 0.95)
 const ADVANTAGE := Color(0.5, 1.0, 0.5)
 const DISADVANTAGE := Color(1.0, 0.5, 0.5)
@@ -130,7 +130,7 @@ func _make_forecast() -> PanelContainer:
 			var label := Label.new()
 			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if col == 0 else HORIZONTAL_ALIGNMENT_CENTER
 			if col == 0:
-				label.text = row_name
+				label.text = tr(row_name)
 				label.add_theme_color_override("font_color", DIM)
 			grid.add_child(label)
 			row.append(label)
@@ -172,7 +172,7 @@ func _make_level_up() -> PanelContainer:
 		for col in 3:
 			var label := Label.new()
 			if col == 0:
-				label.text = Experience.STAT_LABELS[key]
+				label.text = tr(Experience.STAT_LABELS[key])
 				label.add_theme_color_override("font_color", DIM)
 			elif col == 2:
 				label.add_theme_color_override("font_color", ADVANTAGE)
@@ -182,7 +182,7 @@ func _make_level_up() -> PanelContainer:
 		_level_rows.append(row)
 	box.add_child(grid)
 	var hint := Label.new()
-	hint.text = "Z: continue"
+	hint.text = tr("Z: continue")
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_color_override("font_color", DIM)
 	box.add_child(hint)
@@ -225,19 +225,19 @@ func _near_top(cursor_cell: Vector2i, rows: int) -> bool:
 func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i, tile_hp := -1) -> void:
 	var text := ""
 	if unit:
-		var weapon := "No weapon"
+		var weapon := tr("No weapon")
 		if not unit.weapon.is_empty():
 			var rng := str(unit.min_range) if unit.min_range == unit.max_range \
 				else "%d-%d" % [unit.min_range, unit.max_range]
-			weapon = "%s (%d)  Rng %s  [%d/%d]" % [unit.weapon.name, unit.weapon.uses, rng,
+			weapon = tr("%s (%d)  Rng %s  [%d/%d]") % [unit.weapon.name, unit.weapon.uses, rng,
 				unit.items.size(), Unit.MAX_ITEMS]
-		var lv := "Lv %d" % unit.level
+		var lv := tr("Lv %d") % unit.level
 		if unit.team == Unit.Team.PLAYER:
-			lv += "  EXP %d" % unit.exp_points
-		var hp_line := "HP %d/%d  MP %d/%d" % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
+			lv += "  " + tr("EXP %d") % unit.exp_points
+		var hp_line := tr("HP %d/%d  MP %d/%d") % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
 		var side := ""
 		if unit.team != Unit.Team.PLAYER and unit.team != Unit.Team.ENEMY:
-			side = "  (%s)" % Factions.NAMES[unit.team]
+			side = "  (%s)" % tr(Factions.NAMES[unit.team])
 		text = "%s%s  %s  %s\n%s\n" % [unit.unit_name, side, unit.class_display_name(), lv, hp_line]
 		if not unit.weapon.is_empty() or not unit.is_caster():
 			text += weapon + "\n"
@@ -246,23 +246,23 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i, tile_hp
 			if not Items.is_weapon(unit.items[i]):
 				others.append(item_label(unit, i))
 		if not others.is_empty():
-			text += "Items: %s\n" % ", ".join(others)
+			text += tr("Items: %s") % ", ".join(others) + "\n"
 		if not unit.spells.is_empty():
-			text += "Spells: %s\n" % ", ".join(unit.spells)
+			text += tr("Spells: %s") % ", ".join(unit.spells) + "\n"
 		for line in unit_notes(unit):
 			text += line + "\n"
-		text += "STR %d  DEX %d  AGI %d  LCK %d\nDEF %d  MOV %d" % [
+		text += tr("STR %d  DEX %d  AGI %d  LCK %d\nDEF %d  MOV %d") % [
 			unit.combat_str(), unit.combat_dex(), unit.combat_agi(), unit.combat_lck(), unit.combat_def(), unit.mov]
 		if unit.move_type != "foot":
 			text += " (%s)" % unit.move_type.capitalize()
 		if unit.is_caster():
-			text += "  INT %d" % unit.combat_int()
+			text += "  " + tr("INT %d") % unit.combat_int()
 		text += "\n"
 	# Show the bonus the unit on the tile actually gets (fliers and spirits get none).
 	if tile_hp >= 0:
-		text += "%s  HP %d/%d" % [terrain.name, tile_hp, terrain.breakable.hp]
+		text += tr("%s  HP %d/%d") % [terrain.name, tile_hp, terrain.breakable.hp]
 	elif unit and BattleMap.NO_TERRAIN_BONUS.has(unit.move_type):
-		text += "%s  no bonus (%s)" % [terrain.name, unit.move_type.capitalize()]
+		text += tr("%s  no bonus (%s)") % [terrain.name, unit.move_type.capitalize()]
 	else:
 		text += "%s  DEF%+d AVO%+d" % [terrain.name, terrain.def, terrain.avo]
 	_info_label.text = text
@@ -301,7 +301,7 @@ func _refresh_menu() -> void:
 	if _menu_title:
 		lines.append(_menu_title)
 	for i in menu_options.size():
-		lines.append(("> " if i == menu_index else "   ") + menu_options[i])
+		lines.append(("> " if i == menu_index else "   ") + tr(menu_options[i]))
 	_menu_label.text = "\n".join(lines)
 
 
@@ -353,10 +353,10 @@ func _fill_forecast_column(col: int, unit: Unit, stats: Dictionary, can_attack: 
 
 func show_heal_forecast(caster: Unit, target: Unit, spell_name: String, amount: int, cursor_cell: Vector2i) -> void:
 	var cost: int = Spells.get_spell(spell_name).mp
-	var effect := "HP %d -> %d" % [target.hp, target.hp + amount]
+	var effect := tr("HP %d -> %d") % [target.hp, target.hp + amount]
 	if Spells.get_spell(spell_name).get("cures", false):
-		effect = "Cures " + ", ".join(target.statuses.keys())
-	_spell_label.text = "%s  (%d MP)\n%s  MP %d -> %d\n%s  %s" % [
+		effect = tr("Cures {statuses}").format({"statuses": ", ".join(target.statuses.keys())})
+	_spell_label.text = tr("%s  (%d MP)\n%s  MP %d -> %d\n%s  %s") % [
 		spell_name, cost, caster.unit_name, caster.mp, caster.mp - cost, target.unit_name, effect]
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
@@ -365,11 +365,11 @@ func show_heal_forecast(caster: Unit, target: Unit, spell_name: String, amount: 
 ## `note` is an extra line, e.g. the terrain change a terraforming spell will make.
 func show_area_forecast(caster: Unit, spell_name: String, rows: Array, cursor_cell: Vector2i, note := "") -> void:
 	var cost: int = Spells.get_spell(spell_name).mp
-	var lines: Array[String] = ["%s  MP %d -> %d" % [spell_name, caster.mp, caster.mp - cost]]
+	var lines: Array[String] = [tr("%s  MP %d -> %d") % [spell_name, caster.mp, caster.mp - cost]]
 	if rows.is_empty():
-		lines.append("No targets")
+		lines.append(tr("No targets"))
 	for r in rows:
-		lines.append("%s  HP %d  Dmg %d  Hit %d" % r)
+		lines.append(tr("%s  HP %d  Dmg %d  Hit %d") % r)
 	if note:
 		lines.append(note)
 	_spell_label.text = "\n".join(lines)
@@ -377,18 +377,18 @@ func show_area_forecast(caster: Unit, spell_name: String, rows: Array, cursor_ce
 
 
 func show_rescue_forecast(target: Unit, cursor_cell: Vector2i) -> void:
-	_spell_label.text = "Rescue %s\nDEX/AGI halved while carrying" % target.unit_name
+	_spell_label.text = tr("Rescue {unit}\nDEX/AGI halved while carrying").format({"unit": target.unit_name})
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
-## `verb`: "Drop" (a rescued ally) or "Unload" (a ship's passenger).
-func show_drop_forecast(carried: Unit, dest_terrain: String, cursor_cell: Vector2i, verb := "Drop") -> void:
-	_spell_label.text = "%s %s\n-> %s" % [verb, carried.unit_name, dest_terrain]
+## `verb`: "Drop {unit}" (a rescued ally) or "Unload {unit}" (a ship's passenger), untranslated.
+func show_drop_forecast(carried: Unit, dest_terrain: String, cursor_cell: Vector2i, verb := "Drop {unit}") -> void:
+	_spell_label.text = tr(verb).format({"unit": carried.unit_name}) + "\n-> " + dest_terrain
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
 func show_board_forecast(ship: Unit, cursor_cell: Vector2i) -> void:
-	_spell_label.text = "Board %s\nAboard: %d/%d" % [ship.unit_name, ship.passengers.size(),
+	_spell_label.text = tr("Board %s\nAboard: %d/%d") % [ship.unit_name, ship.passengers.size(),
 		ship.passengers.size() + ship.cargo_space()]
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
@@ -397,12 +397,12 @@ func show_inspire_forecast(allies: Array[Unit], bonus: int, cursor_cell: Vector2
 	var names: Array[String] = []
 	for a in allies:
 		names.append(a.unit_name)
-	_spell_label.text = "Inspire  STR/DEF +%d\n%s" % [bonus, ", ".join(names)]
+	_spell_label.text = tr("Inspire  STR/DEF +%d") % bonus + "\n" + ", ".join(names)
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
 func show_shove_forecast(target: Unit, dest_terrain: String, cursor_cell: Vector2i) -> void:
-	_spell_label.text = "Shove\n%s -> %s" % [target.unit_name, dest_terrain]
+	_spell_label.text = tr("Shove") + "\n%s -> %s" % [target.unit_name, dest_terrain]
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
@@ -412,9 +412,9 @@ func show_dance_forecast(target: Unit, duet: Dictionary, cursor_cell: Vector2i) 
 		var names: Array[String] = []
 		for a: Unit in duet.refreshed:
 			names.append(a.unit_name)
-		_spell_label.text = "Duet\n%s" % (", ".join(names) if names else "Nobody to refresh")
+		_spell_label.text = tr("Duet") + "\n" + (", ".join(names) if names else tr("Nobody to refresh"))
 	else:
-		_spell_label.text = "Dance\n%s can act again" % target.unit_name
+		_spell_label.text = tr("Dance") + "\n" + tr("{unit} can act again").format({"unit": target.unit_name})
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
@@ -429,22 +429,22 @@ static func unit_notes(unit: Unit) -> Array[String]:
 	var lines: Array[String] = []
 	for pair in Skills.visible_sources(unit):
 		if Skills.get_data(pair[0]).has("command") or Skills.get_data(pair[0]).has("abilities"):
-			lines.append("Skill: %s" % pair[0])
+			lines.append(TranslationServer.translate("Skill: %s") % pair[0])
 	if not unit.statuses.is_empty():
 		var shown: Array[String] = []
 		for s: String in unit.statuses:
 			var turns: int = unit.statuses[s]
 			shown.append(s if turns < 0 else "%s (%d)" % [s, turns])
-		lines.append("Status: " + ", ".join(shown))
+		lines.append(TranslationServer.translate("Status: %s") % ", ".join(shown))
 	if unit.inspire_bonus > 0:
-		lines.append("Inspired: STR/DEF +%d" % unit.inspire_bonus)
+		lines.append(TranslationServer.translate("Inspired: STR/DEF +%d") % unit.inspire_bonus)
 	if unit.carrying:
-		lines.append("Carrying: %s (DEX/AGI halved)" % unit.carrying.unit_name)
+		lines.append(TranslationServer.translate("Carrying: %s (DEX/AGI halved)") % unit.carrying.unit_name)
 	if unit.is_ship():
 		var names: Array[String] = []
 		for p in unit.passengers:
 			names.append(p.unit_name)
-		lines.append("Aboard (%d/%d): %s" % [unit.passengers.size(), unit.passengers.size() + unit.cargo_space(),
+		lines.append(TranslationServer.translate("Aboard (%d/%d): %s") % [unit.passengers.size(), unit.passengers.size() + unit.cargo_space(),
 			", ".join(names) if not names.is_empty() else "--"])
 	return lines
 
@@ -454,22 +454,22 @@ static func inflict_text(inflict: Dictionary, target: Unit) -> String:
 	if inflict.is_empty():
 		return "--"
 	if Skills.is_immune(target, inflict.status):
-		return "Immune"
+		return TranslationServer.translate("Immune")
 	return "%s %d" % [inflict.status, inflict.get("chance", 100)]
 
 
 static func item_label(unit: Unit, index: int) -> String:
 	var item := unit.items[index]
-	return Items.label(item, " ") + (" E" if index == unit.equipped_index() else "")
+	return Items.label(item, " ") + (" " + TranslationServer.translate("E") if index == unit.equipped_index() else "")
 
 
 ## Partner's inventory while choosing who to trade with.
 func show_trade_preview(partner: Unit, cursor_cell: Vector2i) -> void:
-	var lines: Array[String] = ["Trade with %s" % partner.unit_name]
+	var lines: Array[String] = [tr("Trade with {unit}").format({"unit": partner.unit_name})]
 	for i in partner.items.size():
 		lines.append("  " + item_label(partner, i))
 	if partner.items.is_empty():
-		lines.append("  (no items)")
+		lines.append("  " + tr("(no items)"))
 	_spell_label.text = "\n".join(lines)
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
@@ -509,7 +509,7 @@ func hide_forecast() -> void:
 ## Shows the stats before the level-up with "+1" next to each stat that rose.
 func show_level_up(unit: Unit, before: Dictionary, gains: Dictionary) -> void:
 	hide_info()
-	_level_title.text = "%s  Level Up!  Lv %d" % [unit.unit_name, unit.level]
+	_level_title.text = tr("%s  Level Up!  Lv %d") % [unit.unit_name, unit.level]
 	var i := 0
 	for key in Experience.STATS:
 		var row: Array = _level_rows[i]
@@ -558,7 +558,10 @@ func show_banner(text: String, color: Color) -> void:
 	_banner.visible = false
 
 
-func show_end(text: String, color: Color, hint := "Z: restart   X: level select") -> void:
+## `text` and `hint` come translated.
+func show_end(text: String, color: Color, hint := "") -> void:
+	if hint == "":
+		hint = tr("Z: restart   X: level select")
 	hide_info()
 	hide_menu()
 	hide_forecast()

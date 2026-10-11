@@ -724,13 +724,13 @@ func test_kills_and_biography_moments() -> void:
 	check_eq(lord.weapon.get("kills", 0), 1, "and so does the weapon's")
 	check(Glossary.item(lord.weapon).contains("Kills: 1"), "shown in the weapon's description")
 	check_eq(lord.biography.size(), bio + 1, "a biography entry")
-	check(lord.biography[-1].begins_with("Felled their first foe, Brigand"), "for the first kill")
+	check(Text.render(lord.biography[-1]).begins_with("Felled their first foe, Brigand"), "for the first kill")
 	# A boss, with a critical hit.
 	var boss := _spawn_enemy(Vector2i(6, 6))
 	boss.is_boss = true
 	boss.unit_name = "Warlord"
 	b.actions._apply_strike(lord, boss, {"hit": true, "crit": true, "dmg": 99}, dealt)
-	check(lord.biography[-1].begins_with("Defeated Warlord with a critical hit"), "boss kill noted")
+	check(Text.render(lord.biography[-1]).begins_with("Defeated Warlord with a critical hit"), "boss kill noted")
 	# Spells don't count toward the equipped weapon's kills.
 	var foe := _spawn_enemy(Vector2i(6, 6))
 	b.actions._apply_strike(lord, foe, {"hit": true, "crit": false, "dmg": 99, "spell": true}, dealt)
@@ -741,14 +741,14 @@ func test_kills_and_biography_moments() -> void:
 	bio = lord.biography.size()
 	lord.hp = lord.max_hp
 	b.actions._apply_strike(foe, lord, {"hit": true, "crit": false, "dmg": lord.max_hp - 1}, dealt)
-	check(lord.biography[-1].begins_with("Barely survived"), "close call noted")
+	check(Text.render(lord.biography[-1]).begins_with("Barely survived"), "close call noted")
 	lord.hp = lord.max_hp
 	b.actions._apply_strike(foe, lord, {"hit": true, "crit": false, "dmg": lord.max_hp - 1}, dealt)
 	check_eq(lord.biography.size(), bio + 1, "once per battle")
 	# Saved by Miracle.
 	lord.hp = 10
 	b.actions._apply_strike(foe, lord, {"hit": true, "crit": false, "dmg": 9, "procs": [[lord, "Miracle"]]}, dealt)
-	check(lord.biography[-1].contains("thanks to Miracle"), "Miracle saves are noted")
+	check(Text.render(lord.biography[-1]).contains("thanks to Miracle"), "Miracle saves are noted")
 	# Enemies get no entries.
 	var enemy_bio := foe.biography.size()
 	b.actions._apply_strike(lord, foe, {"hit": true, "crit": false, "dmg": foe.max_hp - 1}, dealt)

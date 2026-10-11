@@ -254,9 +254,9 @@ func jump_to_next_unit() -> void:
 
 func open_map_menu() -> void:
 	battle.ui.hide_info()
-	var options: Array[String] = ["Units", "Objective", "Options", "Suspend", "Restart", "Level Select", "End Turn"]
+	var options: Array[String] = ["Units", "Objective", "Options", "Suspend", "Restart", "Level Select", "End Turn"]  # i18n
 	if battle.phases.can_rewind():
-		options.insert(3, "Rewind")
+		options.insert(3, "Rewind")  # i18n
 	menus.open("map", options)
 
 
@@ -269,9 +269,9 @@ func confirm_end_turn() -> void:
 	if waiting == 0 or not Settings.value("end_turn_warning"):
 		battle.phases.end_player_phase()
 		return
-	var options: Array[String] = ["Cancel", "End Turn"]
-	menus.open("end_turn", options, "End turn? %d unit%s %s acted" % [
-		waiting, "" if waiting == 1 else "s", "hasn't" if waiting == 1 else "haven't"])
+	var options: Array[String] = ["Cancel", "End Turn"]  # i18n
+	menus.open("end_turn", options, tr_n("End turn? %d unit hasn't acted", "End turn? %d units haven't acted",
+		waiting) % waiting)
 
 
 ## Asks the player to pick one of `options` mid-action (e.g. which skill to forget)
@@ -486,7 +486,7 @@ func _start_canto() -> bool:
 	move_budget = left
 	origin_cell = selected.cell
 	_pick_canto_move()
-	selected.popup("Canto", Color.LIGHT_SKY_BLUE)
+	selected.popup(tr("Canto"), Color.LIGHT_SKY_BLUE)
 	return true
 
 
@@ -579,7 +579,7 @@ func _side_counts() -> String:
 	for side in Factions.PHASE_ORDER:
 		var count := battle.units_of(side).size()
 		if count > 0:
-			parts.append("%s %d" % [Factions.NAMES[side], count])
+			parts.append("%s %d" % [tr(Factions.NAMES[side]), count])
 	return "  ".join(parts)
 
 
@@ -589,12 +589,12 @@ func open_objective() -> void:
 	var level := Levels.get_level(Levels.selected)
 	var objective := Objectives.of(level)
 	var lines: Array[String] = [
-		level.name,
-		"Victory: " + Objectives.victory_text(objective),
-		"Defeat: " + Objectives.defeat_text(objective),
+		tr(level.name),
+		tr("Victory: {text}").format({"text": Objectives.victory_text(objective)}),
+		tr("Defeat: {text}").format({"text": Objectives.defeat_text(objective)}),
 		battle.turn_text(),
 		_side_counts(),
-		"Z/X: close",
+		tr("Z/X: close"),
 	]
 	battle.state = Battle.State.OBJECTIVE
 	battle.ui.show_objective(lines)

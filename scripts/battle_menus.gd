@@ -41,54 +41,54 @@ func open_unit_menu() -> void:
 	var options: Array[String] = []
 	var objective := Objectives.of(Levels.get_level(Levels.selected))
 	if Objectives.can_seize(objective, selected):
-		options.append("Seize")
+		options.append("Seize")  # i18n
 	if Objectives.can_escape(objective, selected):
-		options.append("Escape")
+		options.append("Escape")  # i18n
 	var here := battle.map.object_at(selected.cell)
 	if here.get("type", "") == "village" and here.state == "intact":
-		options.append("Visit")
+		options.append("Visit")  # i18n
 	if here.get("type", "") == "chest" and here.state == "intact" and battle.actions.can_open_chest(selected):
-		options.append("Open")
+		options.append("Open")  # i18n
 	if not battle.actions.adjacent_doors(selected).is_empty() and battle.actions.can_open_chest(selected):
-		options.append("Open Door")
+		options.append("Open Door")  # i18n
 	if battle.actions.can_attack_any(selected):
-		options.append("Attack")
+		options.append("Attack")  # i18n
 	if not battle.actions.breakable_in_reach(selected).is_empty():
-		options.append("Break")
+		options.append("Break")  # i18n
 	if not battle.actions.castable_spells(selected).is_empty():
-		options.append("Magic")
+		options.append("Magic")  # i18n
 	for ability in Skills.abilities(selected):
 		if selected.can_use_magic() and Spells.has_targets(selected, ability, battle.units(), battle.map):
 			options.append(ability)
 	if not battle.actions.dance_targets(selected).is_empty():
-		options.append("Dance")
+		options.append("Dance")  # i18n
 	if not battle.actions.inspire_targets(selected).is_empty():
-		options.append("Inspire")
+		options.append("Inspire")  # i18n
 	if not battle.actions.steal_targets(selected).is_empty():
-		options.append("Steal")
+		options.append("Steal")  # i18n
 	if not battle.events.talk_targets(selected).is_empty():
-		options.append("Talk")
+		options.append("Talk")  # i18n
 	if not battle.actions.trade_partners(selected).is_empty():
-		options.append("Trade")
+		options.append("Trade")  # i18n
 	if not battle.actions.shove_targets(selected).is_empty():
-		options.append("Shove")
+		options.append("Shove")  # i18n
 	if not battle.actions.rescue_targets(selected).is_empty():
-		options.append("Rescue")
+		options.append("Rescue")  # i18n
 	if not battle.actions.drop_cells_for(selected).is_empty():
-		options.append("Drop")
+		options.append("Drop")  # i18n
 	if not battle.actions.board_targets(selected).is_empty():
-		options.append("Board")
+		options.append("Board")  # i18n
 	if not battle.actions.unloadable(selected).is_empty():
-		options.append("Unload")
+		options.append("Unload")  # i18n
 	if not selected.items.is_empty():
-		options.append("Items")
-	options.append("Wait")
+		options.append("Items")  # i18n
+	options.append("Wait")  # i18n
 	open("unit", options)
 
 
 ## After a Canto move: only Wait, and X takes the move back.
 func open_canto_menu() -> void:
-	var options: Array[String] = ["Wait"]
+	var options: Array[String] = ["Wait"]  # i18n
 	open("canto", options)
 
 
@@ -133,9 +133,9 @@ func open_items_menu() -> void:
 		var item := selected.items[i]
 		var mark := ""
 		if i == equipped:
-			mark = "  (E)"
+			mark = "  " + tr("(E)")
 		elif Items.is_weapon(item) and not selected.can_wield(item):
-			mark = "  (x)"
+			mark = "  " + tr("(x)")
 		options.append(Items.label(item) + mark)
 	open("items", options)
 
@@ -144,9 +144,9 @@ func open_items_menu() -> void:
 func open_rewind_menu() -> void:
 	var options: Array[String] = []
 	for i in range(battle.turn_history.size() - 1, -1, -1):
-		options.append("Turn %d" % battle.turn_history[i].turn)
-	var uses := "unlimited" if battle.rewinds_left < 0 else "%d left" % battle.rewinds_left
-	open("rewind", options, "Rewind to the start of (%s):" % uses)
+		options.append(tr("Turn %d") % battle.turn_history[i].turn)
+	var uses := tr("unlimited") if battle.rewinds_left < 0 else tr("%d left") % battle.rewinds_left
+	open("rewind", options, tr("Rewind to the start of ({uses}):").format({"uses": uses}))
 
 
 ## Which weapon the Repair Kit at `kit` should restore.
@@ -157,7 +157,7 @@ func open_repair_menu(kit: int) -> void:
 	for i in repair_choices:
 		var w := selected.items[i]
 		options.append("%s  %d/%d" % [w.name, w.uses, Weapons.max_uses(w)])
-	open("repair", options, "Repair which weapon?")
+	open("repair", options, tr("Repair which weapon?"))
 
 
 ## Which item to take from `foe`.
@@ -169,7 +169,7 @@ func open_steal_menu(foe: Unit) -> void:
 		options.append(Items.label(foe.items[i]))
 	battle.map.clear_ranges()
 	battle.cursor.cell = selected.cell
-	open("steal", options, "Steal from " + foe.unit_name)
+	open("steal", options, tr("Steal from {unit}").format({"unit": foe.unit_name}))
 
 
 ## Picks which passenger to unload (skipped when there's only one).
@@ -219,13 +219,13 @@ func accept() -> void:
 				"Suspend":
 					battle.phases.suspend()
 				"Restart":
-					var options: Array[String] = ["Cancel", "Restart"]
-					open("restart", options, "Restart this map?")
+					var options: Array[String] = ["Cancel", "Restart"]  # i18n
+					open("restart", options, tr("Restart this map?"))
 				"Level Select":
-					var options: Array[String] = ["Cancel", "Quit"]
-					var note := "You can resume from the start of this turn." if Settings.value("auto_save") \
-						else "Progress on this map is lost."
-					open("quit", options, "Quit to the level select?\n" + note)
+					var options: Array[String] = ["Cancel", "Quit"]  # i18n
+					var note := tr("You can resume from the start of this turn.") if Settings.value("auto_save") \
+						else tr("Progress on this map is lost.")
+					open("quit", options, tr("Quit to the level select?") + "\n" + note)
 		"formation":
 			match battle.ui.menu_choice():
 				"Fight!":
@@ -316,7 +316,7 @@ func accept() -> void:
 			elif Items.can_use(selected, item):
 				_act(_use_item.bind(battle.ui.menu_index))
 			else:
-				selected.popup("Can't use", Color.LIGHT_GRAY)
+				selected.popup(tr("Can't use"), Color.LIGHT_GRAY)
 				open_items_menu()
 
 

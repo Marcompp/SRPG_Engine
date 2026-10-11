@@ -92,8 +92,8 @@ static func on_damaged(u: Unit) -> void:
 ## "3 turns", "1 turn" or "Until cured".
 static func duration_text(turns: int) -> String:
 	if turns < 0:
-		return "Until cured"
-	return "%d turn%s" % [turns, "" if turns == 1 else "s"]
+		return TranslationServer.translate("Until cured")
+	return TranslationServer.translate_plural("%d turn", "%d turns", turns) % turns
 
 
 ## Inflicts `status` on `u` for `turns` (its default duration when 0). Again on a unit

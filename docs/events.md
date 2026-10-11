@@ -98,3 +98,6 @@ multi-line string per event) or in one text file per chapter.
   enemies: after their turn).
 - **Speakers:** a unit's name when one matches, otherwise a free label ("Messenger")
   with a generic portrait.
+- **Translation:** dialogue, `@narrate` and `@banner` text, and speakers with no
+  unit, are translated when shown, with the English line as the key
+  (`docs/translation.md`).

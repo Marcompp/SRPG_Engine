@@ -2,9 +2,10 @@ class_name Glossary
 extends RefCounted
 ## Help text for the status screen's detail mode (D on the status screen).
 ## Weapon, item and spell entries are built from their data, so numbers stay in
-## sync; the *_NOTES dictionaries add hand-written flavor where it helps.
+## sync; the *_NOTES dictionaries add hand-written flavor where it helps. Every
+## function returns translated text.
 
-const STATS := {
+const STATS := {  # i18n
 	"hp": "Hit points. The unit falls when they reach 0.",
 	"mp": "Magic points. Spent to cast spells. Current MP also reduces spell damage taken (magic defense). Recovers {regen} each turn.",
 	"str": "Strength. Adds to the damage of weapon attacks.",
@@ -18,7 +19,7 @@ const STATS := {
 	"exp": "Experience. Earned by fighting, healing, dancing and inspiring; 100 EXP is a level.",
 }
 
-const COMBAT := {
+const COMBAT := {  # i18n
 	"atk": "Attack: STR + the equipped weapon's might. Weapon triangle: +1 with advantage, -1 with disadvantage.",
 	"hit": "Base hit rate: weapon hit + DEX x2 + LCK / 2. The target's avoid is subtracted.",
 	"avo": "Avoid: attack speed x2 + LCK, plus the terrain bonus (none for fliers and spirits).",
@@ -27,7 +28,7 @@ const COMBAT := {
 	"rng": "Distances the equipped weapon can strike at.",
 }
 
-const MOVE_TYPES := {
+const MOVE_TYPES := {  # i18n
 	"foot": "On foot: the standard costs for every terrain.",
 	"heavy": "Heavy armor: slow in hills, mountains and water, but sure-footed on ice. Weak to Hammers.",
 	"horse": "Mounted on horseback: fast on open ground, slowed by forests, sand and indoors. Weak to Pikes. Can Rescue allies; can't Shove or be Shoved.",
@@ -38,7 +39,7 @@ const MOVE_TYPES := {
 	"spirit": "Spirit: 1 MOV through anything, walls included, but no terrain bonuses. Takes half damage from weapons that aren't silver.",
 }
 
-const WEAPON_NOTES := {
+const WEAPON_NOTES := {  # i18n
 	"Killing Edge": "Its high critical rate makes it deadly.",
 	"Knife": "Light enough to throw at range 2.",
 	"Javelin": "A spear that can be thrown at range 2.",
@@ -51,7 +52,7 @@ const WEAPON_NOTES := {
 	"Quarterstaff": "A caster's staff for close defense.",
 }
 
-const SPELL_NOTES := {
+const SPELL_NOTES := {  # i18n
 	"Heal": "Restores INT + {power} HP to an adjacent ally.",
 	"Fire": "Single-target fire magic: INT + {power} damage. The target may counter.",
 	"Firestorm": "Hits every enemy in a small cross: INT + {power} damage each. No counters.",
@@ -61,24 +62,25 @@ const SPELL_NOTES := {
 
 
 static func stat(key: String, unit: Unit) -> String:
-	var text: String = STATS[key].format({"regen": Spells.MP_REGEN, "level_cap": Experience.LEVEL_CAP})
+	var text: String = TranslationServer.translate(STATS[key]).format({"regen": Spells.MP_REGEN, "level_cap": Experience.LEVEL_CAP})
 	if Experience.STATS.has(key):
-		text += " Cap: %d." % unit.stat_cap(key)
+		text += " " + TranslationServer.translate("Cap: %d.") % unit.stat_cap(key)
 	return text
 
 
 static func unit_class(unit: Unit) -> String:
 	var data := Classes.get_data(unit.unit_class)
-	var text := "%s. Weapons: %s. Movement: %s." % [unit.class_display_name(),
-		", ".join(data.weapons.map(func(w): return str(w).capitalize())), unit.move_type.capitalize()]
+	var text := TranslationServer.translate("{class}. Weapons: {weapons}. Movement: {movement}.").format({"class": unit.class_display_name(),
+		"weapons": ", ".join(data.weapons.map(func(w): return str(w).capitalize())),
+		"movement": unit.move_type.capitalize()})
 	if not unit.mount.is_empty():
-		text += " Riding %s (%s, Lv %d); on foot: %s." % [unit.mount.name, unit.mount.species, unit.mount.level,
-			unit.foot_class]
+		text += " " + TranslationServer.translate("Riding {mount} ({species}, Lv {level}); on foot: {class}.").format({"mount": unit.mount.name,
+			"species": unit.mount.species, "level": unit.mount.level, "class": unit.foot_class})
 	var promotions := Classes.promotions(unit.promotion_class())
 	if not promotions.is_empty():
-		text += " Promotes to %s." % ", ".join(promotions)
+		text += " " + TranslationServer.translate("Promotes to %s.") % ", ".join(promotions)
 	elif data.get("promoted", false):
-		text += " Promoted class."
+		text += " " + TranslationServer.translate("Promoted class.")
 	return text
 
 
@@ -90,52 +92,59 @@ static func item(it: Dictionary) -> String:
 	if Items.is_weapon(it):
 		var base: Dictionary = Weapons.DATA[it.name]
 		var rng := str(it.min_rng) if it.min_rng == it.max_rng else "%d-%d" % [it.min_rng, it.max_rng]
-		var text := "%s (%s). Mt %d  Hit %d  Crit %d  Wt %d  Rng %s  Uses %d/%d." % [
+		var text := TranslationServer.translate("%s (%s). Mt %d  Hit %d  Crit %d  Wt %d  Rng %s  Uses %d/%d.") % [
 			it.name, str(it.type).capitalize(), it.mt, it.hit, it.crit, it.wt, rng, it.uses, base.uses]
 		var effective: Array = it.get("effective", [])
 		if not effective.is_empty():
-			text += " Effective (x%d might) against %s." % [Combat.EFFECTIVE_MULTIPLIER,
-				", ".join(effective.map(func(t): return str(t).capitalize()))]
+			text += " " + TranslationServer.translate("Effective (x{multiplier} might) against {targets}.").format({
+				"multiplier": Combat.EFFECTIVE_MULTIPLIER,
+				"targets": ", ".join(effective.map(func(t): return str(t).capitalize()))})
 		if it.has("inflict"):
-			text += " Hits inflict %s (%d%%)." % [it.inflict.status, it.inflict.get("chance", 100)]
+			text += " " + TranslationServer.translate("Hits inflict {status} ({chance}%).").format({"status": it.inflict.status,
+				"chance": it.inflict.get("chance", 100)})
 		if it.get("silver", false):
-			text += " Silver: spirits don't resist it, and the undead are weak to it."
+			text += " " + TranslationServer.translate("Silver: spirits don't resist it, and the undead are weak to it.")
 		if WEAPON_NOTES.has(it.name):
-			text += " " + WEAPON_NOTES[it.name]
+			text += " " + TranslationServer.translate(WEAPON_NOTES[it.name])
 		for skill: String in it.get("skills", []):
-			text += " Equipped: %s (%s)" % [skill, Skills.get_data(skill).description]
+			text += " " + TranslationServer.translate("Equipped: {skill} ({description})").format({"skill": skill,
+				"description": Skills.get_data(skill).description})
 		if it.get("kills", 0) > 0:
-			text += " Kills: %d." % it.kills
+			text += " " + TranslationServer.translate("Kills: %d.") % it.kills
 		if Weapons.is_broken(it):
-			text += " BROKEN: half Mt, -%d Hit, no Crit until repaired." % Weapons.BROKEN_HIT_PENALTY
+			text += " " + TranslationServer.translate("BROKEN: half Mt, -%d Hit, no Crit until repaired.") % Weapons.BROKEN_HIT_PENALTY
 		return text
 	match it.get("kind", ""):
 		"heal":
-			return "%s: restores %d HP to the user and ends its turn. Uses %d." % [it.name, it.heal, it.uses]
+			return TranslationServer.translate("{item}: restores {amount} HP to the user and ends its turn. Uses {uses}.").format({
+				"item": it.name, "amount": it.heal, "uses": it.uses})
 		"mp":
-			return "%s: restores %d MP to the user and ends its turn. Uses %d." % [it.name, it.mp, it.uses]
+			return TranslationServer.translate("{item}: restores {amount} MP to the user and ends its turn. Uses {uses}.").format({
+				"item": it.name, "amount": it.mp, "uses": it.uses})
 		"cure":
-			return "%s: cures the user's %s and ends its turn. Uses %d." % [it.name,
-				it.cures if it.has("cures") else "statuses", it.uses]
+			return TranslationServer.translate("{item}: cures the user's {statuses} and ends its turn. Uses {uses}.").format({"item": it.name,
+				"statuses": it.cures if it.has("cures") else TranslationServer.translate("statuses"), "uses": it.uses})
 		"repair":
-			return "%s: restores one of the user's weapons to full uses, broken ones too. Ends the user's turn. Uses %d." % [
-				it.name, it.uses]
+			return TranslationServer.translate("{item}: restores one of the user's weapons to full uses, broken ones too. Ends the user's turn. Uses {uses}.").format({
+				"item": it.name, "uses": it.uses})
 		"scroll":
-			return "%s: teaches %s (%s) for good. Ends the user's turn." % [it.name, it.skill,
-				Skills.get_data(it.skill).description]
+			return TranslationServer.translate("{item}: teaches {skill} ({description}) for good. Ends the user's turn.").format({"item": it.name,
+				"skill": it.skill, "description": Skills.get_data(it.skill).description})
 	var text: String = it.name + "."
 	for skill: String in it.get("skills", []):
-		text += " Held: %s (%s)" % [skill, Skills.get_data(skill).description]
+		text += " " + TranslationServer.translate("Held: {skill} ({description})").format({"skill": skill,
+			"description": Skills.get_data(skill).description})
 	if it.has("uses"):
-		text += " Uses %d." % it.uses
+		text += " " + TranslationServer.translate("Uses %d.") % it.uses
 	return text
 
 
 static func spell(spell_name: String) -> String:
 	var s := Spells.get_spell(spell_name)
 	var rng := str(s.max_rng) if s.min_rng == s.max_rng else "%d-%d" % [s.min_rng, s.max_rng]
-	var note: String = SPELL_NOTES.get(spell_name, "").format({"power": s.get("power", 0)})
+	var note := TranslationServer.translate(SPELL_NOTES[spell_name]).format({"power": s.get("power", 0)}) if SPELL_NOTES.has(spell_name) else ""
 	if s.get("status_only", false):
-		note = "No damage: a hit inflicts %s (%s). Can't be countered." % [s.inflict.status,
-			Statuses.get_data(s.inflict.status).description]
-	return "%s. %s Cost %d MP, range %s." % [spell_name, note, s.mp, rng]
+		note = TranslationServer.translate("No damage: a hit inflicts {status} ({description}). Can't be countered.").format({
+			"status": s.inflict.status, "description": Statuses.get_data(s.inflict.status).description})
+	return TranslationServer.translate("{spell}. {note} Cost {mp} MP, range {range}.").format({"spell": spell_name, "note": note, "mp": s.mp,
+		"range": rng})

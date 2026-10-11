@@ -20,28 +20,32 @@ static func of(level: Dictionary) -> Dictionary:
 	return obj if obj is Dictionary else DEFAULT
 
 
+## Translated.
 static func victory_text(obj: Dictionary) -> String:
 	match obj.type:
 		"boss":
-			return "Defeat %s." % obj.boss
+			return TranslationServer.translate("Defeat %s.") % obj.boss
 		"seize":
-			return "Seize the marked tile with your Lord."
+			return TranslationServer.translate("Seize the marked tile with your Lord.")
 		"survive":
-			return "Survive %d turns." % obj.turns
+			return TranslationServer.translate_plural("Survive %d turn.", "Survive %d turns.", obj.turns) % obj.turns
 		"defend":
-			return "Defend the marked tile for %d turns." % obj.turns
+			return TranslationServer.translate_plural("Defend the marked tile for %d turn.",
+				"Defend the marked tile for %d turns.", obj.turns) % obj.turns
 		"escape":
-			return "Escape with your Lord through a marked exit."
-	return "Defeat every enemy."
+			return TranslationServer.translate("Escape with your Lord through a marked exit.")
+	return TranslationServer.translate("Defeat every enemy.")
 
 
+## Translated: the ways to lose, joined with ", or ".
 static func defeat_text(obj: Dictionary) -> String:
-	var text := "Your Lord falls"
+	var ways: Array[String] = [TranslationServer.translate("Your Lord falls")]
 	if obj.type == "defend":
-		text += ", or an enemy reaches the marked tile"
+		ways.append(TranslationServer.translate("an enemy reaches the marked tile"))
 	if obj.has("protect"):
-		text += ", or %s falls" % " or ".join(obj.protect)
-	return text + "."
+		ways.append(TranslationServer.translate("{units} falls").format({
+			"units": TranslationServer.translate(" or ").join(obj.protect)}))
+	return TranslationServer.translate(", or ").join(ways) + "."
 
 
 ## Cells the map marks for the objective (seize tile, defended tile, exits).

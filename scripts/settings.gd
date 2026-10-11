@@ -6,9 +6,9 @@ extends RefCounted
 ## Tests point this elsewhere so they always run with the defaults.
 static var path := "user://settings.cfg"
 
-## Every option, in display order: key, label, and its choices as [value, text].
-## The first choice is the default.
-const OPTIONS := [
+## Every option, in display order: key, label, and its choices as [value, text]
+## (texts translated where shown). The first choice is the default.
+const OPTIONS := [  # i18n
 	{"key": "game_speed", "label": "Game speed",
 		"choices": [[1.0, "Normal"], [1.5, "Fast"], [2.0, "Faster"]]},
 	{"key": "fast_forward_speed", "label": "Fast-forward (hold X)",

@@ -61,5 +61,5 @@ static func can_use(user: Unit, item: Dictionary) -> bool:
 ## that never run out.
 static func label(item: Dictionary, sep := "  ") -> String:
 	if is_weapon(item) and Weapons.is_broken(item):
-		return item.name + sep + "broken"
+		return item.name + sep + TranslationServer.translate("broken")
 	return "%s%s%d" % [item.name, sep, item.uses] if item.has("uses") else item.name

@@ -59,8 +59,9 @@ var is_boss := false
 ## Foes this unit has defeated.
 var kills := 0
 ## Notable events in this unit's story, oldest first (roster "bio"); shown on the
-## status screen's Biography page. Player units only.
-var biography: Array[String] = []
+## status screen's Biography page. Player units only. Entries are Text entries (or
+## plain strings), translated when shown: see Text.render.
+var biography: Array = []
 ## Mounted units can Rescue allies, and can't Shove, be Shoved or be Rescued.
 var mounted := false
 ## The mount it's riding (see Mounts for the record), or {}. Riding reclasses it into
@@ -526,10 +527,10 @@ func use_item(index: int) -> void:
 		"mp":
 			var amount := mini(item.mp, max_mp - mp)
 			regen_mp(amount)
-			popup("+%d MP" % amount, MP_COLOR)
+			popup(tr("+%d MP") % amount, MP_COLOR)
 		"cure":
 			Statuses.cure(self, item.get("cures", ""))
-			popup("Cured", Color.PALE_GREEN)
+			popup(tr("Cured"), Color.PALE_GREEN)
 	item.uses -= 1
 	if item.uses <= 0:
 		items.remove_at(index)

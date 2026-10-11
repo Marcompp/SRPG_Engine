@@ -158,10 +158,10 @@ func _run_command(c: Array) -> void:
 			if skipping:
 				return
 			var speaker := _speaker(c[1])
-			await battle.ui.dialogue.say(speaker, _side_for(speaker.name), c[2])
+			await battle.ui.dialogue.say(speaker, _side_for(speaker.name), tr(c[2]))
 		"narrate":
 			if not skipping:
-				await battle.ui.dialogue.say({}, 0, c[1])
+				await battle.ui.dialogue.say({}, 0, tr(c[1]))
 		"move":
 			var u := find_unit(c[1])
 			if u == null:
@@ -218,7 +218,7 @@ func _run_command(c: Array) -> void:
 		"cure":
 			var u := find_unit(c[1])
 			if u and not Statuses.cure(u, c[2]).is_empty():
-				u.popup("Cured", Color.PALE_GREEN)
+				u.popup(tr("Cured"), Color.PALE_GREEN)
 		"camera":
 			battle.cursor.cell = c[1]
 			if skipping:
@@ -233,7 +233,7 @@ func _run_command(c: Array) -> void:
 		"banner":
 			if not skipping:
 				battle.ui.dialogue.hide_box()
-				await battle.ui.show_banner(c[1], Color("4a3a8a"))
+				await battle.ui.show_banner(tr(c[1]), Color("4a3a8a"))
 
 
 ## The unit `u` switches to the player's side for good (it joins the campaign army
@@ -242,8 +242,8 @@ func recruit(u: Unit) -> void:
 	u.team = Unit.Team.PLAYER
 	u.has_acted = true
 	battle.marked.erase(u)
-	u.biography.append("Joined the army at %s." % battle.actions.map_title())
-	u.popup("Joined!", Color.GOLD)
+	u.biography.append(Text.entry("Joined the army at {map}.", {"map": battle.actions.map_title()}))
+	u.popup(tr("Joined!"), Color.GOLD)
 	u.queue_redraw()
 	battle.refresh_threat()
 
@@ -257,13 +257,14 @@ func find_unit(unit_name: String) -> Unit:
 
 
 ## Portrait data for a speaker: a unit's colors and token letter, or a neutral
-## portrait for labels with no unit ("Messenger").
+## portrait for labels with no unit ("Messenger", translated like the lines).
 func _speaker(speaker_name: String) -> Dictionary:
 	for u in battle.all_units():
 		if u.unit_name == speaker_name:
 			var color: Color = Factions.COLORS[u.team]
 			return {"name": speaker_name, "color": color, "letter": u.token_letter()}
-	return {"name": speaker_name, "color": Color(0.45, 0.45, 0.5), "letter": speaker_name.left(1)}
+	var label := tr(speaker_name)
+	return {"name": label, "color": Color(0.45, 0.45, 0.5), "letter": label.left(1)}
 
 
 ## A speaker keeps the side it already has; a new one takes the side opposite

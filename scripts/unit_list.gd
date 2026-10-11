@@ -12,15 +12,15 @@ const ACTED_TEXT := Color(0.55, 0.55, 0.6)
 const SORTED_HEADER := Color(1.0, 0.85, 0.25)
 ## key: what the column sorts by (see _value()). Name and Class sort A-Z, numbers high to low.
 const COLUMNS := [
-	{"title": "Name", "x": 4.0, "key": "name"},
-	{"title": "Class", "x": 50.0, "key": "class"},
-	{"title": "Lv", "x": 106.0, "key": "lv"},
-	{"title": "HP", "x": 122.0, "key": "hp"},
-	{"title": "Str", "x": 150.0, "key": "str"},
-	{"title": "Dex", "x": 168.0, "key": "dex"},
-	{"title": "Agi", "x": 186.0, "key": "agi"},
-	{"title": "Def", "x": 204.0, "key": "def"},
-	{"title": "Mov", "x": 222.0, "key": "mov"},
+	{"title": "Name", "x": 4.0, "key": "name"},  # i18n
+	{"title": "Class", "x": 50.0, "key": "class"},  # i18n
+	{"title": "Lv", "x": 106.0, "key": "lv"},  # i18n
+	{"title": "HP", "x": 122.0, "key": "hp"},  # i18n
+	{"title": "Str", "x": 150.0, "key": "str"},  # i18n
+	{"title": "Dex", "x": 168.0, "key": "dex"},  # i18n
+	{"title": "Agi", "x": 186.0, "key": "agi"},  # i18n
+	{"title": "Def", "x": 204.0, "key": "def"},  # i18n
+	{"title": "Mov", "x": 222.0, "key": "mov"},  # i18n
 ]
 const TOP := 15.0
 const ROW_H := 10.0
@@ -129,7 +129,7 @@ func _render() -> void:
 		_rows.remove_child(child)
 		child.queue_free()
 	for c in COLUMNS.size():
-		var header := _label(COLUMNS[c].title, Vector2(COLUMNS[c].x, 3),
+		var header := _label(tr(COLUMNS[c].title), Vector2(COLUMNS[c].x, 3),
 			SORTED_HEADER if c == sort_col else DIM)
 		if c == sort_col:
 			header.text += "*"
@@ -152,8 +152,8 @@ func _render() -> void:
 				_fit(label, COLUMNS[c + 1].x - COLUMNS[c].x - 3)
 	_cursor.visible = not units.is_empty()
 	_cursor.position.y = TOP + (index - _scroll) * ROW_H
-	_footer.text = "%d/%d   Z: go to  D: info  L/R: sort  X: close" % [index + 1, units.size()] \
-		if not units.is_empty() else "No units"
+	_footer.text = tr("%d/%d   Z: go to  D: info  L/R: sort  X: close") % [index + 1, units.size()] \
+		if not units.is_empty() else tr("No units")
 
 
 ## Shortens a label's text (ending in ".") until it fits in `width` pixels.

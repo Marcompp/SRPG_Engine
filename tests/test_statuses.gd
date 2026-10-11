@@ -295,8 +295,8 @@ func test_berserk_player_unit() -> void:
 	check(not b.units().has(archer), "at its phase start it attacks the nearest unit, an ally")
 	check(fighter.has_acted, "and that's its turn")
 	check_eq(fighter.exp_points, exp_before, "no EXP for it")
-	check(fighter.biography[-1].begins_with("Struck down Archer, an ally, while berserk"),
-		"remembered (%s)" % fighter.biography[-1])
+	check(Text.render(fighter.biography[-1]).begins_with("Struck down Archer, an ally, while berserk"),
+		"remembered (%s)" % Text.render(fighter.biography[-1]))
 
 
 func test_berserk_enemy() -> void:
