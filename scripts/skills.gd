@@ -80,7 +80,7 @@ static var field: Callable
 
 const DATA := {
 	# Commands.
-	"Dance": {"description": "Dance: refresh an adjacent ally that has already acted.", "command": "dance"},
+	"Dance": {"description": "Dance: refresh an adjacent ally that has already acted. Dancing a dancer is a Duet: it refreshes every ally next to either of them (chaining through other dancers), but not the dancers.", "command": "dance"},
 	"Inspire": {"description": "Inspire: every adjacent ally gets +STR/DEF until your next phase (+1, plus 1 every 5 levels).",
 		"command": "inspire"},
 	"Steal": {"description": "Steal: take an item (not a weapon) from an adjacent foe with lower AGI.", "command": "steal"},

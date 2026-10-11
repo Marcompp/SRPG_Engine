@@ -184,6 +184,38 @@ func test_dance_refreshes_ally() -> void:
 	check_eq(dancer.exp_points, roundi(Experience.DANCE_EXP * 1.1), "Dance EXP (Human x1.1)")
 
 
+func test_duet_refreshes_around_the_troupe() -> void:
+	var dancer := unit_named("Dancer")
+	var partner := unit_named("Bannerman")
+	var third := unit_named("Cleric")
+	var knight := unit_named("Knight")
+	var mage := unit_named("Mage")
+	var archer := unit_named("Archer")
+	clear_board([dancer, partner, third, knight, mage, archer])
+	partner.personal_skills.assign(["Dance"])
+	third.personal_skills.assign(["Dance"])
+	# Dancer (3,6) Duets the Bannerman (4,6); the Cleric (5,6) is a dancer next to it,
+	# so it joins and the Mage (6,6), next to the Cleric only, is refreshed too.
+	dancer.set_cell(Vector2i(3, 6))
+	partner.set_cell(Vector2i(4, 6))
+	third.set_cell(Vector2i(5, 6))
+	knight.set_cell(Vector2i(4, 5))
+	mage.set_cell(Vector2i(6, 6))
+	archer.set_cell(Vector2i(3, 8))
+	for u in [partner, third, knight, mage, archer]:
+		u.has_acted = true
+	var d: Dictionary = b.actions.duet(dancer, partner)
+	check_eq(d.troupe, [dancer, partner, third], "troupe chains through adjacent dancers")
+	check_eq(d.refreshed, [knight, mage], "refreshes allies who acted next to the troupe")
+	await open_menu_in_place(dancer)
+	await pick("Dance")
+	await press(KEY_Z)
+	check(not knight.has_acted and not mage.has_acted, "Duet refreshed them")
+	check(archer.has_acted, "an ally out of reach stays spent")
+	check(partner.has_acted and third.has_acted and dancer.has_acted, "the troupe isn't refreshed")
+	check(b.actions.duet(dancer, knight).is_empty(), "Dancing a non-dancer is a plain Dance")
+
+
 func test_potion_heals_and_ends_turn() -> void:
 	var lord := unit_named("Lord")
 	clear_board([lord])

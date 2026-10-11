@@ -406,8 +406,15 @@ func show_shove_forecast(target: Unit, dest_terrain: String, cursor_cell: Vector
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 
-func show_dance_forecast(target: Unit, cursor_cell: Vector2i) -> void:
-	_spell_label.text = "Dance\n%s can act again" % target.unit_name
+## `duet` is BattleActions.duet's result: {} for a plain Dance.
+func show_dance_forecast(target: Unit, duet: Dictionary, cursor_cell: Vector2i) -> void:
+	if duet:
+		var names: Array[String] = []
+		for a: Unit in duet.refreshed:
+			names.append(a.unit_name)
+		_spell_label.text = "Duet\n%s" % (", ".join(names) if names else "Nobody to refresh")
+	else:
+		_spell_label.text = "Dance\n%s can act again" % target.unit_name
 	_place(_spell_forecast, _away_right(cursor_cell), false)
 
 

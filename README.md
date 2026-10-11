@@ -93,7 +93,7 @@ Exits with code 0 when every test passes, 1 otherwise. The wrapper also fails if
 - EXP and level-ups with growth rates
 - MP-based magic: Heal, Restore (cures statuses), Fire, Firestorm (area), Earth Spike (raises a mountain). Damage spells have an element (Fire, Earth...)
 - Board/Unload: a unit next to an allied ship with room can Board it (ends the boarder's turn; a Galley holds 2). The ship can Unload passengers onto adjacent cells they can stand on without ending its own turn, and passengers that haven't acted can then move. A sunk ship's passengers are set down on the nearest free cell they can stand on
-- Dance (Performer) refreshes an adjacent ally; Inspire (Bannerman) gives every adjacent ally +STR/DEF until the next player phase: +1, plus 1 more every 5 levels (+5 at Lv 20)
+- Dance (Performer) refreshes an adjacent ally (Dancing another dancer is a Duet: every ally next to either one is refreshed, chaining through other adjacent dancers, but the dancers aren't); Inspire (Bannerman) gives every adjacent ally +STR/DEF until the next player phase: +1, plus 1 more every 5 levels (+5 at Lv 20)
 - Enemy AI that heals, picks weapons and casts spells
 - Kill counts per unit and per weapon (shown in the weapon's description); spell kills count for the unit only
 - Auto save (Options, on by default): the start of every player phase is saved, so the level select can resume from there

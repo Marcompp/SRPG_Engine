@@ -438,12 +438,46 @@ func do_inspire(u: Unit) -> void:
 		await gain_exp(u, Experience.INSPIRE_EXP)
 
 
-## Refreshes the target so it can move and act again this phase.
+## Duet: Dancing an ally that can Dance too. The troupe is the two of them plus
+## every dancer chained to them by adjacency; the other allies next to any troupe
+## member who have acted are refreshed. The troupe isn't, so dancers can't loop.
+## {"troupe": Array[Unit], "refreshed": Array[Unit]}, or {} for a plain Dance.
+func duet(dancer: Unit, target: Unit) -> Dictionary:
+	if not Skills.commands(target).has("dance"):
+		return {}
+	var allies := battle.units_of(dancer.team)
+	var troupe: Array[Unit] = [dancer, target]
+	var i := 0
+	while i < troupe.size():
+		for ally in allies:
+			if not troupe.has(ally) and Skills.commands(ally).has("dance") \
+					and BattleMap.distance(troupe[i].cell, ally.cell) == 1:
+				troupe.append(ally)
+		i += 1
+	var refreshed: Array[Unit] = []
+	for ally in allies:
+		if ally.has_acted and not troupe.has(ally) and troupe.any(func(t: Unit) -> bool:
+				return BattleMap.distance(t.cell, ally.cell) == 1):
+			refreshed.append(ally)
+	return {"troupe": troupe, "refreshed": refreshed}
+
+
+## Refreshes the target so it can move and act again this phase, or performs a
+## Duet when the target can Dance too.
 func do_dance(dancer: Unit, target: Unit) -> void:
-	dancer.popup("Dance", Color.PINK)
+	var d := duet(dancer, target)
+	dancer.popup("Duet" if d else "Dance", Color.PINK)
 	await dancer.lunge(target.cell)
-	target.has_acted = false
-	target.popup("Refreshed", Color.PINK)
+	if d:
+		for t: Unit in d.troupe:
+			if t != dancer:
+				t.popup("Duet", Color.PINK)
+		for ally: Unit in d.refreshed:
+			ally.has_acted = false
+			ally.popup("Refreshed", Color.PINK)
+	else:
+		target.has_acted = false
+		target.popup("Refreshed", Color.PINK)
 	await get_tree().create_timer(0.5).timeout
 	if earns_exp(dancer):
 		await gain_exp(dancer, Experience.DANCE_EXP)

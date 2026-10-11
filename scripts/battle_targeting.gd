@@ -182,7 +182,10 @@ func show_target() -> void:
 		battle.map.show_area([], [target.cell])
 		battle.ui.show_rescue_forecast(target, battle.cursor.cell)
 	elif mode == "dance":
-		battle.ui.show_dance_forecast(target, battle.cursor.cell)
+		var d: Dictionary = battle.actions.duet(selected, target)
+		if d:
+			battle.map.show_area([], d.refreshed.map(func(a: Unit) -> Vector2i: return a.cell))
+		battle.ui.show_dance_forecast(target, d, battle.cursor.cell)
 	elif mode == "board":
 		battle.map.show_area([], [target.cell])
 		battle.ui.show_board_forecast(target, battle.cursor.cell)
