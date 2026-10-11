@@ -10,7 +10,7 @@ menu...).
 - One system for everything a unit "has": class abilities (Dance, Inspire), racial
   traits (Troll regeneration, Human EXP bonus), personal skills, weapon and item
   skills, and skills learned from levels or scrolls.
-- Most skills are **pure data** in `scripts/skills.gd`, built from a small set of
+- Most skills are **pure data** in `data/skills.cfg`, built from a small set of
   effect types. Skills that don't fit get a named handler in code (an escape hatch,
   not the default).
 - Every number the player sees (forecast, stats screen) already includes skill
@@ -111,7 +111,7 @@ express.
 
 ## Where it plugs into the code
 
-- **`scripts/skills.gd`** (`Skills`): the data, plus `Skills.of(u)` (every source,
+- **`scripts/skills.gd`** (`Skills`): the data (from `data/skills.cfg`), plus `Skills.of(u)` (every source,
   deduplicated, in a stable order) and helpers to sum `stats`/`battle` effects whose
   conditions hold.
 - **Unit**: `learned` (saved), `skills()` (cached, invalidated when the class, level,

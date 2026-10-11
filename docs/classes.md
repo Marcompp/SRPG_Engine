@@ -1,6 +1,6 @@
 # Classes (design notes)
 
-Reference for the class system (`scripts/classes.gd`): what each class is for and
+Reference for the class system (`scripts/classes.gd`, data in `data/classes.cfg`): what each class is for and
 the rules that shape them. Races are in `docs/races.md`, mounts in
 `docs/mounts.md`, skills in `docs/skills.md`.
 
@@ -82,7 +82,7 @@ Proposed:
 
 - Every class uses the default caps for now, but a class can set its own (`caps`,
   partial). Promoted classes may get different caps later.
-- Promotion bonuses are per class (`PROMOTION_BONUS`).
+- Promotion bonuses are per class (`data/promotion_bonuses.cfg`).
 - Class growths: not decided.
 
 ## Foot classes
@@ -297,7 +297,7 @@ Foot and mounted classes); still to draft.
 ## Retired
 
 - **Wraith:** spirit movement now comes from the Ghost race. Still used 5 times in
-  `scripts/levels.gd`; those become Ghost units in a regular class.
+  the maps in `data/levels/`; those become Ghost units in a regular class.
 
 ## Open questions
 

@@ -26,51 +26,16 @@ const DEFAULT_CAP := 10
 ## exp_rate: multiplier on the EXP the mount earns (see Experience.mount_combat_exp;
 ##           for non-combat EXP like Dance, the fixed amount times this).
 ## riders:   who may ride it: {"gender": [...]} (hidden unit gender).
-const SPECIES := {
-	"Horse": {"move": "horse", "tags": ["horse"], "mov": 7, "exp_rate": 1.0,
-		"base": {"str": 2, "int": 0, "dex": 2, "agi": 3, "lck": 1, "def": 2},
-		"growths": {"str": 40, "int": 5, "dex": 35, "agi": 45, "lck": 30, "def": 35},
-		"description": "The baseline mount: fast on open ground, slowed by forests and indoors. Weak to Pikes."},
-	"Pegasus": {"move": "flying", "tags": ["flying"], "mov": 7, "exp_rate": 0.9,
-		"base": {"str": 1, "int": 2, "dex": 3, "agi": 4, "lck": 3, "def": 1},
-		"growths": {"str": 30, "int": 25, "dex": 40, "agi": 50, "lck": 40, "def": 20},
-		"riders": {"gender": ["female"]},
-		"description": "Flies over any terrain, but no terrain bonuses and weak to bows. Only accepts female riders."},
-	"Drake": {"move": "drake", "tags": ["reptile"], "mov": 5, "exp_rate": 0.7,
-		"base": {"str": 3, "int": 0, "dex": 1, "agi": 1, "lck": 0, "def": 4},
-		"growths": {"str": 45, "int": 5, "dex": 25, "agi": 20, "lck": 15, "def": 45},
-		"description": "Flightless. Less MOV than a horse, but crosses hills and mountains easily. Reptile: weak to Ice, resists Fire."},
-}
+static var SPECIES := GameData.entries("mount_species")
 
 ## Foot class -> its mounted class (one per role, shared by every species).
 ## Classes not listed (heavy armor, ships, spirits) can't mount.
-const MOUNTED_CLASS := {
-	"Swordsman": "Equestrian", "Rogue": "Equestrian", "Corsair": "Equestrian", "Performer": "Equestrian",
-	"Footman": "Cavalry", "Bannerman": "Cavalry",
-	"Axeman": "Raider", "Brigand": "Raider",
-	"Archer": "Nomad", "Poacher": "Nomad",
-	"Mage": "Battlemage", "Cleric": "Battlemage",
-	"Swordsmaster": "Gendarme", "Assassin": "Gendarme", "Swashbuckler": "Gendarme", "Hoplite": "Gendarme",
-	"Berserker": "Warlord",
-	"Marksman": "Hussar", "Reaver": "Hussar",
-	"Sorcerer": "Spellknight", "Bishop": "Spellknight",
-}
+static var MOUNTED_CLASS := GameData.section("mounts", "mounted_class")
 
 ## What a mounted class is called on each species.
-const DISPLAY := {
-	"Equestrian": {"Horse": "Equestrian", "Pegasus": "Sky Knight", "Drake": "Drake Knight"},
-	"Cavalry": {"Horse": "Cavalry", "Pegasus": "Flier", "Drake": "Drake Lancer"},
-	"Raider": {"Horse": "Raider", "Pegasus": "Sky Raider", "Drake": "Drake Raider"},
-	"Nomad": {"Horse": "Nomad", "Pegasus": "Sky Archer", "Drake": "Drake Archer"},
-	"Battlemage": {"Horse": "Battlemage", "Pegasus": "Sky Mage", "Drake": "Drake Mage"},
-	"Gendarme": {"Horse": "Gendarme", "Pegasus": "Whitewing", "Drake": "Drake Lord"},
-	"Warlord": {"Horse": "Warlord", "Pegasus": "Storm Rider", "Drake": "Wyrm Warlord"},
-	"Hussar": {"Horse": "Hussar", "Pegasus": "Sky Hussar", "Drake": "Drake Hussar"},
-	"Spellknight": {"Horse": "Spellknight", "Pegasus": "Sky Sage", "Drake": "Drake Sage"},
-}
+static var DISPLAY := GameData.section("mounts", "display")
 
-const NAMES := ["Bayard", "Arion", "Marengo", "Copper", "Thistle", "Gale", "Ember", "Juniper", "Shadowfax",
-	"Bramble", "Duchess", "Pepper", "Comet", "Willow", "Sable", "Fenwick"]
+static var NAMES := GameData.strings("mounts", "names", "list")
 
 
 static func species_data(species: String) -> Dictionary:

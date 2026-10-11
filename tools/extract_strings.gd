@@ -11,6 +11,13 @@ extends SceneTree
 
 const SCRIPTS_DIR := "res://scripts/"
 const EVENTS_DIR := "res://events/"
+const DATA_DIR := "res://data/"
+## Data files whose entry (section) names are shown to the player.
+const NAMED_DATA: Array[String] = ["weapons", "items", "classes", "races", "spells", "skills", "statuses",
+	"mount_species"]
+## Display text keys of a data entry (its top-level keys only: a roster's unit "name"
+## isn't one).
+const DATA_TEXT_KEYS: Array[String] = ["name", "description", "cured_text"]
 const OUTPUT := "res://locale/messages.pot"
 
 const _SINGLE := ["tr", "TranslationServer.translate", "Text.entry"]
@@ -36,6 +43,13 @@ static func collect() -> Dictionary:
 			_add(messages, found, path)
 	for path in _files(EVENTS_DIR, "txt"):
 		for found in scan_events(FileAccess.get_file_as_string(path)):
+			_add(messages, found, path)
+	var data_files := _files(DATA_DIR, "cfg")
+	for dir in DirAccess.get_directories_at(DATA_DIR):
+		data_files.append_array(_files(DATA_DIR + dir + "/", "cfg"))
+	for path in data_files:
+		var file := path.trim_prefix(DATA_DIR).get_basename()
+		for found in scan_data(FileAccess.get_file_as_string(path), NAMED_DATA.has(file), file == "mounts"):
 			_add(messages, found, path)
 	return messages
 
@@ -86,6 +100,37 @@ static func scan_events(source: String) -> Array:
 				result.append({"text": c[2], "line": i + 1})
 			"narrate", "banner":
 				result.append({"text": c[1], "line": i + 1})
+	return result
+
+
+## Texts in a data file: [{"text", "line"}]. `named`: its entry names are display
+## names (NAMED_DATA). `mounts`: its [display] section holds mounted class names.
+static func scan_data(source: String, named: bool, mounts := false) -> Array:
+	var result := []
+	var section := ""
+	var header := RegEx.create_from_string("^\\[(.+)\\]$")
+	var field := RegEx.create_from_string("^(\\w+|\"(?:[^\"\\\\]|\\\\.)*\")=(.*)$")
+	var lines := source.split("\n")
+	for i in lines.size():
+		var line := lines[i].strip_edges(false, true)
+		var m := header.search(line)
+		if m:
+			section = m.get_string(1)
+			if named:
+				result.append({"text": section, "line": i + 1})
+			continue
+		m = field.search(line)
+		if not m:
+			continue
+		if DATA_TEXT_KEYS.has(m.get_string(1)):
+			var value = str_to_var(m.get_string(2))
+			if value is String:
+				result.append({"text": value, "line": i + 1})
+		elif mounts and section == "display":
+			var names = str_to_var(m.get_string(2))
+			if names is Dictionary:
+				for display_name in names.values():
+					result.append({"text": display_name, "line": i + 1})
 	return result
 
 

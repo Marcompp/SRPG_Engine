@@ -1,7 +1,7 @@
 # Gold, shops and services (design notes)
 
 Design notes. The whole build order is built: `Campaign.gold`, `Battle.gold`,
-`Items.PRICES`, `scripts/shop.gd`, and gold and shops in the campaign chapters
+`Items.PRICES` (`data/economy.cfg`), `scripts/shop.gd`, and gold and shops in the campaign chapters
 (rewards 1000-3000, gold on the thieves and bosses, a gold village in chapters 1
 and 3, a gold chest in chapter 5, a map shop in chapter 3, bigger prep stocks from
 chapter 3 on).

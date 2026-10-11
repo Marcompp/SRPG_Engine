@@ -15,19 +15,10 @@ const KILLS_FOR_TRAIT := 50
 ##          "ranged" (2+ tiles away), "boss"
 ##   state: "low_hp" (wielder at or below half HP), "alone" (no ally next to it),
 ##          "afflicted" (wielder under a status)
-const LEANINGS := {
-	"tag:heavy": ["Armorbane"], "tag:horse": ["Horsebane", "Impale"], "tag:flying": ["Skybane", "Impale"],
-	"tag:reptile": ["Wyrmbane"], "tag:undead": ["Grimbane"], "tag:spirit": ["Grimbane"], "tag:fae": ["Faebane"],
-	"tag:greenskin": ["Orcbane"], "tag:aquatic": ["Tidebane"], "tag:wooden": ["Woodsplitter"],
-	"vs:sword": ["Swordbreaker"], "vs:axe": ["Axebreaker"], "vs:spear": ["Spearbreaker"], "vs:bow": ["Bowbreaker"],
-	"crit": ["Crit +20", "Lethality"], "counter": ["Quick Riposte", "Steady Stance", "Vantage"],
-	"initiated": ["Death Blow", "Darting Blow"], "ranged": ["Far Shot", "Aegis"], "boss": ["Lethality", "Death Blow"],
-	"low_hp": ["Wrath", "Vantage", "Desperation", "Miracle"], "alone": ["Solo Fighter", "Evasion"],
-	"afflicted": ["Steady Stance", "Miracle"],
-}
+static var LEANINGS := GameData.section("weapon_traits", "leanings")
 ## Traits any weapon can roll, whatever its history, each with this weight (a
 ## history key's kills are split between its traits).
-const GENERIC: Array[String] = ["Death Blow", "Evasion", "Crit +20", "Darting Blow"]
+static var GENERIC := GameData.strings("weapon_traits", "generic", "traits")
 const GENERIC_WEIGHT := 3.0
 
 

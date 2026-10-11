@@ -47,17 +47,7 @@ const DEFAULTS := {
 }
 
 ## Classic Fire Emblem enemy archetypes.
-const PRESETS := {
-	"charger": {},
-	"ambusher": {"move": "in_range"},
-	"boss": {"move": "hold", "caution": 0.0},
-	"turret": {"move": "hold"},
-	"sentry": {"move": "guard", "guard_radius": 3},
-	"sleeper": {"move": "hold", "wake": {"in_threat": true, "attacked": true}},
-	"reinforcement": {"move": "hold", "wake": {"turn": 3}},
-	"coward": {"retreat_below": 0.5},
-	"thief": {"move": "goto", "attack": false, "loot": true},
-}
+static var PRESETS := GameData.entries("ai_presets")
 
 
 static func resolve(ai: Dictionary) -> Dictionary:

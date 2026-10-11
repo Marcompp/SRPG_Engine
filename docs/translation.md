@@ -60,15 +60,18 @@ It collects:
   and both arguments of `tr_n()` and `TranslationServer.translate_plural()`,
   in `scripts/*.gd`;
 - every string on a statement marked `# i18n`;
-- dialogue, speakers, `@narrate` and `@banner` text in `events/*.txt`.
+- dialogue, speakers, `@narrate` and `@banner` text in `events/*.txt`;
+- from the data files (`data/`, see `docs/data.md`): the names of weapons, items,
+  classes, races, spells, skills, statuses and mount species, the `name`,
+  `description` and `cured_text` of any entry (terrain and maps included), and
+  mounted class names. The English text is the key here too.
 
 ## Not done yet
 
-- **Game data:** class, race, skill, item, weapon, spell, status, mount, terrain and
-  map names and descriptions, roster bios, and event scripts written as data lists in
-  `scripts/levels.gd`. They're shown as written. Some screens already pass them through
-  `tr()`, but nothing extracts them yet. This belongs with moving the data out of
-  `.gd` constants, which will pick the key scheme.
+- **Showing game data translated:** data names and descriptions are extracted (see
+  above), but most screens still show them as written; some already pass them
+  through `tr()`. Roster bios and event scripts written as data lists in the maps
+  aren't extracted yet.
 - **English grammar in code:** a few texts build English forms, like `"{race}s can't
   ride."`, `.to_lower()` on a status name, `.capitalize()` on move types and weapon
   types, and the hidden gender words (`male`, `female`). These go with the data.

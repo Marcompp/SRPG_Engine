@@ -1,7 +1,7 @@
 # Mounts (design notes)
 
 Design for the mount system. The first version is built (see "Decided later" and
-`scripts/mounts.gd`); capture, raising and breeding are still open.
+`scripts/mounts.gd`, data in `data/mount_species.cfg`); capture, raising and breeding are still open.
 
 Mounts are creatures a unit rides into battle. Equipping one in battle prep reclasses
 the unit into a mounted class. Mounts have their own stats, levels and skills, and

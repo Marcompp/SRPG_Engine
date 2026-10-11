@@ -110,11 +110,23 @@ func f(n):
 	check_eq(found.get("Defeated {foe}.", {}).get("line", 0), 12, "line numbers")
 	var events: Array = extractor.scan_events("== start ==\nLord: Hold the bridge.\n@narrate Dawn.\n@move Lord (1, 2)\n")
 	check_eq(events.map(func(m): return m.text), ["Lord", "Hold the bridge.", "Dawn."], "event text")
-	# The whole project: menu ids, marked constants, event lines.
+	var data: Array = extractor.scan_data("""
+[Iron Sword]
+type="sword"
+description="A plain \\"iron\\" blade."
+players=[
+	{"name": "Lord", "class": "Swordsman"}
+]
+""", true).map(func(m): return m.text)
+	check_eq(data, ["Iron Sword", "A plain \"iron\" blade."], "data: entry names and display fields, not unit names")
+	# The whole project: menu ids, marked constants, event lines, data.
 	var all: Dictionary = extractor.collect()
 	for key in ["Wait", "Player Phase", "Seized {map}.", "Fell in {map}, turn {turn}.", "Game speed",
-			"Raiders from the east! Keep them off the Elder!"]:
+			"Raiders from the east! Keep them off the Elder!", "Killing Edge", "Swordsmaster", "Poison Immunity",
+			"Woke up", "Sky Knight", "Thicket", "River Crossing", "Chapter 1: Border Village"]:
 		check(all.has(key), "project has %s" % key)
+	for key in ["sword", "river_crossing"]:
+		check(not all.has(key), "project skips %s" % key)
 	var pot: String = extractor.to_pot(all)
 	check(pot.contains("msgid \"Wait\"\nmsgstr \"\""), "writes a gettext template")
 	check(pot.contains("msgid_plural"), "with plurals")

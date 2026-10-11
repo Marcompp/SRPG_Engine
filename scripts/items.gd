@@ -10,32 +10,12 @@ extends RefCounted
 ## Using an item ends the unit's turn.
 ## Any item (or weapon) can list "skills": held items grant them while in the
 ## inventory, weapons only while equipped. Items without "uses" never run out.
-const CONSUMABLES := {
-	"Potion": {"kind": "heal", "heal": 15, "uses": 3},
-	"Ether": {"kind": "mp", "mp": 15, "uses": 3},
-	"Antitoxin": {"kind": "cure", "cures": "Poison", "uses": 3},
-	"Panacea": {"kind": "cure", "uses": 1},
-	# Opens a chest (one use per chest). Rogue-movement units open chests without one.
-	"Chest Key": {"kind": "key", "uses": 1},
-	"Repair Kit": {"kind": "repair", "uses": 2},
-	"Celerity Scroll": {"kind": "scroll", "skill": "Celerity", "uses": 1},
-	"Vigor Scroll": {"kind": "scroll", "skill": "Strength +2", "uses": 1},
-	# Held items with skills.
-	"Power Ring": {"kind": "ring", "skills": ["Strength +2"]},
-	"Speed Ring": {"kind": "ring", "skills": ["Speed +2"]},
-}
+static var CONSUMABLES := GameData.entries("items")
 
 
 ## Price of a fresh one, in gold (docs/economy.md). Items not listed have no price:
 ## they can't be bought or sold.
-const PRICES := {
-	"Iron Sword": 460, "Killing Edge": 1300, "Knife": 400, "Iron Spear": 360, "Javelin": 450,
-	"Iron Axe": 270, "Steel Axe": 600, "Hatchet": 400, "Iron Bow": 540, "Pike": 800, "Hammer": 800,
-	"Woodcutter": 600, "Silver Sword": 1500, "Silver Spear": 1200, "Silver Axe": 1000, "Silver Bow": 1600,
-	"Venom Edge": 900, "Quarterstaff": 400,
-	"Potion": 300, "Ether": 500, "Antitoxin": 450, "Panacea": 800, "Chest Key": 300, "Repair Kit": 800,
-	"Celerity Scroll": 3000, "Vigor Scroll": 3000, "Power Ring": 2500, "Speed Ring": 2500,
-}
+static var PRICES := GameData.section("economy", "prices")
 
 
 static func cost(item_name: String) -> int:

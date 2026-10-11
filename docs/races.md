@@ -1,6 +1,6 @@
 # Races (design notes)
 
-Reference for the race system (`scripts/races.gd`): the lore of each race and how it
+Reference for the race system (`scripts/races.gd`, data in `data/races.cfg`): the lore of each race and how it
 plays. Races are about lore and worldbuilding first: a race being stronger than
 another is fine. When a racial trait affects tactical play, it should be a skill.
 
@@ -18,7 +18,7 @@ skills. Poison is a status effect (`docs/status_effects.md`).
 - Fae MP regen renamed and made stronger (see Racial skills).
 - Ents limited to plain foot and heavy armor classes, like Stoneborn.
 - New race fields: gender ratio, generic name pools (the hook is in
-  `scripts/names.gd`), graphics.
+  `data/names.cfg`), graphics.
 - A hybrid table, for a future second generation.
 
 **Not yet:** the mounted-class penalty, the other elements, counter-weapons for

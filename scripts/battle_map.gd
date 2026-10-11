@@ -19,67 +19,7 @@ const IMPASSABLE := -1.0
 ## occupant's phase) and `cost`: MOV spent to enter, by move type. "*" is the cost for
 ## every type not listed; -1 = impassable. Fliers pay 1 wherever they aren't listed,
 ## and spirits always pay 1 (see cost_for()).
-const TERRAIN := {
-	# Outdoors
-	".": {"name": "Plain", "def": 0, "avo": 0, "color": Color("78b04f"),
-		"cost": {"*": 1, "mermaid": 3, "ship": 6}},
-	"=": {"name": "Path", "def": 0, "avo": -20, "color": Color("c9ad7a"),
-		"cost": {"*": 0.7, "mermaid": 1.5, "ship": 5}},
-	"H": {"name": "House", "def": 0, "avo": 15, "color": Color("78b04f"),
-		"cost": {"*": 1, "horse": 1.2, "ship": 10}},
-	"T": {"name": "Fort", "def": 3, "avo": 25, "heal": 0.2, "color": Color("9c8a6a"),
-		"cost": {"*": 1.5}},
-	"S": {"name": "Sand", "def": 0, "avo": 5, "color": Color("d8c78a"),
-		"cost": {"*": 1, "horse": 1.5, "mermaid": 2, "ship": 5}},
-	"D": {"name": "Dune", "def": 0, "avo": 15, "color": Color("c9ac62"),
-		"cost": {"*": 1.5, "horse": 3, "mermaid": 2, "ship": 4}},
-	"F": {"name": "Forest", "def": 1, "avo": 20, "color": Color("4e8a3a"),
-		"cost": {"*": 2, "mermaid": 3, "horse": 4, "ship": 10}},
-	"#": {"name": "Thicket", "def": 2, "avo": 30, "color": Color("2f5f2c"),
-		"cost": {"*": 10, "horse": 20, "ship": 20}},
-	"h": {"name": "Hill", "def": 2, "avo": 20, "color": Color("9aa25a"),
-		"cost": {"*": 4, "horse": 10, "drake": 2, "mermaid": 10, "heavy": 10, "ship": 20}},
-	"M": {"name": "Mountain", "def": 3, "avo": 30, "color": Color("8a7a5c"),
-		"cost": {"*": 7, "horse": 15, "drake": 4, "mermaid": 15, "heavy": 15, "ship": 20}},
-	"~": {"name": "River", "def": 0, "avo": 10, "color": Color("3f7fd0"),
-		"cost": {"*": 6, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
-	"L": {"name": "Lake", "def": 0, "avo": 10, "color": Color("4a8ad8"),
-		"cost": {"*": 6, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
-	"W": {"name": "Sea", "def": 0, "avo": 10, "color": Color("2a5fa8"),
-		"cost": {"*": 6, "mermaid": 1, "ship": 1, "horse": 8, "heavy": 8}},
-	"v": {"name": "Waterfall", "def": 0, "avo": 30, "color": Color("7ab8f0"),
-		"cost": {"*": 20, "mermaid": 6, "ship": 8}},
-	"*": {"name": "Snow", "def": 0, "avo": 5, "color": Color("e6edf3"),
-		"cost": {"*": 1, "horse": 1.5, "mermaid": 2, "ship": 5}},
-	"i": {"name": "Ice", "def": 0, "avo": -20, "color": Color("b6def0"),
-		"cost": {"*": 1.5, "horse": 2, "heavy": 1, "mermaid": 1, "ship": 4}},
-	# Indoors
-	"_": {"name": "Floor", "def": 0, "avo": 0, "color": Color("8c857a"),
-		"cost": {"*": 1, "mermaid": 3, "horse": 1.5, "flying": 1.5, "ship": 10}},
-	"c": {"name": "Carpet", "def": 0, "avo": 0, "color": Color("9a3a3a"),
-		"cost": {"*": 1, "mermaid": 3, "horse": 1.5, "flying": 1.5, "ship": 10}},
-	"X": {"name": "Wall", "def": 0, "avo": 0, "color": Color("4a4440"),
-		"cost": {"*": IMPASSABLE, "flying": IMPASSABLE}},
-	"I": {"name": "Pillar", "def": 0, "avo": 20, "color": Color("8c857a"),
-		"cost": {"*": 2, "ship": 20}},
-	"O": {"name": "Abyss", "def": 0, "avo": 0, "color": Color("101018"),
-		"cost": {"*": IMPASSABLE}},
-	"|": {"name": "Fence", "def": 0, "avo": 0, "color": Color("9a9282"),
-		"cost": {"*": IMPASSABLE}},
-	# Breakable: "breakable" gives the tile's HP and what it becomes when broken.
-	"x": {"name": "Cracked Wall", "def": 0, "avo": 0, "color": Color("4a4440"),
-		"cost": {"*": IMPASSABLE, "flying": IMPASSABLE}, "breakable": {"hp": 20, "becomes": "_"}},
-	"/": {"name": "Cracked Fence", "def": 0, "avo": 0, "color": Color("9a9282"),
-		"cost": {"*": IMPASSABLE}, "breakable": {"hp": 10, "becomes": "."}},
-	"Y": {"name": "Trunk", "def": 0, "avo": 0, "color": Color("78b04f"),
-		"cost": {"*": IMPASSABLE}, "breakable": {"hp": 15, "becomes": ".", "bridge": true}},
-	# Doors: opened by units that can open chests, or broken like a cracked wall.
-	"+": {"name": "Door", "def": 0, "avo": 0, "color": Color("4a4440"),
-		"cost": {"*": IMPASSABLE, "flying": IMPASSABLE}, "breakable": {"hp": 20, "becomes": "_"}, "door": true},
-	# Left by a fallen trunk: walkable, and water units still pass underneath.
-	"B": {"name": "Bridge", "def": 0, "avo": 0, "color": Color("3f7fd0"),
-		"cost": {"*": 1, "mermaid": 1, "ship": 1}},
-}
+static var TERRAIN := GameData.entries("terrain")
 
 ## Water a fallen trunk can bridge, and how many tiles of it.
 const BRIDGEABLE: Array[String] = ["~", "L"]

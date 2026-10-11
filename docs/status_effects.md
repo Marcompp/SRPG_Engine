@@ -15,7 +15,7 @@ runs out or is cured.
   class, race, learned, weapon and item skills; active statuses become one more
   source. So a status can use any skill key (`stats`, `battle`, `rules`, `map`...)
   and combat, the forecast and the AI see it with no extra code. Statuses are
-  defined in `scripts/statuses.gd`, a table like the skills one.
+  defined in `data/statuses.cfg`, a table like the skills one.
 - **On the unit:** `statuses: {name: turns_left}` (-1: until cured). Saved by
   SaveGame, so suspend, auto save and rewind keep them.
 - **Several at once.** Different statuses coexist; the same one again refreshes its

@@ -25,82 +25,20 @@ extends RefCounted
 ## promotes_to: classes this one can promote into. Promotion will happen in the
 ##              battle prep screen and keeps the unit's level.
 
-const DATA := {
-	# Foot
-	"Swordsman": {"weapons": ["sword"], "move": "foot", "learn": {10: "Speed +2"}, "promotes_to": ["Swordsmaster"]},
-	"Swordsmaster": {"weapons": ["sword"], "move": "foot", "skills": ["Crit +20"], "promoted": true},
-	"Footman": {"weapons": ["spear"], "move": "foot", "learn": {10: "Open Ground"}, "promotes_to": ["Hoplite"]},
-	"Hoplite": {"weapons": ["spear"], "move": "foot", "skills": ["Impale"], "promoted": true},
-	"Axeman": {"weapons": ["axe"], "move": "foot", "learn": {10: "Strength +2"}, "promotes_to": ["Berserker"]},
-	"Archer": {"weapons": ["bow"], "move": "foot", "learn": {10: "Skill +4"}, "promotes_to": ["Marksman"]},
-	"Marksman": {"weapons": ["bow"], "move": "foot", "skills": ["Bow Range +1"], "promoted": true},
-	# Rogue / scouting
-	"Rogue": {"weapons": ["sword"], "move": "foot", "skills": ["Forester", "Steal", "Lockpick"],
-		"learn": {10: "Evasion"}, "promotes_to": ["Assassin"]},
-	"Assassin": {"weapons": ["sword", "bow"], "move": "foot", "skills": ["Forester", "Steal", "Lockpick", "Lethality"],
-		"promoted": true},
-	"Corsair": {"weapons": ["sword"], "move": "foot", "skills": ["Swimming"], "learn": {10: "Sea Legs"},
-		"promotes_to": ["Swashbuckler"]},
-	"Swashbuckler": {"weapons": ["sword", "axe"], "move": "foot", "skills": ["Swimming", "Pass"], "promoted": true},
-	"Brigand": {"weapons": ["axe"], "move": "foot", "skills": ["Climbing"], "learn": {10: "Highlander"},
-		"promotes_to": ["Berserker"]},
-	"Berserker": {"weapons": ["axe"], "move": "foot", "skills": ["Swimming", "Climbing", "Wrath"], "promoted": true},
-	"Poacher": {"weapons": ["bow"], "move": "foot", "skills": ["Forester"], "learn": {10: "Ambush"},
-		"promotes_to": ["Reaver"]},
-	"Reaver": {"weapons": ["bow", "axe"], "move": "foot", "skills": ["Forester", "Brawn"], "promoted": true},
-	# Armor
-	"Guard": {"weapons": ["spear"], "move": "heavy", "learn": {10: "Defense +2"}, "promotes_to": ["Juggernaut"]},
-	"Turret": {"weapons": ["bow"], "move": "heavy", "learn": {10: "Max HP +5"}, "promotes_to": ["Juggernaut"]},
-	"Juggernaut": {"weapons": ["spear", "axe", "bow"], "move": "heavy", "skills": ["Warding"], "promoted": true},
-	# Mages
-	"Mage": {"weapons": ["staff"], "move": "foot", "learn": {10: "Magic +2"}, "promotes_to": ["Sorcerer"]},
-	"Sorcerer": {"weapons": ["staff", "sword"], "move": "foot", "skills": ["Spell Range +1"], "promoted": true},
-	"Cleric": {"weapons": ["staff"], "move": "foot", "learn": {10: "Max MP +5"}, "promotes_to": ["Bishop"]},
-	"Bishop": {"weapons": ["staff", "spear"], "move": "foot", "skills": ["Prayer"], "promoted": true},
-	# Horse
-	"Equestrian": {"weapons": ["sword"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Gendarme"]},
-	"Cavalry": {"weapons": ["spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Gendarme"]},
-	"Gendarme": {"weapons": ["sword", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
-	"Nomad": {"weapons": ["bow"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Hussar"]},
-	"Hussar": {"weapons": ["bow", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
-	"Raider": {"weapons": ["axe"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Warlord"]},
-	"Warlord": {"weapons": ["axe", "spear"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
-	"Battlemage": {"weapons": ["staff"], "move": "horse", "mounted": true, "skills": ["Canto"], "promotes_to": ["Spellknight"]},
-	"Spellknight": {"weapons": ["staff", "sword"], "move": "horse", "mounted": true, "skills": ["Canto"], "promoted": true},
-	# Ships
-	"Galley": {"weapons": ["bow"], "move": "ship", "abilities": ["ship"], "capacity": 2},
-	# Spirits (pass through any terrain, even walls, for 1 MOV; no terrain bonuses)
-	"Wraith": {"weapons": ["sword"], "move": "spirit"},
-	# Special
-	"Performer": {"weapons": ["sword"], "move": "foot", "skills": ["Dance"], "learn": {10: "Footwork"}},
-	"Bannerman": {"weapons": ["spear"], "move": "foot", "skills": ["Inspire"]},
-}
+static var DATA := GameData.entries("classes")
 
 
 ## Stat caps (keys as in Experience.STATS). Every class uses these unless it sets
 ## its own "caps" (a partial dictionary is fine: unlisted stats keep the default).
-const DEFAULT_CAPS := {"hp": 80, "mp": 40, "str": 20, "int": 20, "dex": 20, "agi": 20, "lck": 20, "def": 20}
+static var DEFAULT_CAPS := GameData.section("class_stats", "default_caps")
 
 
 ## Promotion (in the campaign's prep screen): a unit at PROMOTION_LEVEL or above can
 ## promote into one of its class's "promotes_to" classes. It keeps its level and gains
 ## the new class's bonus (keys as in Experience.STATS; capped by the new class's caps).
 const PROMOTION_LEVEL := 15
-const DEFAULT_PROMOTION_BONUS := {"hp": 3, "str": 1, "dex": 1, "agi": 1, "def": 1, "mp": 1}
-const PROMOTION_BONUS := {
-	"Swordsmaster": {"hp": 3, "str": 2, "dex": 3, "agi": 3, "def": 1},
-	"Hoplite": {"hp": 4, "str": 2, "dex": 1, "agi": 1, "def": 3},
-	"Marksman": {"hp": 3, "str": 2, "dex": 3, "agi": 2, "def": 1},
-	"Assassin": {"hp": 2, "str": 1, "dex": 3, "agi": 3, "lck": 2},
-	"Swashbuckler": {"hp": 4, "str": 2, "dex": 2, "agi": 2, "def": 1},
-	"Berserker": {"hp": 5, "str": 3, "dex": 1, "agi": 1, "def": 1},
-	"Reaver": {"hp": 3, "str": 2, "dex": 2, "agi": 2, "def": 1},
-	"Juggernaut": {"hp": 4, "str": 2, "def": 4},
-	"Sorcerer": {"hp": 2, "int": 3, "dex": 1, "agi": 1, "mp": 4},
-	"Bishop": {"hp": 3, "int": 2, "agi": 1, "lck": 2, "mp": 4},
-	"Gendarme": {"hp": 3, "str": 2, "dex": 1, "agi": 1, "def": 2},
-	"Hussar": {"hp": 3, "str": 1, "dex": 2, "agi": 2, "def": 1},
-}
+static var DEFAULT_PROMOTION_BONUS := GameData.section("class_stats", "default_promotion_bonus")
+static var PROMOTION_BONUS := GameData.entries("promotion_bonuses")
 
 
 static func promotion_bonus(class_id: String) -> Dictionary:

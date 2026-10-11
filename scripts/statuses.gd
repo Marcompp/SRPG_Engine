@@ -21,22 +21,7 @@ extends RefCounted
 ## lingers:     kept when the chapter ends (others are cleared).
 ## effects:     skill keys (see Skills) that apply while it lasts.
 
-const DATA := {
-	"Poison": {"description": "Loses 4-6 HP at the start of each of its phases (never below 1, unless already at 1 HP).",
-		"color": Color("b050e0"), "duration": 3, "tick": {"damage": [4, 6]}},
-	"Silence": {"description": "Can't use spells or racial attacks.",
-		"color": Color("5aa0ff"), "duration": 3, "restrict": ["magic"]},
-	"Sleep": {"description": "Can't move, act or counterattack. Wakes up when it takes damage.",
-		"color": Color("7080b0"), "duration": 2, "restrict": ["move", "act"], "cure_on_hit": true,
-		"cured_text": "Woke up"},
-	"Paralyse": {"description": "Can't move, but can still act where it stands.",
-		"color": Color("e0c040"), "duration": 1, "restrict": ["move"]},
-	"Berserk": {"description": "Out of control: at the start of its phase it attacks the nearest unit it can reach, friend or foe.",
-		"color": Color("e05030"), "duration": 3, "control": "berserk"},
-	"Petrify": {"description": "Turned to stone: can't move, act or counterattack, and has no Avoid, but DEF +10. Lasts until cured, even between chapters.",
-		"color": Color("909090"), "duration": -1, "restrict": ["move", "act"], "no_avoid": true, "lingers": true,
-		"effects": {"stats": {"def": 10}}},
-}
+static var DATA := GameData.entries("statuses")
 
 const KEYS: Array[String] = ["description", "color", "duration", "tick", "restrict", "cure_on_hit", "cured_text",
 	"no_avoid", "control", "lingers", "effects"]

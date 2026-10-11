@@ -5,8 +5,7 @@ extends RefCounted
 ## on one buys into and sells from its own inventory). Prices: Items.PRICES.
 
 ## What the prep screen's Shop sells when a chapter has no "shop" list.
-const DEFAULT_STOCK: Array[String] = ["Iron Sword", "Iron Spear", "Iron Axe", "Iron Bow", "Javelin", "Hatchet",
-	"Quarterstaff", "Potion", "Ether", "Antitoxin", "Chest Key"]
+static var DEFAULT_STOCK := GameData.strings("economy", "shop", "default_stock")
 
 
 ## The prep screen's stock for a chapter (Chapters.DATA entry).

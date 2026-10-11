@@ -19,16 +19,11 @@ const WEAK_MULTIPLIER := 2
 ## Weaknesses and resistances by tag (see Unit.tags), against damage sources:
 ## weapon types, "silver" and spell elements. Spirits also resist every weapon
 ## that isn't silver.
-const TAG_TRAITS := {
-	"aquatic": {"weak": ["spear", "lightning"], "resist": ["fire", "water"]},
-	"reptile": {"weak": ["ice"], "resist": ["fire"]},
-	"wooden": {"weak": ["axe", "fire", "ice"], "resist": ["water", "earth"]},
-	"undead": {"weak": ["silver", "fire", "light"], "resist": ["dark"]},
-}
+static var TAG_TRAITS := GameData.section("combat", "tag_traits")
 const TRIANGLE_DMG := 1
 const TRIANGLE_HIT := 15
 ## Key beats value. Bows and staves sit outside the triangle.
-const TRIANGLE := {"sword": "axe", "axe": "spear", "spear": "sword"}
+static var TRIANGLE := GameData.section("combat", "triangle")
 
 
 ## +1 if a has weapon-triangle advantage over b, -1 if disadvantage, else 0.

@@ -23,28 +23,7 @@ const MP_REGEN := 1
 ## inflict:  {"status", "chance"}: each hit gives the target that status (see Statuses)
 ##           with `chance`% odds. Also on weapons (Weapons).
 ## status_only: deals no damage and can't be countered: it's only for its `inflict`.
-const DATA := {
-	"Heal": {"mp": 4, "target": "ally", "min_rng": 1, "max_rng": 1, "power": 10, "exp": 11},
-	"Restore": {"mp": 6, "target": "ally", "min_rng": 1, "max_rng": 1, "power": 0, "exp": 11, "cures": true},
-	"Fire": {"mp": 3, "target": "enemy", "element": "fire", "min_rng": 1, "max_rng": 2, "power": 5, "hit": 90},
-	"Firestorm": {"mp": 8, "target": "area", "element": "fire", "min_rng": 1, "max_rng": 3, "radius": 1, "power": 3, "hit": 80},
-	# Status spells: the normal spell hit chance, then the status.
-	"Silence": {"mp": 5, "target": "enemy", "min_rng": 1, "max_rng": 3, "power": 0, "hit": 70, "status_only": true,
-		"inflict": {"status": "Silence", "chance": 100}},
-	"Sleep": {"mp": 6, "target": "enemy", "min_rng": 1, "max_rng": 3, "power": 0, "hit": 60, "status_only": true,
-		"inflict": {"status": "Sleep", "chance": 100}},
-	"Bind": {"mp": 4, "target": "enemy", "min_rng": 1, "max_rng": 2, "power": 0, "hit": 80, "status_only": true,
-		"inflict": {"status": "Paralyse", "chance": 100}},
-	"Berserk": {"mp": 7, "target": "enemy", "min_rng": 1, "max_rng": 2, "power": 0, "hit": 60, "status_only": true,
-		"inflict": {"status": "Berserk", "chance": 100}},
-	"Stone": {"mp": 10, "target": "enemy", "min_rng": 1, "max_rng": 2, "power": 0, "hit": 50, "status_only": true,
-		"inflict": {"status": "Petrify", "chance": 100}},
-	"Earth Spike": {"mp": 5, "target": "area", "element": "earth", "min_rng": 1, "max_rng": 2, "radius": 0, "power": 6, "hit": 85,
-		"terraform": "M"},
-	# Racial attacks.
-	"Fire Breath": {"mp": 0, "target": "enemy", "element": "fire", "min_rng": 1, "max_rng": 2, "power": 6, "hit": 80,
-		"ability": true, "physical": true},
-}
+static var DATA := GameData.entries("spells")
 
 ## Terrain that terraforming spells can transform.
 const TERRAFORMABLE: Array[String] = [".", "=", "F", "S", "D", "*"]
