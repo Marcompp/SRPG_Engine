@@ -38,18 +38,21 @@ var is_lord := false
 ## decide (move type, tags, mounted, weapon types, abilities) into the fields below.
 var unit_class := ""
 ## Movement type: one of BattleMap.MOVE_TYPES. Decides terrain costs and
-## whether terrain bonuses apply. The race can override the class's (see Races).
+## whether terrain bonuses apply. The class (or mount) and the unit's body skills
+## each propose one, and the highest wins (see Races.winning_move).
 var move_type := "foot"
-## Effectiveness tags: the class's move type plus the race's tags. Weapons are
+## Effectiveness tags: the class's move type plus the mount's, race's and body
+## skills' tags. Weapons are
 ## effective against these, and Combat.TAG_TRAITS gives weaknesses/resistances.
 var tags: Array[String] = []
 ## Race: a key of Races.DATA (roster "race", default "Human").
 var race := "Human"
-## Possible values of `gender`.
-const GENDERS: Array[String] = ["male", "female"]
+## Possible values of `gender` ("none": races without gender, like Ents).
+const GENDERS: Array[String] = ["male", "female", "none"]
 ## Hidden: never shown to the player, but rules can check it (e.g. mounts that only
-## accept some riders). Roster "gender"; generics without one get a random gender.
-var gender: String = GENDERS.pick_random()
+## accept some riders). Roster "gender"; units without one roll it from their race's
+## gender ratio (see Races.roll_gender).
+var gender := "male"
 ## Generic units (roster "generic": true) get a random name (see Names) and show
 ## their class's initial on the map instead of their name's.
 var generic := false
@@ -216,7 +219,7 @@ static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictio
 	u.race = stats.get("race", "Human")
 	assert(Races.DATA.has(u.race), "unknown race: " + u.race)
 	u.gold = stats.get("gold", 0)
-	u.gender = stats.get("gender", u.gender)
+	u.gender = stats.get("gender", Races.roll_gender(u.race))
 	assert(GENDERS.has(u.gender), "unknown gender: " + u.gender)
 	u.generic = stats.get("generic", false)
 	if u.generic:
@@ -273,21 +276,21 @@ func set_class(class_id: String) -> void:
 	var data := Classes.get_data(class_id)
 	assert(Races.allows(race, class_id), "%s can't be a %s" % [race, class_id])
 	unit_class = class_id
-	move_type = Races.move_type(race, class_id)
+	var own_move: String = data.move
 	var class_tag: String = data.move
 	if not mount.is_empty():
 		# The species decides how a mounted unit moves and what it counts as.
 		var species := Mounts.species_data(mount.species)
-		move_type = species.move
+		own_move = species.move
 		class_tag = species.tags[0]
+	move_type = Races.winning_move([own_move] + Skills.moves(self))
 	assert(BattleMap.MOVE_TYPES.has(move_type), "unknown move type: " + move_type)
-	mov_bonus = Races.bonus_mov(race, class_id)
+	mov_bonus = Skills.foot_mov(self) if Races.FOOT_MOVES.has(data.move) else 0
 	tags.assign([class_tag])
+	var more: Array = Races.get_data(race).get("tags", []) + Skills.body_tags(self)
 	if not mount.is_empty():
-		for tag: String in Mounts.species_data(mount.species).tags:
-			if not tags.has(tag):
-				tags.append(tag)
-	for tag: String in Races.get_data(race).get("tags", []):
+		more = Mounts.species_data(mount.species).tags + more
+	for tag: String in more:
 		if not tags.has(tag):
 			tags.append(tag)
 	mounted = data.get("mounted", false)
@@ -378,9 +381,14 @@ func skills_learned_at(lv: int) -> Array[String]:
 	return result
 
 
-## Cap for a stat (keys as in Experience.STATS), from the unit's class.
+## Cap for a stat (keys as in Experience.STATS): the class's, changed by the race's.
 func stat_cap(key: String) -> int:
-	return Classes.caps(unit_class)[key]
+	return Classes.caps(unit_class)[key] + Races.cap_change(race, key)
+
+
+## Growth rate for a stat (%): its own, plus its race's and skills' changes.
+func growth_rate(key: String) -> int:
+	return growths.get(key, 0) + Races.growth_change(race, key) + Skills.growth_bonus(self, key)
 
 
 func is_capped(key: String) -> bool:
@@ -395,18 +403,18 @@ func is_ship() -> bool:
 	return has_ability("ship")
 
 
-## Rescue: mounted units and carrier races (Centaurs) can carry allies.
+## Rescue: mounted units and carriers (Equine: Centaurs) can carry allies.
 func can_carry() -> bool:
-	return mounted or race_data().get("carrier", false)
+	return mounted or Skills.has_handling(self, "carrier")
 
 
 func can_be_carried() -> bool:
-	return not (mounted or is_ship() or race_data().get("carrier", false) or race_data().get("immovable", false))
+	return not (mounted or is_ship() or Skills.has_handling(self, "carrier") or Skills.has_handling(self, "immovable"))
 
 
-## Shove: mounted units can't (they Rescue instead), unless their race is a carrier.
+## Shove: mounted units can't (they Rescue instead), unless they're carriers.
 func can_shove() -> bool:
-	return not is_ship() and (not mounted or race_data().get("carrier", false))
+	return not is_ship() and (not mounted or Skills.has_handling(self, "carrier"))
 
 
 func can_be_shoved() -> bool:

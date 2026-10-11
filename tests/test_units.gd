@@ -534,6 +534,7 @@ func test_race_class_bans() -> void:
 		["Naga", "Cavalry", false], ["Naga", "Raider", false], ["Naga", "Footman", true],
 		["Centaur", "Guard", true], ["Minotaur", "Nomad", false],
 		["Harpy", "Guard", false], ["Harpy", "Cavalry", true], ["Ent", "Equestrian", false],
+		["Ent", "Rogue", false], ["Ent", "Archer", true], ["Ent", "Turret", true],
 		["Stoneborn", "Rogue", false], ["Stoneborn", "Cavalry", false], ["Stoneborn", "Guard", true],
 		["Stoneborn", "Axeman", true], ["Human", "Battlemage", true],
 	]:
@@ -582,8 +583,53 @@ func test_race_movement_and_tags() -> void:
 	fighter.set_race("Ent")
 	check(fighter.move_type == "heavy" and not fighter.tags.has("heavy"), "Ents only move as heavy")
 	galley.set_class("Galley")
+	galley.set_race("Naga")
+	check_eq(galley.move_type, "ship", "ships outrank other movement")
 	galley.set_race("Ghost")
-	check_eq(galley.move_type, "ship", "ships keep sailing whatever the crew")
+	check_eq(galley.move_type, "spirit", "but spirits outrank ships")
+
+
+func test_movement_priority() -> void:
+	var fighter := unit_named("Fighter")  # Axeman
+	check_eq(Races.winning_move(["foot", "mermaid"]), "mermaid", "a skill beats a class of the same rank")
+	check_eq(Races.winning_move(["horse", "flying"]), "horse", "horse beats flying")
+	fighter.set_race("Naga")
+	fighter.set_class("Guard")
+	check_eq(fighter.move_type, "heavy", "a Naga in armor moves as heavy (heavy outranks aquatic)")
+	check(fighter.tags.has("aquatic"), "and still counts as aquatic")
+	fighter.set_class("Axeman")
+	fighter.set_race("Human")
+	fighter.personal_skills.append("Winged")
+	fighter.set_class("Axeman")
+	check(fighter.move_type == "flying" and fighter.tags.has("flying"), "a personal Winged skill flies too")
+	fighter.mount_up(Mounts.generate("Horse"))
+	check_eq(fighter.move_type, "horse", "a winged rider moves as its horse")
+	check(fighter.tags.has("flying") and fighter.tags.has("horse"), "and counts as both")
+	fighter.dismount()
+	fighter.personal_skills.clear()
+	fighter.set_race("Ghost")
+	fighter.mount_up(Mounts.generate("Horse"))
+	check_eq(fighter.move_type, "spirit", "a Ghost rides as a spirit")
+	fighter.dismount()
+	fighter.set_race("Human")
+	fighter.items.append(Items.make("Power Ring"))
+	check(Skills.innate(fighter).size() < Skills.of(fighter).size(), "equipment skills aren't innate")
+
+
+func test_race_stats() -> void:
+	var lord := unit_named("Lord")
+	check_eq(lord.stat_cap("str"), 20, "Humans keep the class caps")
+	lord.set_race("Ent")
+	check_eq(lord.stat_cap("hp"), 90, "Ents: HP cap +10")
+	check_eq(lord.stat_cap("agi"), 17, "AGI cap -3")
+	check_eq(lord.stat_cap("def"), 23, "DEF cap +3")
+	lord.growths = {"agi": 40, "def": 30}
+	check_eq(lord.growth_rate("agi"), 30, "AGI growth -10")
+	check_eq(lord.growth_rate("def"), 40, "DEF growth +10")
+	lord.set_race("Elf")
+	check_eq(lord.growth_rate("str"), 0, "unlisted stats keep their growth")
+	lord.agility = 23
+	check(lord.is_capped("agi") and lord.stat_cap("agi") == 23, "Elves: AGI cap 23")
 
 
 func test_race_weaknesses_and_resistances() -> void:
@@ -682,7 +728,10 @@ func test_race_regen_and_exp() -> void:
 	check_eq(lord.hp, 5 + ceili(lord.max_hp * 0.1), "Trolls regenerate 10% HP")
 	check_eq(mage.mp_regen(), Spells.MP_REGEN, "normal MP regen")
 	mage.set_race("Fairy")
-	check_eq(mage.mp_regen(), Spells.MP_REGEN + 1, "Fairies recover 1 more")
+	check_eq(mage.mp_regen(), Spells.MP_REGEN + ceili(mage.max_mp * 0.15), "Fairies recover 15% of max MP more")
+	mage.set_race("Human")
+	mage.learned.append("Mana Flow")
+	check_eq(mage.mp_regen(), Spells.MP_REGEN + 1, "Mana Flow, now a learnable skill: 1 more")
 	lord.exp_points = 0
 	await b.actions.gain_exp(lord, 10)
 	check_eq(lord.exp_points, 10, "Trolls earn plain EXP")

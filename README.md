@@ -152,27 +152,25 @@ Spells are separate from classes: any unit with `"spells"` in its roster entry c
 
 ## Races
 
-Set with `"race"` in a unit's roster entry (default Human); defined in `data/races.cfg`. Design and lore notes, including planned stat tendencies, are in [docs/races.md](docs/races.md). A race's movement replaces its class's, but the class's tag stays (a Centaur Guard moves as a horse and is a target for both the Pike and the Hammer). Ship classes keep sailing whatever the race.
+Set with `"race"` in a unit's roster entry (default Human); defined in `data/races.cfg`. Design and lore notes are in [docs/races.md](docs/races.md). Racial movement comes from body skills (Winged, Aquatic, Equine, Spirit, Wooden Body, Stone Body): the class (or the mount, when riding) and the unit's own skills each propose a movement type, and the highest wins: spirit > ship > horse/drake > flying > heavy > foot/aquatic, a skill winning ties with its class (`Races.MOVE_PRIORITY`). The class's tag stays either way (a Centaur Guard moves as a horse and is a target for both the Pike and the Hammer). Races also change stat caps and growth rates (following the stat tendencies in docs/races.md), and roll a unit's hidden gender from their ratio when the roster doesn't set it (Harpies 70% female; Ents and the Stoneborn have none).
 
 | Race | Tags | Movement | Other | Can't take |
 |---|---|---|---|---|
 | Human | | | 1.1x EXP | |
-| Orc | greenskin | | Poison immune* | |
-| Troll | | | Regenerates 10% HP per turn; poison immune* | |
+| Orc | greenskin | | Poison immune | |
+| Troll | | | Regenerates 10% HP per turn; poison immune | |
 | Elf | fae | | | |
-| Fairy | flying, fae | flying unless mounted | +1 MP regen | |
-| Naga | aquatic, reptile | mermaid | | Mounted classes |
-| Lizal | reptile | foot classes (scouts too) also get Swimming and Climbing | Poison immune* | |
-| Centaur | horse | horse; +1 MOV in foot classes | Can Rescue and Shove; can't be Rescued or Shoved | Flying classes |
+| Fairy | flying, fae | Winged: flying | Wellspring: recovers 15% of max MP per turn | |
+| Naga | aquatic, reptile | Aquatic: mermaid | | Mounted classes |
+| Lizal | reptile | foot classes (scouts too) also get Swimming and Climbing | Poison immune | |
+| Centaur | horse | Equine: horse; +1 MOV in foot classes | Can Rescue and Shove; can't be Rescued or Shoved | Flying classes |
 | Minotaur | horse | | | Mounted classes |
-| Harpy | flying | flying unless mounted | | Heavy classes |
-| Dragon | flying, reptile | flying unless mounted | Fire Breath (racial attack: fire, range 1-2, STR + 6 vs DEF, no MP; its own unit menu entry) | |
-| Ent | wooden | heavy | Can't be Rescued or Shoved | Mounted classes |
-| Stoneborn | heavy | heavy | Can't be Rescued or Shoved; poison immune* | All but foot and heavy classes |
-| Skeleton | undead | | Poison immune* | |
-| Ghost | undead, spirit | spirit | Poison immune* | |
-
-\* Poison isn't implemented yet.
+| Harpy | flying | Winged: flying | | Heavy classes |
+| Dragon | flying, reptile | Winged: flying | Fire Breath (racial attack: fire, range 1-2, STR + 6 vs DEF, no MP; its own unit menu entry) | |
+| Ent | wooden | Wooden Body: heavy | Can't be Rescued or Shoved | All but foot and heavy classes |
+| Stoneborn | heavy | Stone Body: heavy | Can't be Rescued or Shoved; poison immune | All but foot and heavy classes |
+| Skeleton | undead | | Poison immune | |
+| Ghost | undead, spirit | Spirit: spirit | Poison immune | |
 
 | Tag | Weak to (x2) | Resists (1/2) |
 |---|---|---|
@@ -188,7 +186,7 @@ Only Fire and Earth spells exist so far.
 
 A unit's class sets its movement type. Costs live in `data/terrain.cfg` (– = impassable). Costs can be fractional, and a unit can be placed by Shove, Drop or Unload only on a tile it could enter in one move (cost ≤ MOV).
 
-A unit's race can override it (see Races).
+A unit's body skills can propose another one, and the highest in the movement priority wins (see Races).
 
 Movement types: **foot** (most units), **heavy** (armor), **horse**, **mermaid** (aquatic), **ship** (seafaring), **flying**, **spirit**. Terrain specialties are skills that make their own terrain cheaper and nothing else: **Forester** (forest 1.5, thicket 6: scouts), **Climbing** (hill 2, mountain 4: Brigands), **Swimming** (river/lake/sea 2, waterfall 6: Corsairs); Berserkers and amphibious races in foot classes have both Swimming and Climbing. **Pathfinder** makes every enterable tile cost 1. Fliers and spirits get no terrain DEF/AVO. Fliers pay 1 MOV anywhere a tile doesn't list them, and spirits always pay 1 MOV, even through walls, abysses and fences.
 

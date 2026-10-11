@@ -205,8 +205,8 @@ Needs more work. Options so far:
 
 ### Other
 
-- **Boats as mounts**: leaning no. Ship classes already keep their movement whatever
-  the race, and boats don't fit raising, renaming, gender or mount EXP. Could come
+- **Boats as mounts**: leaning no. Ship classes already outrank every racial
+  movement but Spirit, and boats don't fit raising, renaming, gender or mount EXP. Could come
   back later as a separate "vehicle" idea tied to Rescue.
 - **Raising** between chapters (training in the stable, feed items).
 - **Breeding** (possible later): two mounts produce a foal that inherits growths or

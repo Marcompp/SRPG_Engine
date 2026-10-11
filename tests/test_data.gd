@@ -34,8 +34,15 @@ func test_data_references_exist() -> void:
 			skill.call(s, "race " + id)
 		for ban: String in r.get("banned", []):
 			check(ban == "mounted" or BattleMap.MOVE_TYPES.has(ban), "race %s: unknown ban %s" % [id, ban])
-		for m: String in r.get("only", []) + ([r.move] if r.has("move") else []):
+		for m: String in r.get("only", []):
 			check(BattleMap.MOVE_TYPES.has(m), "race %s: unknown move type %s" % [id, m])
+		for key: String in r.get("caps", {}).keys() + r.get("growths", {}).keys():
+			check(Experience.STATS.has(key), "race %s: unknown stat %s" % [id, key])
+		for g: String in r.get("gender_ratio", {}):
+			check(Unit.GENDERS.has(g), "race %s: unknown gender %s" % [id, g])
+		for key: String in r:
+			check(key in ["tags", "skills", "amphibious", "banned", "only", "caps", "growths", "gender_ratio",
+				"description"], "race %s: unknown key %s" % [id, key])
 	for id: String in Weapons.DATA:
 		var w: Dictionary = Weapons.DATA[id]
 		for s: String in w.get("skills", []):

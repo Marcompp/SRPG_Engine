@@ -170,7 +170,23 @@ func test_hidden_gender() -> void:
 		check(Unit.GENDERS.has(u.gender), "a valid gender (%s)" % u.gender)
 		seen[u.gender] = true
 		u.free()
-	check_eq(seen.size(), Unit.GENDERS.size(), "both genders show up among generics")
+	check_eq(seen.keys().size(), 2, "both genders show up among human generics")
+	check(not seen.has("none"), "humans always have one")
+	# Other races roll from their ratio.
+	data["race"] = "Stoneborn"
+	data["class"] = "Axeman"
+	data["items"] = ["Iron Axe"]
+	var stone := Unit.create("Statue", Unit.Team.ENEMY, Vector2i.ZERO, data)
+	check_eq(stone.gender, "none", "the Stoneborn have no gender")
+	check(Names.random("Stoneborn", "none") != "", "and still get a name")
+	stone.free()
+	var females := 0
+	for i in 400:
+		if Races.roll_gender("Harpy") == "female":
+			females += 1
+	check(females > 230 and females < 330, "Harpies are about 70%% female (%d/400)" % females)
+	data.erase("race")
+	data["class"] = "Brigand"
 	# A roster "gender" fixes it.
 	data["gender"] = "female"
 	for i in 10:

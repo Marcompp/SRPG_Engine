@@ -14,7 +14,8 @@ extends RefCounted
 ## weight_relief: its weapons count as this much lighter (see Combat.attack_speed).
 ## command:    adds a unit menu command: "dance", "inspire", "steal".
 ## turn_start: at the start of its side's phase: {"heal": fraction of max HP, "mp": MP,
-##             "heal_allies": fraction of max HP for adjacent allies}.
+##             "mp_fraction": fraction of max MP, "heal_allies": fraction of max HP for
+##             adjacent allies}.
 ## terrain_costs: {terrain key: MOV}: it pays this instead when it's cheaper than its
 ##             move type's cost (Swimming, Climbing, Forester).
 ## range:      max range bonus by weapon type, or "spell" for every spell: {"bow": 1}.
@@ -57,6 +58,15 @@ extends RefCounted
 ##             "no_adjacent_ally": true, "killed": true (after_combat: the foe died).
 ## hidden:     never shown to the player (status screen, info panel, proc popups),
 ##             on either side.
+## Body keys (racial movement and build: Winged, Equine, Stone Body...) only count
+## from a unit's own skills, not equipment or statuses (see innate), and apply when
+## its class is set:
+## move:       a movement type it proposes. The class (or mount), and these, each
+##             propose one; the highest in Races.MOVE_PRIORITY wins.
+## tags:       effectiveness tags it adds (see Unit.tags): ["flying"].
+## foot_mov:   extra MOV in a foot class (scouts included).
+## handling:   "carrier" (can Rescue and Shove in any class; can't be Rescued or
+##             Shoved) or "immovable" (can't be Rescued or Shoved).
 
 const LEARNED_CAP := 5
 const BATTLE_KEYS: Array[String] = ["atk", "def", "res", "hit", "avo", "crit", "crit_avo", "as"]
@@ -67,7 +77,7 @@ const CONDITIONS: Array[String] = ["initiating", "defending", "phase", "hp_below
 	"weapon_type", "foe_weapon_type", "foe_tag", "terrain", "adjacent_ally", "no_adjacent_ally", "killed"]
 const EFFECT_KEYS: Array[String] = ["description", "stats", "command", "turn_start", "exp", "immune", "battle",
 	"rules", "proc", "after_combat", "map", "aura", "growths", "terrain_costs", "range", "weight_relief", "abilities", "if",
-	"hidden"]
+	"hidden", "move", "tags", "foot_mov", "handling"]
 const AFTER_EFFECTS: Array[String] = ["heal", "refresh", "damage_foe", "damage_near_foe", "inflict"]
 const MAP_RULES: Array[String] = ["pass", "pathfinder", "canto", "footwork"]
 ## Skills that make terrain cheaper (see terrain_costs): innate to scouts, climbers and
@@ -98,6 +108,24 @@ static func is_hidden(skill: String) -> bool:
 ## name of the weapon or item that grants it. Active statuses come last (their
 ## effects work like skills), with their turns left as the source ("2 turns").
 static func sources(u: Unit) -> Array:
+	return _sources(u, true)
+
+
+## The unit's own skills, with their sources: personal, class, mount, race and
+## learned, but not its equipment's or statuses. Body skills (move, tags, foot_mov,
+## handling) only count from these: they're applied with the class (Unit.set_class).
+static func innate_sources(u: Unit) -> Array:
+	return _sources(u, false)
+
+
+static func innate(u: Unit) -> Array[String]:
+	var result: Array[String] = []
+	for pair in innate_sources(u):
+		result.append(pair[0])
+	return result
+
+
+static func _sources(u: Unit, equipment: bool) -> Array:
 	var result := []
 	var seen := {}
 	var add := func(list: Array, source: String) -> void:
@@ -121,6 +149,8 @@ static func sources(u: Unit) -> Array:
 			and Classes.get_data(u.unit_class).move == "foot" and u.mount.is_empty():
 		add.call(["Swimming", "Climbing"], "Race")  # i18n
 	add.call(u.learned, "Learned")  # i18n
+	if not equipment:
+		return result
 	if not u.weapon.is_empty():
 		add.call(u.weapon.get("skills", []), u.weapon.name)
 	for item in u.items:
@@ -234,12 +264,49 @@ static func abilities(u: Unit) -> Array[String]:
 	return result
 
 
-## Extra MP recovered at the start of its phase.
+## Extra MP recovered at the start of its phase: flat "mp" plus "mp_fraction" of max
+## MP (rounded up).
 static func turn_mp(u: Unit) -> int:
 	var total := 0
+	var fraction := 0.0
 	for skill in of(u):
 		total += get_data(skill).get("turn_start", {}).get("mp", 0)
+		fraction += get_data(skill).get("turn_start", {}).get("mp_fraction", 0.0)
+	return total + ceili(u.max_mp * fraction)
+
+
+# --- Body (applied with the class, from innate skills only) ---------------------------
+
+## Movement types `u`'s own skills propose (see Races.winning_move), in skill order.
+static func moves(u: Unit) -> Array[String]:
+	var result: Array[String] = []
+	for skill in innate(u):
+		if get_data(skill).has("move"):
+			result.append(get_data(skill).move)
+	return result
+
+
+## Effectiveness tags `u`'s own skills add (Winged: flying).
+static func body_tags(u: Unit) -> Array[String]:
+	var result: Array[String] = []
+	for skill in innate(u):
+		for tag: String in get_data(skill).get("tags", []):
+			if not result.has(tag):
+				result.append(tag)
+	return result
+
+
+## Extra MOV `u`'s own skills give in a foot class (Equine).
+static func foot_mov(u: Unit) -> int:
+	var total := 0
+	for skill in innate(u):
+		total += get_data(skill).get("foot_mov", 0)
 	return total
+
+
+## Whether one of `u`'s own skills has `handling` ("carrier" or "immovable").
+static func has_handling(u: Unit, handling: String) -> bool:
+	return innate(u).any(func(skill: String) -> bool: return get_data(skill).get("handling", "") == handling)
 
 
 static func is_immune(u: Unit, status: String) -> bool:
@@ -480,6 +547,13 @@ static func problems_in(skill: String, d: Dictionary) -> Array[String]:
 	for status: String in d.get("immune", []):
 		if not Statuses.DATA.has(status):
 			problems.append("%s: unknown status %s" % [skill, status])
+	if d.has("move") and not BattleMap.MOVE_TYPES.has(d.move):
+		problems.append("%s: unknown move type %s" % [skill, d.move])
+	if d.has("handling") and not d.handling in ["carrier", "immovable"]:
+		problems.append("%s: unknown handling %s" % [skill, d.handling])
+	for key: String in d.get("turn_start", {}):
+		if not key in ["heal", "mp", "mp_fraction", "heal_allies"]:
+			problems.append("%s: unknown turn_start key %s" % [skill, key])
 	if d.has("proc"):
 		if not PROC_EFFECTS.has(d.proc.get("effect", "")):
 			problems.append("%s: unknown proc effect" % skill)

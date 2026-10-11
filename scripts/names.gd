@@ -10,5 +10,9 @@ static var DEFAULT: Dictionary = BY_RACE["default"]
 
 static func random(race: String, gender: String) -> String:
 	var lists: Dictionary = BY_RACE.get(race, DEFAULT)
-	var pool: Array = lists.get(gender, DEFAULT[gender])
+	var pool: Array = lists.get(gender, DEFAULT.get(gender, []))
+	if pool.is_empty():
+		# No list for it (no gender: "none"): any of the race's names.
+		for g in lists:
+			pool = pool + lists[g]
 	return pool.pick_random()

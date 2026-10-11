@@ -6,28 +6,31 @@ another is fine. When a racial trait affects tactical play, it should be a skill
 
 ## Status
 
-**Built:** race data, tags, movement overrides, class bans, Rescue/Shove rules, the
-three effectiveness levels, spell elements (Fire, Earth), racial skills (Adaptable,
-Regeneration, Mana Flow, Poison Immunity, Fire Breath), the Amphibious terrain
-skills. Poison is a status effect (`docs/status_effects.md`).
+**Built:** race data, tags, class bans, Rescue/Shove rules, the three effectiveness
+levels, spell elements (Fire, Earth), racial skills (Adaptable, Regeneration,
+Poison Immunity, Wellspring, Fire Breath), the Amphibious terrain skills, racial
+movement as body skills with the movement priority (see Movement), stat cap and
+growth changes, gender ratios, and Ents limited to plain foot and heavy classes.
+Poison is a status effect (`docs/status_effects.md`).
 
 **Planned (decided):**
-- Per-race stat cap changes (about -3 to +3), growth changes, and maybe base stats.
-- Racial movement as skills, with a priority order between race, class and mount
-  (see Movement).
-- Fae MP regen renamed and made stronger (see Racial skills).
-- Ents limited to plain foot and heavy armor classes, like Stoneborn.
-- New race fields: gender ratio, generic name pools (the hook is in
-  `data/names.cfg`), graphics.
+- Maybe per-race base stats.
+- New race fields: generic name pools (the hook is in `data/names.cfg`: a section per
+  race), graphics.
 - A hybrid table, for a future second generation.
 
 **Not yet:** the mounted-class penalty, the other elements, counter-weapons for
-Greenskin and Fae, per-race stats.
+Greenskin and Fae.
 
 Defaults picked during implementation (change freely): Equine bonus is +1 MOV;
-Troll regen is 10% max HP per turn; Fairy regen is +1 MP per turn; "foot and scout
-classes" are the foot, rogue, climb, swim and swim_climb move types; Stoneborn can't
-take scout classes; ship classes keep their movement whatever the race.
+Troll regen is 10% max HP per turn; the Fae regen is called **Wellspring**, 15% of
+max MP per turn (rounded up); "foot and scout classes" are the foot, rogue, climb,
+swim and swim_climb move types; Stoneborn and Ents can't take scout classes. Stat
+steps for the tendencies table: caps ++ +3, + +2, - -2, -- -3, except HP (++ +10,
++ +5, - -5, -- -10) and MP (++ +6, + +3, - -3, -- -6); growths ++ +10, + +5, - -5,
+-- -10. Blank tendencies (Naga, Dragon, Centaur, Ent MP, Elf STR) change nothing.
+Body skills (move, tags, MOV, Rescue/Shove) count from a unit's own skills
+(personal, class, mount, race, learned), not from equipment or statuses.
 
 ## The world
 
@@ -95,21 +98,21 @@ Greenskin and Fae are tags for future specific counter-weapons (Effective).
 
 ### Movement
 
-**Today:** a race can **override** the class's movement (Naga, Centaur, Ghost...),
-**add** to it (Lizal), or **ban** classes it can't take. Ship classes keep their
-own movement. A movement override changes how the unit moves, not its tags: a
-Centaur Guard moves as a horse but has both the horse and heavy tags, so both the
-Pike and the Hammer are effective against it.
-
-**Planned:** racial movement becomes skills (Winged, Aquatic, Equine, Spirit, Wooden
-Body, Stone Body). The class, the race skills and the mount each propose a movement
-type, and the highest one in this order wins:
+Racial movement is skills (Winged, Aquatic, Equine, Spirit, Wooden Body, Stone
+Body; skill keys `move`, `tags`, `foot_mov`, `handling`). The class (or, when
+riding, the mount: it replaces the class's proposal), and the unit's skills each
+propose a movement type, and the highest one in this order wins
+(`Races.MOVE_PRIORITY`; on a tie the skill wins, so a Naga Footman swims):
 
 > Spirit > Maritime (ship) > Horse / Drake > Flying > Heavy > Foot / Aquatic
 
 Examples: a Winged Dragon on a horse moves as a horse (Horse beats Flying); a Ghost
-always moves as a spirit; a Centaur Guard moves as a horse. This is a rule of thumb:
-the exact order may need refining case by case.
+always moves as a spirit, even riding or crewing a ship; a Centaur Guard moves as a
+horse; a Naga Guard moves as heavy armor. A different movement doesn't change the
+class's tag: a Centaur Guard has both the horse and heavy tags, so both the Pike and
+the Hammer are effective against it. A race can also **add** to movement (Lizal) or
+**ban** classes it can't take. This is a rule of thumb: the exact order may need
+refining case by case.
 
 - **Swimming, Climbing and Forester are modifiers**, not overrides: they change
   terrain costs on top of whatever movement type wins, so they don't follow the
@@ -129,7 +132,9 @@ Mounted units can Rescue but can't Shove; they can't be Shoved or Rescued.
 
 ### Gender and names
 
-Generic units roll their hidden gender from the race's ratio. Default 50:50.
+Units without a roster gender roll their hidden one from the race's ratio
+(`gender_ratio`). Default 50:50. Races with no gender have `none`: they can't ride
+mounts that accept only some genders, and get names from any list.
 
 | Race | Ratio (female : male) |
 |---|---|
@@ -139,8 +144,8 @@ Generic units roll their hidden gender from the race's ratio. Default 50:50.
 | Ent, Stoneborn | No gender |
 | Skeleton, Ghost | Whatever they were in life |
 
-Generic name pools are per race (`Names.BY_RACE`); every race uses the default
-list for now.
+Generic name pools are per race (a section of `data/names.cfg`); every race uses
+the default list for now.
 
 ## Racial skills
 
@@ -148,17 +153,17 @@ list for now.
 |---|---|---|---|
 | Adaptable | 1.1x EXP | Human | Built |
 | Regeneration | Recovers 10% max HP every turn | Troll | Built |
-| Mana Flow | +1 MP every turn | Fairy | Built; becomes a weaker learnable skill |
-| *(new name)* | Stronger MP regen drawn from nature (e.g. 15% max MP per turn) | Fae | Planned |
+| Mana Flow | +1 MP every turn | (learnable) | Built |
+| Wellspring | MP regen drawn from nature: 15% max MP per turn | Fairy | Built (name and amount are defaults) |
 | Poison Immunity | Can't be poisoned | Orc, Troll, Lizal, Stoneborn, Skeleton, Ghost | Built |
 | Fire Breath | Fire attack at range 1-2, STR-based, no MP | Dragon | Built |
 | Swimming + Climbing (Amphibious) | In a foot class, also swims and climbs | Lizal | Built |
-| Winged | Moves as flying (see Movement); counts as flying | Fairy, Harpy, Dragon | Planned as a skill (today a race property) |
-| Aquatic | Moves as aquatic; counts as aquatic: weak to spears and Lightning, resists Fire and Water | Naga | Planned as a skill |
-| Equine | Moves as horse, +1 MOV in foot classes; carries and shoves; can't be carried or shoved | Centaur | Planned as a skill |
-| Spirit | Moves as spirit; counts as spirit | Ghost | Planned as a skill |
-| Wooden Body | Moves as heavy; weak to axes, Fire and Ice; resists Water and Earth; can't be carried or shoved | Ent | Planned as a skill |
-| Stone Body | Moves as heavy; counts as heavy; can't be carried or shoved | Stoneborn | Planned as a skill |
+| Winged | Moves as flying (see Movement); counts as flying | Fairy, Harpy, Dragon | Built |
+| Aquatic | Moves as aquatic; counts as aquatic: weak to spears and Lightning, resists Fire and Water | Naga | Built |
+| Equine | Moves as horse, +1 MOV in foot classes; carries and shoves; can't be carried or shoved | Centaur | Built |
+| Spirit | Moves as spirit; counts as spirit | Ghost | Built |
+| Wooden Body | Moves as heavy; weak to axes, Fire and Ice; resists Water and Earth; can't be carried or shoved | Ent | Built |
+| Stone Body | Moves as heavy; counts as heavy; can't be carried or shoved | Stoneborn | Built |
 
 Tag-only traits (no skill): **Greenskin**, **Fae**, **Reptile** (weak to Ice,
 resists Fire), **Undead** (weak to silver, Fire and Light; resists Dark),
@@ -174,22 +179,23 @@ Summary of the rules. Each race's lore and details follow.
 | Orc | Greenskin, Poison Immunity | – |
 | Troll | Regeneration, Poison Immunity | – |
 | Elf | Fae | – |
-| Fairy (Sidhe) | Winged, Fae, MP regen | – |
+| Fairy (Sidhe) | Winged, Fae, Wellspring | – |
 | Naga | Aquatic, Reptile | Mounted classes |
 | Lizal | Amphibious, Reptile, Poison Immunity | – |
 | Centaur | Equine | Flying classes, mounts |
 | Minotaur | Half-Equine | Mounted classes |
 | Harpy | Winged | Heavy classes |
 | Dragon | Winged, Reptile, Fire Breath | – |
-| Ent | Wooden Body | Mounted classes (planned: anything but plain foot or heavy) |
+| Ent | Wooden Body | Anything but plain foot or heavy |
 | Stoneborn | Stone Body, Poison Immunity | Anything but plain foot or heavy |
 | Skeleton | Undead, Poison Immunity | – |
 | Ghost | Undead, Spirit, Poison Immunity | – |
 
 ### Stat tendencies
 
-Rough direction only, no numbers yet. `++` very high, `+` high, `-` low,
-`--` very low / negligible, blank = average. These become cap and growth changes.
+`++` very high, `+` high, `-` low, `--` very low / negligible, blank = average.
+These are the races' cap and growth changes (`caps`, `growths` in
+`data/races.cfg`; the steps are under Status).
 
 | Race | HP | MP | STR | INT | DEX | AGI | LCK | DEF | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -289,8 +295,8 @@ are Sidhe. Fae born directly from nature are always female; the Sidhe, unlike mo
 fae, can have children, male or female. A human can become a fae in some
 circumstances (by default, a Sidhe).
 
-- **In game:** the playable **Fairy** race is the Sidhe. Winged, Fae, MP regen
-  (to be renamed and made stronger). Sidhe can ride, like dragons in human form.
+- **In game:** the playable **Fairy** race is the Sidhe. Winged, Fae, Wellspring
+  (15% of max MP back every turn). Sidhe can ride, like dragons in human form.
 - **Subraces (mostly too small to be units):** Pixies (born from nature), Sprites
   (born from magical elements), Redcaps (mushroom fae), Brownies (house fairies),
   and more.
@@ -375,8 +381,8 @@ and carry it all their lives.
 Living wood, or walking trees. They have minds but act mostly on instinct, form no
 civilizations, and can't speak. They can be magically powerful.
 
-- **In game:** Wooden Body. Planned: plain foot and heavy classes only (like
-  Stoneborn). Very high HP and DEF, very low AGI. No gender.
+- **In game:** Wooden Body. Plain foot and heavy classes only (like Stoneborn).
+  Very high HP and DEF, very low AGI. No gender.
 
 ### Stoneborn
 
@@ -448,10 +454,12 @@ entry can't have children. Races without gender never appear here.
 ## Open questions
 
 - Subraces and layered races: which model (see Model).
-- Movement priority puts Heavy above Aquatic, so a Naga in a heavy class would move
-  as heavy armor. Today Naga always move as aquatic. Should Naga be banned from
-  heavy classes, or is that the intended result?
+- Movement priority puts Heavy above Aquatic, so a Naga in a heavy class moves as
+  heavy armor (built that way). Should Naga be banned from heavy classes instead?
+- Movement priority puts Spirit above Maritime, so a Ghost in a ship class moves as
+  a spirit, through land and walls (built that way; before, ships kept sailing
+  whatever the race). Keep it, or put Maritime first?
 - Half-Equine fits Minotaurs poorly as a name (they're bovine); the `horse` tag
   still works. Rename it (e.g. Hoofed), or keep it for the Sagittaur?
 - Naga and Dragon stat tendencies.
-- Name of the stronger Fae MP regen skill, and its exact amount.
+- The Fae MP regen's name (Wellspring for now) and amount (15%).
