@@ -1,6 +1,7 @@
 # Factions (design notes)
 
-Design notes. Steps 1 and 2 of the build order are built (`scripts/factions.gd`). Today a unit is on one of two teams, player (blue) or
+Design notes. The whole build order is built (`scripts/factions.gd`); the test map
+is Three Armies (`events/three_armies.txt`). Today a unit is on one of two teams, player (blue) or
 enemy (red). This adds three AI factions, each with its own phase:
 
 | Faction | Color | Default stance | Phase |
@@ -21,8 +22,10 @@ Phases with no units are skipped. Each has a banner ("Ally Phase"...).
 - **Defaults** as in the table. A map can override them: `"relations":
   {"other": ["enemy"]}` (purple only fights red). Saved with the battle.
 - **Events** change them mid-battle: `@hostile purple, player` / `@peace purple,
-  player` (betrayals, truces), and `@side Unit, green` moves one unit to a faction
-  (`@recruit` stays the shortcut for joining the player).
+  player` (betrayals, truces; both work both ways), and `@side Unit, green` moves one
+  unit to a faction (`@side Unit, player` is the same as `@recruit`). Sides can be
+  named by key (player, ally, enemy, other, neutral) or color (blue, green, red,
+  purple, yellow), in commands and in turn and area triggers.
 - **Passing through:** a unit can move through units of any faction that isn't
   hostile to it either way (blue and green pass through each other).
 - **Your attacks** list every unit your side is hostile to. Your side starts hostile

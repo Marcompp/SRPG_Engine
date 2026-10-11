@@ -82,12 +82,11 @@ func on_death(u: Unit) -> void:
 
 ## A unit ended its move on `u.cell`. Returns whether a scene played.
 func on_area(u: Unit) -> bool:
-	var team := Factions.key(u.team)
 	var test := func(e: Dictionary) -> bool:
 		if e.trigger != "area" or not e.args[0].has(u.cell):
 			return false
 		var who: String = e.args[1]
-		return who == "" or who == u.unit_name or who == team
+		return who == "" or who == u.unit_name or Factions.from_key(who) == u.team
 	return await _fire(test)
 
 
@@ -203,6 +202,19 @@ func _run_command(c: Array) -> void:
 			var u := find_unit(c[1])
 			if u:
 				battle.actions.inflict(u, c[2], c[3])
+		"hostile", "peace":
+			Factions.set_hostile(c[1], c[2], c[0] == "hostile")
+			Factions.set_hostile(c[2], c[1], c[0] == "hostile")
+			battle.refresh_threat()
+		"side":
+			var u := find_unit(c[1])
+			if u and c[2] == Unit.Team.PLAYER:
+				recruit(u)
+			elif u:
+				u.team = c[2]
+				battle.marked.erase(u)
+				u.queue_redraw()
+				battle.refresh_threat()
 		"cure":
 			var u := find_unit(c[1])
 			if u and not Statuses.cure(u, c[2]).is_empty():

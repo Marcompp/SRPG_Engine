@@ -83,8 +83,8 @@ func test_relations_saved() -> void:
 	check(not Factions.hostile(Unit.Team.OTHER, Unit.Team.PLAYER), "relations come back with a save")
 	Factions.reset()
 	check(Factions.hostile(Unit.Team.OTHER, Unit.Team.PLAYER), "(reset)")
-	var r: Dictionary = EventScript.parse("== turn 2, ally ==\nAlly: Hi.\n== turn 2, purple ==\n")
-	check_eq(r.events[0].args, [2, "ally"], "turn events can name any side's phase")
+	var r: Dictionary = EventScript.parse("== turn 2, green ==\nAlly: Hi.\n== turn 2, sideways ==\n")
+	check_eq(r.events[0].args, [2, "ally"], "turn events can name any side's phase, by color too")
 	check_eq(r.errors.size(), 1, "unknown phases are reported")
 
 
@@ -158,3 +158,48 @@ func test_green_allies_gain_exp() -> void:
 	check_eq(b.state, b.State.IDLE, "with no level-up window to wait on")
 	check(Objectives.defeat_text({"type": "rout", "protect": ["Elder"]}).contains("or Elder falls"),
 		"a protect list is part of the defeat conditions")
+
+
+func test_faction_event_commands() -> void:
+	var r: Dictionary = EventScript.parse("== start ==\n@hostile other, player\n@peace purple, red\n@side Lord, green\n"
+		+ "@hostile purple\n@side Lord, sideways")
+	check_eq(r.errors.size(), 2, "bad commands are reported: %s" % [r.errors])
+	check_eq(r.events[0].script, [["hostile", Unit.Team.OTHER, Unit.Team.PLAYER], ["peace", Unit.Team.OTHER, Unit.Team.ENEMY],
+		["side", "Lord", Unit.Team.ALLY]], "sides by name or color")
+	var archer := unit_named("Archer")
+	await b.events.run([["peace", Unit.Team.PLAYER, Unit.Team.ENEMY], ["side", "Archer", Unit.Team.OTHER]])
+	check(not Factions.hostile(Unit.Team.PLAYER, Unit.Team.ENEMY) and not Factions.hostile(Unit.Team.ENEMY, Unit.Team.PLAYER),
+		"@peace works both ways")
+	check_eq(archer.team, Unit.Team.OTHER, "@side moves a unit to a side")
+	Factions.reset()
+
+
+func test_three_armies_map() -> void:
+	await start_level("three_armies")
+	var lord := unit_named("Lord")
+	var varga := unit_named("Varga", Unit.Team.OTHER)
+	check(Factions.hostile(Unit.Team.OTHER, Unit.Team.ENEMY) and not Factions.hostile(Unit.Team.OTHER, Unit.Team.PLAYER),
+		"the mercenaries start out hunting only the raiders")
+	check(Objectives.defeat_text(Objectives.of(Levels.get_level("three_armies"))).contains("Elder falls"), "protect the Elder")
+	# The betrayal on turn 3's enemy phase.
+	await b.events.on_turn(3, "enemy")
+	check(Factions.hostile(Unit.Team.OTHER, Unit.Team.PLAYER) and not Factions.hostile(Unit.Team.OTHER, Unit.Team.ENEMY),
+		"turn 3: the mercenaries turn on you")
+	# Talking to Varga brings them over.
+	lord.set_cell(varga.cell + Vector2i(0, 1))
+	check(b.events.talk_targets(lord).has(varga), "the Lord can talk to Varga")
+	b.input.selected = lord
+	await b.events.run_talk(lord, varga)
+	check_eq(varga.team, Unit.Team.ALLY, "Varga joins as an ally")
+	check_eq(unit_named("Kett", Unit.Team.ALLY).team, Unit.Team.ALLY, "with the whole band")
+	# Losing the Elder loses the map.
+	Levels.selected = "three_armies"  # (start_level points it back at the default map)
+	check_eq(Objectives.result(b), "", "(still going)")
+	remove_unit(unit_named("Elder", Unit.Team.NEUTRAL))
+	check_eq(Objectives.result(b), "defeat", "the Elder falls: defeat")
+	Levels.selected = "river_crossing"
+
+
+func test_three_armies_phases_run() -> void:
+	await start_level("three_armies")
+	await run_enemy_phases()

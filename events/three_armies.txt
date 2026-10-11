@@ -1,0 +1,33 @@
+# Three Armies: a test map for factions. Format: scripts/event_script.gd
+# (and docs/events.md; factions: docs/factions.md).
+
+== start ==
+@narrate A border village, the morning the raiders came.
+Captain: Raiders from the east! Keep them off the Elder!
+@camera (14, 0)
+Varga: Gorr's head is worth good silver. Stay out of our way, blue, and we'll stay out of yours.
+@camera (1, 5)
+Lord: Mercenaries. Watch them, but let them work.
+
+== turn 3, enemy | unless mercs_joined ==
+Gorr: Varga! Whatever they pay you, I'll double it. Turn on them.
+Varga: ...Silver is silver. Lads, new job.
+@peace purple, red
+@hostile purple, blue
+@hostile purple, green
+@banner Betrayal!
+@flag betrayed
+
+== talk Lord, Varga ==
+Lord: Whatever Gorr offers, the village will match it. And you'll be alive to spend it.
+Varga: Ha. You're bolder than him. Fine, we'll fight beside you.
+@peace purple, blue
+@peace purple, green
+@hostile purple, red
+@side Varga, green
+@side Brann, green
+@side Kett, green
+@flag mercs_joined
+
+== death Elder ==
+Captain: The Elder... no!

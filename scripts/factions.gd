@@ -18,6 +18,8 @@ const PHASE_ORDER: Array[Unit.Team] = [PLAYER, ALLY, ENEMY, OTHER, NEUTRAL]
 ## Keys used in level data and events ("== turn 3, ally ==", "team": "other").
 const KEYS := {PLAYER: "player", ALLY: "ally", ENEMY: "enemy", OTHER: "other", NEUTRAL: "neutral"}
 const NAMES := {PLAYER: "Player", ALLY: "Ally", ENEMY: "Enemy", OTHER: "Other", NEUTRAL: "Neutral"}
+## Colors work as keys too ("== turn 3, green ==", "@side Varga, purple").
+const ALIASES := {"blue": PLAYER, "green": ALLY, "red": ENEMY, "purple": OTHER, "yellow": NEUTRAL}
 ## Level roster lists for each side.
 const ROSTERS := {"players": PLAYER, "allies": ALLY, "enemies": ENEMY, "others": OTHER, "neutrals": NEUTRAL}
 const COLORS := {PLAYER: Color("3a6fd8"), ALLY: Color("3aa848"), ENEMY: Color("d84a3a"), OTHER: Color("9a4ad8"),
@@ -77,12 +79,12 @@ static func key(side: Unit.Team) -> String:
 	return KEYS[side]
 
 
-## The side for a key ("ally"), or -1 for an unknown one.
+## The side for a key ("ally") or color ("green"), or -1 for an unknown one.
 static func from_key(text: String) -> int:
 	for side in KEYS:
 		if KEYS[side] == text:
 			return side
-	return -1
+	return ALIASES.get(text, -1)
 
 
 ## Relations as plain data for a save (keys as strings, so they survive any format).

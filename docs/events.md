@@ -40,6 +40,8 @@ is alive, a minimum turn.
 | recruit | A unit switches to the player's side (and joins the campaign army) |
 | give | Puts an item in a unit's inventory |
 | status / cure | Gives a unit a status (optionally for a number of turns), or cures one or all of its statuses |
+| hostile / peace | Two sides start or stop fighting each other (see docs/factions.md) |
+| side | A unit changes sides |
 | camera | Pans to a cell |
 | wait | Pause |
 | flag | Sets a flag (kept for the map; campaign flags later) |

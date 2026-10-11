@@ -11,7 +11,7 @@ static var selected := "river_crossing"
 ## Set by the level select to resume the suspended battle instead of starting fresh.
 static var resume := false
 
-const ORDER: Array[String] = ["river_crossing", "coastal_raid", "desert_outpost", "frozen_pass", "castle_keep", "ruined_fort", "great_valley", "loyal_steeds", "status_trials"]
+const ORDER: Array[String] = ["river_crossing", "coastal_raid", "desert_outpost", "frozen_pass", "castle_keep", "ruined_fort", "great_valley", "loyal_steeds", "status_trials", "three_armies"]
 
 const DATA := {
 	"river_crossing": {
@@ -560,6 +560,78 @@ and Petrify, and how to cure them.",
 				"hp": 24, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 4, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
 			{"name": "Brigand", "cell": Vector2i(10, 5), "class": "Brigand", "items": ["Iron Axe"], "lv": 4,
 				"hp": 24, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 4, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
+		],
+	},
+	"three_armies": {
+		"name": "Three Armies",
+		"description": "Factions: green militia, purple mercenaries hunting the
+raiders (for now), and villagers to protect.",
+		"layout": [
+			"......F.....hhT.",
+			"..F.........h...",
+			"........F.......",
+			"...======.......",
+			"...=.H..H......F",
+			"...=..........FF",
+			"...=====H=====..",
+			"......H...H.....",
+			".F..............",
+			"...........F....",
+			"....F..........h",
+			"..............hh",
+		],
+		"objective": {"type": "boss", "boss": "Gorr", "protect": ["Elder"]},
+		# The mercenaries start out hunting only the raiders (see the turn 3 event).
+		"relations": {"other": ["enemy"], "player": ["enemy", "neutral"], "ally": ["enemy"]},
+		"players": [
+			{"name": "Lord", "cell": Vector2i(1, 5), "class": "Swordsman", "lord": true, "items": ["Iron Sword", "Potion"], "lv": 5,
+				"hp": 24, "str": 8, "dex": 9, "agi": 9, "lck": 7, "def": 6, "mov": 5, "mp": 4, "growths": {"hp": 70, "str": 45, "dex": 45, "agi": 45, "lck": 40, "def": 25, "mp": 25}},
+			{"name": "Rider", "cell": Vector2i(1, 6), "class": "Swordsman", "items": ["Iron Sword"], "lv": 4,
+				"mount": {"species": "Horse", "level": 2, "name": "Dun", "gender": "male"},
+				"hp": 18, "str": 8, "dex": 8, "agi": 8, "lck": 4, "def": 5, "mov": 5, "mp": 2, "growths": {"hp": 70, "str": 45, "dex": 45, "agi": 45, "lck": 40, "def": 25, "mp": 25}},
+			{"name": "Cleric", "cell": Vector2i(0, 5), "class": "Cleric", "items": ["Quarterstaff"], "lv": 4,
+				"spells": ["Heal", "Restore"],
+				"hp": 16, "str": 2, "dex": 6, "agi": 6, "lck": 8, "def": 2, "int": 7, "mov": 5, "mp": 20, "growths": {"hp": 70, "str": 45, "dex": 45, "agi": 45, "lck": 40, "def": 25, "mp": 25}},
+			{"name": "Archer", "cell": Vector2i(0, 6), "class": "Archer", "items": ["Iron Bow"], "lv": 4,
+				"hp": 19, "str": 7, "dex": 9, "agi": 7, "lck": 4, "def": 3, "mov": 5, "mp": 1, "growths": {"hp": 70, "str": 45, "dex": 45, "agi": 45, "lck": 40, "def": 25, "mp": 25}},
+			{"name": "Fighter", "cell": Vector2i(2, 6), "class": "Axeman", "items": ["Iron Axe", "Hatchet"], "lv": 4,
+				"hp": 26, "str": 9, "dex": 5, "agi": 5, "lck": 3, "def": 4, "mov": 5, "mp": 0, "growths": {"hp": 70, "str": 45, "dex": 45, "agi": 45, "lck": 40, "def": 25, "mp": 25}},
+		],
+		"allies": [
+			{"name": "Captain", "cell": Vector2i(6, 5), "class": "Footman", "items": ["Iron Spear"], "lv": 4,
+				"hp": 22, "str": 8, "dex": 7, "agi": 6, "lck": 3, "def": 6, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
+			{"name": "Militia", "cell": Vector2i(7, 5), "class": "Footman", "items": ["Iron Spear"], "lv": 2,
+				"hp": 18, "str": 6, "dex": 5, "agi": 5, "lck": 2, "def": 4, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
+			{"name": "Bowman", "cell": Vector2i(9, 5), "class": "Archer", "items": ["Iron Bow"], "lv": 2,
+				"hp": 16, "str": 5, "dex": 7, "agi": 5, "lck": 2, "def": 2, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
+		],
+		"neutrals": [
+			{"name": "Elder", "cell": Vector2i(5, 4), "class": "Footman", "items": [], "lv": 1,
+				"hp": 14, "str": 1, "dex": 1, "agi": 2, "lck": 5, "def": 1, "mov": 4, "mp": 0},
+			{"name": "Villager", "cell": Vector2i(8, 4), "class": "Footman", "items": [], "lv": 1,
+				"hp": 12, "str": 1, "dex": 1, "agi": 3, "lck": 2, "def": 0, "mov": 4, "mp": 0},
+			{"name": "Farmer", "cell": Vector2i(6, 7), "class": "Axeman", "items": ["Hatchet"], "lv": 1,
+				"hp": 16, "str": 4, "dex": 2, "agi": 2, "lck": 2, "def": 1, "mov": 4, "mp": 0},
+		],
+		"enemies": [
+			{"name": "Gorr", "cell": Vector2i(15, 9), "class": "Brigand", "items": ["Steel Axe"], "lv": 6,
+				"hp": 32, "str": 11, "dex": 6, "agi": 5, "lck": 2, "def": 6, "mov": 5, "mp": 0, "ai": {"preset": "boss"}},
+			{"name": "Raider", "generic": true, "cell": Vector2i(13, 6), "class": "Brigand", "items": ["Iron Axe"], "lv": 3,
+				"hp": 22, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 3, "mov": 5, "mp": 0},
+			{"name": "Raider", "generic": true, "cell": Vector2i(14, 7), "class": "Brigand", "items": ["Iron Axe"], "lv": 3,
+				"hp": 22, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 3, "mov": 5, "mp": 0},
+			{"name": "Raider", "generic": true, "cell": Vector2i(13, 8), "class": "Brigand", "items": ["Iron Axe"], "lv": 3,
+				"hp": 22, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 3, "mov": 5, "mp": 0},
+			{"name": "Raider", "generic": true, "cell": Vector2i(14, 5), "class": "Archer", "items": ["Iron Bow"], "lv": 3,
+				"hp": 18, "str": 6, "dex": 6, "agi": 5, "lck": 1, "def": 2, "mov": 5, "mp": 0},
+		],
+		"others": [
+			{"name": "Varga", "cell": Vector2i(14, 0), "class": "Swordsmaster", "items": ["Killing Edge"], "lv": 3,
+				"hp": 30, "str": 11, "dex": 12, "agi": 12, "lck": 6, "def": 6, "mov": 6, "mp": 2},
+			{"name": "Brann", "cell": Vector2i(13, 1), "class": "Footman", "items": ["Iron Spear"], "lv": 4,
+				"hp": 22, "str": 8, "dex": 6, "agi": 6, "lck": 2, "def": 6, "mov": 5, "mp": 0},
+			{"name": "Kett", "cell": Vector2i(11, 1), "class": "Archer", "items": ["Iron Bow"], "lv": 4,
+				"hp": 18, "str": 7, "dex": 8, "agi": 6, "lck": 2, "def": 3, "mov": 5, "mp": 0},
 		],
 	},
 }

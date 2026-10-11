@@ -31,6 +31,9 @@ extends RefCounted
 ##   @status Lord, Poison              give a unit a status (see Statuses)...
 ##   @status Lord, Poison, 5           ...for this many turns (-1: until cured)
 ##   @cure Lord                        cure a unit's statuses (or "@cure Lord, Poison")
+##   @hostile other, player            these two sides fight each other (see Factions;
+##   @peace other, enemy               sides by name or color: "purple, blue"); or stop
+##   @side Varga, ally                 a unit changes sides (@recruit: joins the player)
 ##   @camera (10, 4)                   pan the view
 ##   @wait 0.5                         pause, in seconds
 ##   @flag bridge_held                 set a flag (see "if"/"unless")
@@ -40,14 +43,15 @@ extends RefCounted
 ## "script": [command arrays], "line"}. Commands are arrays: ["say", speaker, text],
 ## ["narrate", text], ["move", unit, cell], ["spawn", name, cell], ["remove", unit],
 ## ["recruit", unit], ["give", unit, item], ["status", unit, status, turns (0: its
-## default)], ["cure", unit, status ("": all)], ["camera", cell], ["wait", seconds],
+## default)], ["cure", unit, status ("": all)], ["hostile", side, side], ["peace", side,
+## side], ["side", unit, side] (sides as Unit.Team), ["camera", cell], ["wait", seconds],
 ## ["flag", name], ["banner", text]. A level's "events" entry can hold events in
 ## that same shape (with "script" written as command arrays) for anything the text
 ## can't express.
 
 const TRIGGERS: Array[String] = ["start", "turn", "talk", "battle", "death", "area", "visit", "victory", "defeat"]
 const COMMANDS: Array[String] = ["say", "narrate", "move", "spawn", "remove", "recruit", "give", "status",
-	"cure", "camera", "wait", "flag", "banner"]
+	"cure", "hostile", "peace", "side", "camera", "wait", "flag", "banner"]
 
 
 ## Events in the file at `path`, or [] if there's none. Errors are pushed (and
@@ -111,6 +115,8 @@ static func _header(text: String, n: int, errors: Array) -> Dictionary:
 			if args.size() > 1 and Factions.from_key(args[1]) < 0:
 				errors.append("line %d: turn phase must be one of %s" % [n, ", ".join(Factions.KEYS.values())])
 				return {}
+			if args.size() > 1:
+				args[1] = Factions.key(Factions.from_key(args[1]))  # "green" -> "ally"
 		"talk":
 			if args.size() != 2:
 				errors.append("line %d: \"talk\" needs two unit names" % n)
@@ -195,6 +201,19 @@ static func _command(line: String, n: int, errors: Array) -> Array:
 					% [n, ", ".join(Statuses.DATA.keys())])
 				return []
 			return ["status", parts[0].strip_edges(), parts[1].strip_edges(), turns.to_int()]
+		"hostile", "peace":
+			var parts := rest.split(",")
+			if parts.size() != 2 or Factions.from_key(parts[0].strip_edges()) < 0 \
+					or Factions.from_key(parts[1].strip_edges()) < 0:
+				errors.append("line %d: @%s needs two sides, like \"@%s other, player\"" % [n, word, word])
+				return []
+			return [word, Factions.from_key(parts[0].strip_edges()), Factions.from_key(parts[1].strip_edges())]
+		"side":
+			var parts := rest.split(",")
+			if parts.size() != 2 or Factions.from_key(parts[1].strip_edges()) < 0:
+				errors.append("line %d: @side needs \"Unit, side\" (player, ally, enemy, other, neutral)" % n)
+				return []
+			return ["side", parts[0].strip_edges(), Factions.from_key(parts[1].strip_edges())]
 		"cure":
 			var parts := rest.split(",")
 			var status := parts[1].strip_edges() if parts.size() == 2 else ""
