@@ -26,3 +26,6 @@ mono_crash.*.json
 
 # Android export templates
 /android/
+
+/gitgnore/
+/gitignore/
