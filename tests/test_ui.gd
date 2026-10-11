@@ -238,7 +238,8 @@ func test_objective_screen() -> void:
 	check(text.contains("Victory: Defeat every enemy."), "victory condition")
 	check(text.contains("Defeat: Your Lord falls."), "defeat condition")
 	check(text.contains("Turn 1"), "turn number")
-	check(text.contains("Enemies %d" % b.units_of(Unit.Team.ENEMY).size()), "enemy count")
+	check(text.contains("Enemy %d" % b.units_of(Unit.Team.ENEMY).size()), "enemy count")
+	check(text.contains("Player %d" % b.units_of(Unit.Team.PLAYER).size()), "and yours")
 	await press(KEY_X)
 	check_eq(b.state, b.State.IDLE, "X closes it")
 

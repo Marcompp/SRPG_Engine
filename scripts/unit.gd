@@ -2,7 +2,9 @@ class_name Unit
 extends Node2D
 ## A single unit on the map. Drawn as a colored square with an HP bar.
 
-enum Team { PLAYER, ENEMY }
+## The side a unit fights for (see Factions). New sides go at the end: saves store
+## the number.
+enum Team { PLAYER, ENEMY, ALLY, OTHER, NEUTRAL }
 
 const PLAYER_COLOR := Color("3a6fd8")
 const ENEMY_COLOR := Color("d84a3a")
@@ -624,7 +626,7 @@ func die() -> void:
 
 
 func _draw() -> void:
-	var body := ACTED_COLOR if has_acted else (PLAYER_COLOR if team == Team.PLAYER else ENEMY_COLOR)
+	var body: Color = ACTED_COLOR if has_acted else Factions.COLORS[team]
 	draw_rect(Rect2(2, 1, 12, 11), body)
 	draw_rect(Rect2(2, 1, 12, 11), Color.BLACK, false, 1.0)
 	if is_lord:
@@ -641,7 +643,7 @@ func _draw() -> void:
 	var aboard: Unit = carrying if carrying else (passengers[0] if not passengers.is_empty() else null)
 	if aboard:
 		# Small flag in the carried unit's team color.
-		var flag := PLAYER_COLOR if aboard.team == Team.PLAYER else ENEMY_COLOR
+		var flag: Color = Factions.COLORS[aboard.team]
 		draw_rect(Rect2(3, 2, 3, 3), Color.WHITE)
 		draw_rect(Rect2(3.5, 2.5, 2, 2), flag.lightened(0.3))
 	draw_string(ThemeDB.fallback_font, Vector2(2, 10), token_letter(),

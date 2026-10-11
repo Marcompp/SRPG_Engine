@@ -340,7 +340,7 @@ func get_reachable(unit: Unit, units: Array[Unit], budget := -1.0) -> Dictionary
 			var step := unit_cost(unit, nxt)
 			if step < 0:
 				continue
-			if occupied.has(nxt) and occupied[nxt].team != unit.team and not passes:
+			if occupied.has(nxt) and not Factions.friendly(unit.team, occupied[nxt].team) and not passes:
 				continue
 			var total: float = costs[cur] + step
 			# Costs can be fractional (Path 0.7), so allow for float rounding.

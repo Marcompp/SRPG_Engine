@@ -85,10 +85,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				if u and u.team == Unit.Team.PLAYER and not u.has_acted and not Statuses.restricts(u, "act") \
 						and not Statuses.is_berserk(u):
 					select(u)
-				elif u and u.team != Unit.Team.PLAYER:
+				elif u and Factions.hostile(u.team, Unit.Team.PLAYER):
 					toggle_mark(u)
 				else:
-					# An empty tile, or a unit that already acted.
+					# An empty tile, a unit that already acted, or one that's no threat.
 					open_map_menu()
 		Battle.State.FORMATION:
 			if next:
@@ -404,15 +404,16 @@ func quick_cells(u: Unit, target: Unit) -> Array[Vector2i]:
 
 
 func _can_act_on_from(u: Unit, target: Unit, dist: int) -> bool:
-	if target.team != u.team:
+	var foe := Factions.hostile(u.team, target.team)
+	if foe:
 		for w in u.weapons():
 			if u.reaches(w, dist):
 				return true
-	elif target.hp >= target.max_hp:
+	elif target.team != u.team or target.hp >= target.max_hp:
 		return false
 	for s in u.spells if u.can_use_magic() else []:
 		var spell := Spells.get_spell(s)
-		var wanted := "enemy" if target.team != u.team else "ally"
+		var wanted := "enemy" if foe else "ally"
 		if spell.target == wanted and Spells.can_afford(u, s) and Spells.reaches(s, dist, u):
 			return true
 	return false
@@ -426,7 +427,7 @@ func _open_quick_menu() -> void:
 	targeting.preferred = target
 	if not battle.units().has(target):
 		menus.open_unit_menu()
-	elif target.team != selected.team and selected.weapons().any(func(w: Dictionary) -> bool:
+	elif Factions.hostile(selected.team, target.team) and selected.weapons().any(func(w: Dictionary) -> bool:
 			return selected.reaches(w, BattleMap.distance(selected.cell, target.cell))):
 		menus.open_attack_menu()
 	elif battle.actions.castable_spells(selected).any(func(s: String) -> bool:
@@ -511,8 +512,8 @@ func update_hover() -> void:
 	hovered = battle.unit_at(battle.cursor.cell)
 	if not hovered:
 		battle.map.clear_ranges()
-	elif hovered.team == Unit.Team.ENEMY:
-		# Enemies show where their behavior lets them act (a boss: just its tile).
+	elif hovered.team != Unit.Team.PLAYER:
+		# AI units show where their behavior lets them act (a boss: just its tile).
 		var parents: Dictionary = battle.map.get_reachable(hovered, battle.units()).parents
 		show_unit_ranges(hovered, {"cells": EnemyAI.movement_cells(hovered, battle), "parents": parents})
 	else:
@@ -572,6 +573,16 @@ func close_unit_list() -> void:
 	browse()
 
 
+## "Player 5  Enemy 7  Ally 2": units left on each side that has any.
+func _side_counts() -> String:
+	var parts: Array[String] = []
+	for side in Factions.PHASE_ORDER:
+		var count := battle.units_of(side).size()
+		if count > 0:
+			parts.append("%s %d" % [Factions.NAMES[side], count])
+	return "  ".join(parts)
+
+
 ## Map menu > Objective: win/lose conditions (levels can override the text with
 ## "objective" / "defeat"), the turn and how many units each side has left.
 func open_objective() -> void:
@@ -582,7 +593,7 @@ func open_objective() -> void:
 		"Victory: " + Objectives.victory_text(objective),
 		"Defeat: " + Objectives.defeat_text(objective),
 		battle.turn_text(),
-		"Allies %d   Enemies %d" % [battle.units_of(Unit.Team.PLAYER).size(), battle.units_of(Unit.Team.ENEMY).size()],
+		_side_counts(),
 		"Z/X: close",
 	]
 	battle.state = Battle.State.OBJECTIVE

@@ -82,7 +82,7 @@ func on_death(u: Unit) -> void:
 
 ## A unit ended its move on `u.cell`. Returns whether a scene played.
 func on_area(u: Unit) -> bool:
-	var team := "player" if u.team == Unit.Team.PLAYER else "enemy"
+	var team := Factions.key(u.team)
 	var test := func(e: Dictionary) -> bool:
 		if e.trigger != "area" or not e.args[0].has(u.cell):
 			return false
@@ -182,7 +182,7 @@ func _run_command(c: Array) -> void:
 			if data.is_empty():
 				push_error("event: no event_units entry for %s" % c[1])
 				return
-			var team := Unit.Team.PLAYER if data.get("team", "enemy") == "player" else Unit.Team.ENEMY
+			var team: Unit.Team = maxi(Factions.from_key(data.get("team", "enemy")), 0) as Unit.Team
 			battle.units_root.add_child(Unit.create(data.get("name", c[1]), team, c[2], data))
 			battle.refresh_threat()
 		"remove":
@@ -249,7 +249,7 @@ func find_unit(unit_name: String) -> Unit:
 func _speaker(speaker_name: String) -> Dictionary:
 	for u in battle.all_units():
 		if u.unit_name == speaker_name:
-			var color := Unit.PLAYER_COLOR if u.team == Unit.Team.PLAYER else Unit.ENEMY_COLOR
+			var color: Color = Factions.COLORS[u.team]
 			return {"name": speaker_name, "color": color, "letter": u.token_letter()}
 	return {"name": speaker_name, "color": Color(0.45, 0.45, 0.5), "letter": speaker_name.left(1)}
 

@@ -141,8 +141,9 @@ func _render() -> void:
 	for row in range(_scroll, mini(_scroll + VISIBLE_ROWS, units.size())):
 		var u := units[row]
 		var y := TOP + (row - _scroll) * ROW_H
-		var color := ENEMY_TEXT if u.team == Unit.Team.ENEMY \
-			else (ACTED_TEXT if u.has_acted else PLAYER_TEXT)
+		var color: Color = ENEMY_TEXT if u.team == Unit.Team.ENEMY \
+			else (Factions.COLORS[u.team].lightened(0.4) if u.team != Unit.Team.PLAYER \
+			else (ACTED_TEXT if u.has_acted else PLAYER_TEXT))
 		var values := [u.unit_name, u.class_display_name(), u.level, "%d/%d" % [u.hp, u.max_hp],
 			u.strength, u.dexterity, u.agility, u.defense, u.mov]
 		for c in COLUMNS.size():

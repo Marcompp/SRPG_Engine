@@ -7,14 +7,14 @@ extends RefCounted
 ##   # Comments start with "#"; blank lines are ignored.
 ##   == start ==                       before the first player phase
 ##   == turn 3 ==                      start of turn 3's player phase
-##   == turn 3, enemy ==               start of turn 3's enemy phase
+##   == turn 3, enemy ==               start of turn 3's enemy phase (also ally, other, neutral)
 ##   == talk Lord, Thief ==            Lord gets a Talk command next to Thief
 ##   == battle Bandit King ==          before any fight involving the Bandit King
 ##   == battle Lord, Bandit King ==    before a fight between these two
 ##   == death Rider ==                 when Rider falls
 ##   == area (12, 3)-(14, 5), (20, 1) ==   a unit ends its move on one of these cells
 ##                                     ("(x, y)-(x, y)" is a rectangle)
-##   == area (12, 3)-(14, 5), Lord ==  ...only this unit ("player"/"enemy": a side)
+##   == area (12, 3)-(14, 5), Lord ==  ...only this unit (or a side: "player", "ally"...)
 ##   == visit (3, 3) ==                the village there is visited (before its reward)
 ##   == victory ==                     the map is won, before the end screen
 ##   == defeat ==                      the map is lost, before the end screen
@@ -108,8 +108,8 @@ static func _header(text: String, n: int, errors: Array) -> Dictionary:
 				errors.append("line %d: \"turn\" needs a turn number" % n)
 				return {}
 			args[0] = args[0].to_int()
-			if args.size() > 1 and not args[1] in ["player", "enemy"]:
-				errors.append("line %d: turn phase must be player or enemy" % n)
+			if args.size() > 1 and Factions.from_key(args[1]) < 0:
+				errors.append("line %d: turn phase must be one of %s" % [n, ", ".join(Factions.KEYS.values())])
 				return {}
 		"talk":
 			if args.size() != 2:
@@ -207,7 +207,8 @@ static func _command(line: String, n: int, errors: Array) -> Array:
 
 
 ## For area/visit headers: [cells, who]: every "(x, y)" and "(x, y)-(x, y)" rectangle
-## in `text`, and whatever text is left ("" for anyone, a unit name, "player" or "enemy").
+## in `text`, and whatever text is left ("" for anyone, a unit name, or a side: "player",
+## "enemy", "ally", "other", "neutral").
 static func _cells_and_who(text: String) -> Array:
 	var cells: Array = []
 	var re := RegEx.create_from_string("\\(\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)(\\s*-\\s*\\(\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\))?")

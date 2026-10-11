@@ -65,6 +65,7 @@ func _ready() -> void:
 	danger_on = Settings.value("danger_zone_default")
 	rewinds_left = Settings.value("rewinds")
 	var level := Levels.get_level(Levels.selected)
+	Factions.reset(level)
 	map.load_layout(level.layout)
 	map.load_objects(level.get("objects", []), Objectives.of(level))
 	if level.has("deploy"):
@@ -72,8 +73,10 @@ func _ready() -> void:
 	else:
 		for data in level.players:
 			units_root.add_child(Unit.create(data.name, Unit.Team.PLAYER, data.cell, data))
-	for data in level.enemies:
-		units_root.add_child(Unit.create(data.name, Unit.Team.ENEMY, data.cell, data))
+	for roster: String in Factions.ROSTERS:
+		if roster != "players":
+			for data in level.get(roster, []):
+				units_root.add_child(Unit.create(data.name, Factions.ROSTERS[roster], data.cell, data))
 	var players := units_of(Unit.Team.PLAYER)
 	cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	_start_camera()
@@ -153,6 +156,24 @@ func units() -> Array[Unit]:
 	for child in units_root.get_children():
 		if child is Unit and child.hp > 0 and child.carried_by == null and not child.escaped:
 			result.append(child)
+	return result
+
+
+## Units `u`'s side is hostile to (see Factions): who it may attack.
+func foes_of(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	for o in units():
+		if Factions.hostile(u.team, o.team):
+			result.append(o)
+	return result
+
+
+## Units whose side is hostile to `team`: the danger zone, and what a rout must defeat.
+func threats_to(team: Unit.Team) -> Array[Unit]:
+	var result: Array[Unit] = []
+	for o in units():
+		if Factions.hostile(o.team, team):
+			result.append(o)
 	return result
 
 
@@ -241,7 +262,7 @@ func refresh_threat() -> void:
 		if is_instance_valid(e) and e.hp > 0:
 			alive.append(e)
 	marked = alive
-	map.danger_cells = threat_of(units_of(Unit.Team.ENEMY)) if danger_on else {}
+	map.danger_cells = threat_of(threats_to(Unit.Team.PLAYER)) if danger_on else {}
 	map.marked_cells = threat_of(marked)
 
 

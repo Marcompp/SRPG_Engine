@@ -192,7 +192,7 @@ func _render_left() -> void:
 	frame.size = Vector2(50, 50)
 	_left.add_child(frame)
 	var portrait := ColorRect.new()
-	portrait.color = Unit.PLAYER_COLOR if unit.team == Unit.Team.PLAYER else Unit.ENEMY_COLOR
+	portrait.color = Factions.COLORS[unit.team]
 	portrait.position = Vector2(16, 6)
 	portrait.size = Vector2(48, 48)
 	_left.add_child(portrait)

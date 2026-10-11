@@ -235,7 +235,10 @@ func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i, tile_hp
 		if unit.team == Unit.Team.PLAYER:
 			lv += "  EXP %d" % unit.exp_points
 		var hp_line := "HP %d/%d  MP %d/%d" % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
-		text = "%s  %s  %s\n%s\n" % [unit.unit_name, unit.class_display_name(), lv, hp_line]
+		var side := ""
+		if unit.team != Unit.Team.PLAYER and unit.team != Unit.Team.ENEMY:
+			side = "  (%s)" % Factions.NAMES[unit.team]
+		text = "%s%s  %s  %s\n%s\n" % [unit.unit_name, side, unit.class_display_name(), lv, hp_line]
 		if not unit.weapon.is_empty() or not unit.is_caster():
 			text += weapon + "\n"
 		var others: Array[String] = []

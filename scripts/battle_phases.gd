@@ -120,23 +120,42 @@ func count_down_statuses(team: Unit.Team) -> void:
 		await get_tree().create_timer(0.5).timeout
 
 
+## Ends the player phase, then each AI side gets its phase (Factions.PHASE_ORDER),
+## then the next turn's player phase.
 func end_player_phase() -> void:
 	battle.state = Battle.State.BUSY
 	battle.ui.hide_info()
 	await count_down_statuses(Unit.Team.PLAYER)
 	battle.enemy_phase = true
-	await battle.ui.show_banner("Enemy Phase", Color("b02828"))
-	clear_inspire(Unit.Team.ENEMY)
-	for e in battle.units_of(Unit.Team.ENEMY):
-		e.regen_mp(e.mp_regen())
-	await heal_on_tiles(Unit.Team.ENEMY)
-	await tick_statuses(Unit.Team.ENEMY)
-	if check_game_over():
+	for side in Factions.PHASE_ORDER:
+		if side == Unit.Team.PLAYER:
+			continue
+		# The enemy phase always runs (reinforcements); other sides only with units.
+		if side != Unit.Team.ENEMY and battle.units_of(side).is_empty():
+			continue
+		if not await ai_phase(side):
+			return
+	if check_game_over(true):
 		return
-	await spawn_reinforcements()
-	await battle.events.on_turn(battle.turn, "enemy")
-	EnemyAI.update_all_wake(battle)
-	for e in battle.units_of(Unit.Team.ENEMY):
+	start_player_phase()
+
+
+## One AI side's phase: start-of-phase effects, then each of its units' turns.
+## Returns false if the battle ended during it.
+func ai_phase(side: Unit.Team) -> bool:
+	await battle.ui.show_banner("%s Phase" % Factions.NAMES[side], Factions.BANNER_COLORS[side])
+	clear_inspire(side)
+	for e in battle.units_of(side):
+		e.regen_mp(e.mp_regen())
+	await heal_on_tiles(side)
+	await tick_statuses(side)
+	if check_game_over():
+		return false
+	if side == Unit.Team.ENEMY:
+		await spawn_reinforcements()
+	await battle.events.on_turn(battle.turn, Factions.key(side))
+	EnemyAI.update_all_wake(battle, side)
+	for e in battle.units_of(side):
 		# has_acted: reinforcements that just arrived wait for the next phase.
 		if not is_instance_valid(e) or e.hp <= 0 or e.has_acted:
 			continue
@@ -144,18 +163,16 @@ func end_player_phase() -> void:
 		if is_instance_valid(e) and e.hp > 0:
 			await battle.events.on_area(e)
 		if check_game_over():
-			return
+			return false
 		# Galeforce: one more turn.
 		if is_instance_valid(e) and e.hp > 0 and e.refresh_pending:
 			e.refresh_pending = false
 			e.has_acted = false
 			await EnemyAI.take_turn(e, battle)
 			if check_game_over():
-				return
-	if check_game_over(true):
-		return
-	await count_down_statuses(Unit.Team.ENEMY)
-	start_player_phase()
+				return false
+	await count_down_statuses(side)
+	return true
 
 
 ## The level's reinforcements for this turn appear on their cell, or the nearest

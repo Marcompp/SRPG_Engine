@@ -98,7 +98,7 @@ static func targets_for(caster: Unit, spell_name: String, units: Array[Unit]) ->
 				if u.team != caster.team or not needs:
 					continue
 			"enemy":
-				if u.team == caster.team:
+				if not Factions.hostile(caster.team, u.team):
 					continue
 			_:
 				continue
@@ -124,7 +124,7 @@ static func area_targets(caster: Unit, spell_name: String, center: Vector2i, uni
 	var cells := area_cells(spell_name, center, map)
 	var result: Array[Unit] = []
 	for u in units:
-		if u.team != caster.team and cells.has(u.cell):
+		if Factions.hostile(caster.team, u.team) and cells.has(u.cell):
 			result.append(u)
 	return result
 

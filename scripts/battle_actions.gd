@@ -13,7 +13,7 @@ var _close_calls := {}
 
 func enemies_in_range(u: Unit, w: Dictionary) -> Array[Unit]:
 	var result: Array[Unit] = []
-	for e in battle.units_of(Unit.Team.ENEMY):
+	for e in battle.foes_of(u):
 		if u.reaches(w, BattleMap.distance(u.cell, e.cell)):
 			result.append(e)
 	return result
@@ -189,7 +189,7 @@ func steal_targets(u: Unit) -> Array[Unit]:
 	if not Skills.commands(u).has("steal") or (u.items.size() >= Unit.MAX_ITEMS and not Campaign.active):
 		return result
 	for foe in battle.units():
-		if foe.team != u.team and BattleMap.distance(u.cell, foe.cell) == 1 \
+		if Factions.hostile(u.team, foe.team) and BattleMap.distance(u.cell, foe.cell) == 1 \
 				and u.combat_agi() > foe.combat_agi() and not stealable_items(foe).is_empty():
 			result.append(foe)
 	return result
@@ -689,7 +689,7 @@ func _after_combat(u, foe, foe_cell: Vector2i, effect: Dictionary) -> void:
 					victims.append(foe)
 			else:
 				for o in battle.units():
-					if o.team != u.team and o != foe and BattleMap.distance(o.cell, foe_cell) <= 2:
+					if Factions.hostile(u.team, o.team) and o != foe and BattleMap.distance(o.cell, foe_cell) <= 2:
 						victims.append(o)
 			if victims.is_empty():
 				return

@@ -457,7 +457,10 @@ static func battle_mods(u: Unit, foe: Unit, map: BattleMap, initiating: bool) ->
 			continue
 		for skill in of(o):
 			var aura: Dictionary = get_data(skill).get("aura", {})
-			if aura.is_empty() or d > aura.radius or (aura.affects == "allies") != (o.team == u.team):
+			if aura.is_empty() or d > aura.radius:
+				continue
+			# Allies: the owner's own side; enemies: sides the owner is hostile to.
+			if not (o.team == u.team if aura.affects == "allies" else Factions.hostile(o.team, u.team)):
 				continue
 			for key in aura.battle:
 				mods[key] += aura.battle[key]

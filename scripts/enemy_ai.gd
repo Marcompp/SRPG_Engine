@@ -32,7 +32,7 @@ static func update_wake(u: Unit, battle: Battle) -> void:
 	var wake: Dictionary = u.ai.wake
 	if wake.is_empty() or u.ai_awake:
 		return
-	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
+	var players: Array[Unit] = battle.foes_of(u)
 	var woke := false
 	if wake.get("attacked", false) and u.was_attacked:
 		woke = true
@@ -58,8 +58,8 @@ static func update_wake(u: Unit, battle: Battle) -> void:
 			ally.ai_awake = true
 
 
-static func update_all_wake(battle: Battle) -> void:
-	for e in battle.units_of(Unit.Team.ENEMY):
+static func update_all_wake(battle: Battle, team := Unit.Team.ENEMY) -> void:
+	for e in battle.units_of(team):
 		update_wake(e, battle)
 
 
@@ -167,7 +167,8 @@ static func take_turn(enemy: Unit, battle: Battle) -> void:
 		_finish(enemy)
 		return
 	var map: BattleMap = battle.map
-	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
+	# "players": whoever its side is hostile to (the player's units, for enemies).
+	var players: Array[Unit] = battle.foes_of(enemy)
 	if players.is_empty():
 		return
 
@@ -256,7 +257,7 @@ static func _finish(enemy) -> void:
 ## player's units).
 static func _best_attack(enemy: Unit, battle: Battle, cells: Dictionary, foes: Array[Unit] = []) -> Dictionary:
 	var map: BattleMap = battle.map
-	var players: Array[Unit] = foes if not foes.is_empty() else battle.units_of(Unit.Team.PLAYER)
+	var players: Array[Unit] = foes if not foes.is_empty() else battle.foes_of(enemy)
 	var all_units: Array[Unit] = battle.units()
 	var best := {}
 	var best_score := -INF
@@ -465,8 +466,8 @@ static func _retreat_cell(u: Unit, battle: Battle, reach: Dictionary) -> Vector2
 				tile = c
 		if tile != Vector2i(-1, -1):
 			return _closest_cell(map.cost_field(tile, u), reach.cells, u.cell)
-	# Away: the reachable cell farthest from the nearest player.
-	var players: Array[Unit] = battle.units_of(Unit.Team.PLAYER)
+	# Away: the reachable cell farthest from the nearest foe.
+	var players: Array[Unit] = battle.foes_of(u)
 	var best := u.cell
 	var best_dist := -1
 	for c in reach.cells:

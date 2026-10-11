@@ -66,18 +66,19 @@ static func result(battle: Battle, turn_over := false) -> String:
 	if not _lord_alive(battle):
 		return "defeat"
 	if obj.type == "defend":
-		for e in battle.units_of(Unit.Team.ENEMY):
+		for e in battle.threats_to(Unit.Team.PLAYER):
 			if e.cell == obj.cell:
 				return "defeat"
 	if battle.objective_done:
 		return "victory"
-	var routed: bool = battle.units_of(Unit.Team.ENEMY).is_empty()
+	# Every unit hostile to the player: red, purple, provoked yellow (see Factions).
+	var routed: bool = battle.threats_to(Unit.Team.PLAYER).is_empty()
 	match obj.type:
 		"seize", "escape":
 			return ""
 		"boss":
 			if routed or not battle.all_units().any(
-					func(u: Unit) -> bool: return u.team == Unit.Team.ENEMY and u.unit_name == obj.boss):
+					func(u: Unit) -> bool: return u.team != Unit.Team.PLAYER and u.unit_name == obj.boss):
 				return "victory"
 		"survive", "defend":
 			if routed or (turn_over and battle.turn >= obj.turns):
