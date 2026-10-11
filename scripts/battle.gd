@@ -97,6 +97,7 @@ func begin() -> void:
 func _start_camera() -> void:
 	camera.setup(map.cols, map.rows)
 	camera.snap(cursor.cell)
+	cursor.snap()
 	ui.view_origin = camera.origin
 
 

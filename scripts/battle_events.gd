@@ -223,6 +223,7 @@ func _run_command(c: Array) -> void:
 			battle.cursor.cell = c[1]
 			if skipping:
 				battle.camera.snap(c[1])
+				battle.cursor.snap()
 			else:
 				await battle.camera.settle()
 		"wait":

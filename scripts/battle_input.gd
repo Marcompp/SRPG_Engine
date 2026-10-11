@@ -17,7 +17,14 @@ var targeting := BattleTargeting.new(self)
 var trade := BattleTrade.new(self)
 var formation := BattleFormation.new(self)
 
-var selected: Unit
+## The selected unit bobs faster while it's selected (Unit.lifted).
+var selected: Unit:
+	set(value):
+		if is_instance_valid(selected):
+			selected.lifted = false
+		selected = value
+		if value:
+			value.lifted = true
 var origin_cell := Vector2i.ZERO
 var reach := {}
 ## Set once the selected unit trades or unloads; its move can no longer be undone.

@@ -15,6 +15,9 @@ var origin := Vector2i.ZERO
 ## Screen size in tiles (15 x 10 at 240 x 160).
 var view := Vector2i(15, 10)
 var _map_size := Vector2i(15, 10)
+## Screen shake strength in pixels, decaying to 0 (see shake()). Uses `offset`, so
+## it never disturbs the scroll position.
+var _shake := 0.0
 
 
 func _ready() -> void:
@@ -63,8 +66,19 @@ func settle() -> void:
 		await get_tree().process_frame
 
 
+## Shakes the view for impact (crits, kills). Stronger shakes override weaker ones.
+func shake(strength := 2.0) -> void:
+	_shake = maxf(_shake, strength)
+
+
 func _process(delta: float) -> void:
 	position = position.move_toward(_target(), SPEED * delta)
+	if _shake > 0.0:
+		_shake = maxf(0.0, _shake - delta * 12.0)
+		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized() * _shake
+		offset = offset.round()
+	elif offset != Vector2.ZERO:
+		offset = Vector2.ZERO
 
 
 func _target() -> Vector2:

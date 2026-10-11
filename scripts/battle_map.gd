@@ -108,6 +108,11 @@ const MARKED_EDGE_COLOR := Color(1.0, 0.35, 0.35, 0.95)
 const ARROW_COLOR := Color(1.0, 0.85, 0.25, 0.95)
 const DEPLOY_COLOR := Color(0.4, 0.85, 1.0, 0.25)
 const DEPLOY_EDGE_COLOR := Color(0.55, 0.9, 1.0, 0.95)
+## A light wave that sweeps diagonally across the range highlights, like GBA Fire
+## Emblem's shimmering move tiles. Peak alpha, and the wave's speed and wavelength.
+const SHIMMER_ALPHA := 0.16
+const SHIMMER_SPEED := 4.0
+const SHIMMER_SPREAD := 0.6
 
 var cols := 0
 var rows := 0
@@ -152,6 +157,28 @@ var objects: Array = []
 ## Objective tiles to outline (see Objectives.marked_cells) and the objective type.
 var objective_cells: Array[Vector2i] = []
 var objective_type := ""
+## Draws the shimmer on top of the highlights. Its own layer, so the shimmer
+## doesn't redraw the whole map every frame.
+var _shimmer: Node2D
+
+
+func _ready() -> void:
+	_shimmer = Node2D.new()
+	_shimmer.draw.connect(_draw_shimmer)
+	add_child(_shimmer)
+
+
+func _process(_delta: float) -> void:
+	if not (move_cells.is_empty() and attack_cells.is_empty() and support_cells.is_empty()):
+		_shimmer.queue_redraw()
+
+
+func _draw_shimmer() -> void:
+	var t := Time.get_ticks_msec() / 1000.0 * SHIMMER_SPEED
+	for cells in [move_cells, attack_cells, support_cells]:
+		for c: Vector2i in cells:
+			var a := SHIMMER_ALPHA * (0.5 + 0.5 * sin(t - (c.x + c.y) * SHIMMER_SPREAD))
+			_shimmer.draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), Color(1, 1, 1, a))
 
 
 static func distance(a: Vector2i, b: Vector2i) -> int:
@@ -437,6 +464,8 @@ func clear_ranges() -> void:
 	area_cells = []
 	arrow_path = []
 	queue_redraw()
+	if _shimmer:
+		_shimmer.queue_redraw()
 
 
 func _draw() -> void:

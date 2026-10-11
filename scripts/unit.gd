@@ -136,7 +136,9 @@ var defense := 2
 var intelligence := 0
 ## Computed properties (getters over other fields) that suspend saves must skip:
 ## they're rebuilt from the fields they read. Add any new computed property here.
-const SAVE_SKIP: Array[String] = ["mov", "max_hp", "max_mp", "weapon", "min_range", "max_range", "moving"]
+## Also skipped: transient animation state (see Game feel below).
+const SAVE_SKIP: Array[String] = ["mov", "max_hp", "max_mp", "weapon", "min_range", "max_range", "moving",
+	"lifted", "_shown_hp", "_flash", "_bob"]
 ## MOV from the roster and level-ups; `mov` adds the race's bonus (see Races).
 var base_mov := 5
 var mov_bonus := 0
@@ -183,6 +185,26 @@ var has_acted := false:
 	set(value):
 		has_acted = value
 		queue_redraw()
+
+# --- Game feel (visual only, never saved) ---------------------------------------
+## Units that can still act bob a pixel, in step with each other like GBA map
+## sprites; the selected unit (`lifted`) bobs faster.
+const BOB_PERIOD := 0.5
+const LIFTED_BOB_PERIOD := 0.18
+## HP per second the bar drains (or fills) toward the real HP.
+const BAR_SPEED := 30.0
+const HIT_FLASH_COLOR := Color(1, 1, 1, 0.85)
+const BAR_LOSS_COLOR := Color("f8e070")
+var lifted := false:
+	set(value):
+		lifted = value
+		queue_redraw()
+## HP the bar shows; it chases `hp`. -1 until first drawn, so new units start full.
+var _shown_hp := -1.0
+## Strength of the white flash (hit, crit wind-up), fading to 0.
+var _flash := 0.0
+## Current bob frame (0 or 1).
+var _bob := 0
 
 
 static func create(p_name: String, p_team: Team, p_cell: Vector2i, stats: Dictionary) -> Unit:
@@ -453,7 +475,7 @@ func spend_mp(amount: int) -> void:
 
 func heal(amount: int) -> void:
 	hp = mini(max_hp, hp + amount)
-	queue_redraw()
+	queue_redraw()  # the bar fills up from _shown_hp
 	modulate = Color(0.5, 1, 0.6)
 	create_tween().tween_property(self, "modulate", Color.WHITE, 0.35)
 
@@ -568,26 +590,60 @@ func move_along(path: Array[Vector2i]) -> void:
 	moving = false
 
 
-func lunge(toward: Vector2i) -> void:
+## Attack motion: a small pull back, then a quick thrust toward `toward`. A crit
+## (`heavy`) flashes and holds the wind-up first, so it reads before it lands.
+func lunge(toward: Vector2i, heavy := false) -> void:
 	var base := Vector2(cell * BattleMap.TILE)
-	var offset := Vector2(toward - cell).normalized() * 5.0
+	var dir := Vector2(toward - cell).normalized()
 	var tw := create_tween()
-	tw.tween_property(self, "position", base + offset, 0.08)
-	tw.tween_property(self, "position", base, 0.1)
+	if heavy:
+		flash()
+		tw.tween_property(self, "position", base - dir * 3.0, 0.12).set_ease(Tween.EASE_OUT)
+		tw.tween_interval(0.12)
+	else:
+		tw.tween_property(self, "position", base - dir * 1.5, 0.05)
+	tw.tween_property(self, "position", base + dir * (8.0 if heavy else 6.0), 0.06) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(self, "position", base, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await tw.finished
+
+
+## Knocked back a little from `from` on a hit (further on a crit).
+func recoil(from: Vector2i, heavy := false) -> void:
+	await _hop(Vector2(cell - from).normalized() * (4.0 if heavy else 2.0), 0.05, 0.14)
+
+
+## Sidesteps a missed attack from `from`.
+func dodge(from: Vector2i) -> void:
+	var dir := Vector2(cell - from).normalized()
+	await _hop(Vector2(-dir.y, dir.x) * 4.0, 0.07, 0.12)
+
+
+## Out to `offset` from the unit's cell and back.
+func _hop(offset: Vector2, out_time: float, back_time: float) -> void:
+	var base := Vector2(cell * BattleMap.TILE)
+	var tw := create_tween()
+	tw.tween_property(self, "position", base + offset, out_time).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "position", base, back_time).set_trans(Tween.TRANS_QUAD)
+	await tw.finished
+
+
+## White flash over the unit's body, fading out.
+func flash(strength := 1.0) -> void:
+	_flash = maxf(_flash, strength)
+	queue_redraw()
 
 
 func notify_attacked() -> void:
 	was_attacked = true
 
 
+## The HP bar drains to the new HP (see _process) instead of jumping.
 func take_damage(amount: int) -> void:
 	hp = maxi(0, hp - amount)
 	if amount > 0 and hp > 0:
 		Statuses.on_damaged(self)
-	queue_redraw()
-	modulate = Color(1, 0.3, 0.3)
-	create_tween().tween_property(self, "modulate", Color.WHITE, 0.25)
+	flash()
 
 
 ## Spends one use of the equipped weapon. Returns true if it broke
@@ -602,35 +658,64 @@ func use_weapon() -> bool:
 	return w.uses <= 0
 
 
-## Floating combat text above the unit.
 ## Floating text over the unit. `raise` lifts it, so two popups at once don't overlap.
-func popup(text: String, color: Color, raise := 0.0) -> void:
+## It pops up past its resting height and settles back, then fades; `big` (crits) is larger.
+func popup(text: String, color: Color, raise := 0.0, big := false) -> void:
 	var label := Label.new()
 	label.text = text
 	label.z_index = 10
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.position = Vector2(-12, -8 - raise)
-	label.size = Vector2(40, 10)
-	label.add_theme_font_size_override("font_size", 8)
+	label.position = Vector2(-22, -6 - raise)
+	label.size = Vector2(60, 10)
+	label.add_theme_font_size_override("font_size", 10 if big else 8)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 3)
 	add_child(label)
 	var tw := label.create_tween()
-	tw.tween_property(label, "position:y", -16.0 - raise, 0.5)
-	tw.parallel().tween_property(label, "modulate:a", 0.0, 0.3).set_delay(0.4)
+	tw.tween_property(label, "position:y", -15.0 - raise, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.35 if big else 0.25)
+	tw.tween_property(label, "modulate:a", 0.0, 0.25)
 	tw.tween_callback(label.queue_free)
 
 
+## Blinks white a few times, then fades out.
 func die() -> void:
 	var tw := create_tween()
+	for i in 3:
+		tw.tween_callback(flash)
+		tw.tween_interval(0.1)
 	tw.tween_property(self, "modulate:a", 0.0, 0.3)
 	await tw.finished
 	get_parent().remove_child(self)
 	queue_free()
 
 
+func _process(delta: float) -> void:
+	var redraw := false
+	if _shown_hp < 0.0:
+		_shown_hp = hp
+	elif _shown_hp != hp:
+		_shown_hp = move_toward(_shown_hp, hp, BAR_SPEED * delta)
+		redraw = true
+	if _flash > 0.0:
+		_flash = maxf(0.0, _flash - delta * 5.0)
+		redraw = true
+	# Bobbing runs on the wall clock, so every unit bobs in step.
+	var bob := 0
+	if not has_acted and hp > 0 and not Statuses.restricts(self, "act"):
+		var period := LIFTED_BOB_PERIOD if lifted else BOB_PERIOD
+		bob = int(Time.get_ticks_msec() / (period * 1000.0)) % 2
+	if bob != _bob:
+		_bob = bob
+		redraw = true
+	if redraw:
+		queue_redraw()
+
+
 func _draw() -> void:
+	# The body bobs; the HP and MP bars underneath stay put.
+	draw_set_transform(Vector2(0, -_bob))
 	var body: Color = ACTED_COLOR if has_acted else Factions.COLORS[team]
 	draw_rect(Rect2(2, 1, 12, 11), body)
 	draw_rect(Rect2(2, 1, 12, 11), Color.BLACK, false, 1.0)
@@ -653,7 +738,13 @@ func _draw() -> void:
 		draw_rect(Rect2(3.5, 2.5, 2, 2), flag.lightened(0.3))
 	draw_string(ThemeDB.fallback_font, Vector2(2, 10), token_letter(),
 		HORIZONTAL_ALIGNMENT_CENTER, 12, 9, Color.WHITE)
-	_draw_bar(13, 2, float(hp) / max_hp, HP_COLOR)
+	if _flash > 0.0:
+		draw_rect(Rect2(2, 1, 12, 11), Color(HIT_FLASH_COLOR, HIT_FLASH_COLOR.a * _flash))
+	draw_set_transform(Vector2.ZERO)
+	# HP bar: what's being drained (or filled) shows in BAR_LOSS_COLOR until the bar catches up.
+	var shown := _shown_hp if _shown_hp >= 0.0 else float(hp)
+	_draw_bar(13, 2, maxf(shown, hp) / max_hp, BAR_LOSS_COLOR)
+	_draw_bar(13, 2, minf(shown, hp) / max_hp, HP_COLOR, false)
 	if is_caster():
 		# No dark backing for MP, so spent MP doesn't read like missing HP.
 		_draw_bar(15, 1, float(mp) / max_mp, MP_COLOR if can_cast_any() else MP_EMPTY_COLOR, false)

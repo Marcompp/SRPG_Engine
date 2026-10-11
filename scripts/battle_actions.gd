@@ -557,7 +557,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 			continue
 		var result := Combat.strike(a, d, battle.map, attacker)
 		result["counter"] = a != attacker
-		await a.lunge(d.cell)
+		await a.lunge(d.cell, result.crit)
 		_apply_strike(a, d, result, dealt)
 		if result.hit and a.use_weapon():
 			a.popup(tr("Broke!"), Color.LIGHT_GRAY)
@@ -575,13 +575,13 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
 	var result := Combat.spell_strike(caster, target, spell, battle.map)
-	await caster.lunge(target.cell)
+	await caster.lunge(target.cell, result.crit)
 	_apply_strike(caster, target, result, dealt)
 	await get_tree().create_timer(0.45).timeout
 	if target.hp > 0 and not spell.get("status_only", false) and Combat.can_counter(caster, target, battle.map):
 		var counter := Combat.strike(target, caster, battle.map, caster)
 		counter["counter"] = true
-		await target.lunge(caster.cell)
+		await target.lunge(caster.cell, counter.crit)
 		_apply_strike(target, caster, counter, dealt)
 		if counter.hit and target.use_weapon():
 			target.popup(tr("Broke!"), Color.LIGHT_GRAY)
@@ -645,7 +645,11 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 		if result.dmg > 0 and not dealt.has(a):
 			dealt.append(a)
 		d.popup((tr("Crit! %d") if result.crit else "%d") % result.dmg,
-			Color.ORANGE if result.crit else Color.WHITE)
+			Color.ORANGE if result.crit else Color.WHITE, 0.0, result.crit)
+		if result.dmg > 0:
+			d.recoil(a.cell, result.crit)
+		if result.crit or d.hp <= 0:
+			battle.camera.shake(3.0 if result.crit else 2.0)
 		if d.hp <= 0 and d.mount.get("skills", []).has("Loyal"):
 			_loyal_save(d)
 		elif d.hp <= 0:
@@ -657,6 +661,7 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 			_record_close_call(d, a)
 	else:
 		d.popup(tr("Miss"), Color.LIGHT_GRAY)
+		d.dodge(a.cell)
 	# After the damage, so a sleep-inducing hit isn't undone by its own damage.
 	if result.hit and result.get("inflict", "") != "" and d.hp > 0:
 		inflict(d, result.inflict)

@@ -297,6 +297,7 @@ func rewind_to(index: int) -> void:
 	var players := battle.units_of(Unit.Team.PLAYER)
 	battle.cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	battle.camera.snap(battle.cursor.cell)
+	battle.cursor.snap()
 	await battle.ui.show_banner(tr("Rewound to") + "\n" + battle.turn_text(), Color("4a3a8a"))
 	_resume_player_phase()
 
