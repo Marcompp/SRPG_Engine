@@ -7,7 +7,8 @@ extends RefCounted
 ## current MP is also magic defense: spent MP should stay spent for a while.
 const MP_REGEN := 1
 
-## target: "ally"  = heal another unit on the caster's team (with "cures": cure its
+## target: "ally"  = heal another unit on a side friendly to the caster's (its own,
+##                   and green allies for the player's; with "cures": cure its
 ##                   statuses instead, healing nothing; see Statuses).
 ##         "enemy" = single-target damage; the target may counter.
 ##         "area"  = damage every enemy within `radius` of a chosen cell; no counters.
@@ -95,7 +96,7 @@ static func targets_for(caster: Unit, spell_name: String, units: Array[Unit]) ->
 		match spell.target:
 			"ally":
 				var needs := not u.statuses.is_empty() if spell.get("cures", false) else u.hp < u.max_hp
-				if u.team != caster.team or not needs:
+				if not Factions.friendly(caster.team, u.team) or not needs:
 					continue
 			"enemy":
 				if not Factions.hostile(caster.team, u.team):

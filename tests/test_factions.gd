@@ -95,8 +95,66 @@ func test_purple_fights_red() -> void:
 	lord.set_cell(Vector2i(0, 0))
 	var red := _spawn(Unit.Team.ENEMY, Vector2i(11, 6))
 	var purple := _spawn(Unit.Team.OTHER, Vector2i(11, 7))
+	for u in [red, purple]:
+		u.base_max_hp = 80
+		u.hp = 80
 	b.phases.end_player_phase()
 	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
 		await process_frame
 	check(red.was_attacked and purple.was_attacked, "red and purple attack each other on their phases")
 	check_eq(lord.hp, lord.max_hp, "the Lord, out of reach, is left alone")
+
+
+func test_supporting_green_allies() -> void:
+	var cleric := unit_named("Cleric")
+	var fighter := unit_named("Fighter")
+	clear_board([cleric, fighter])
+	cleric.set_cell(Vector2i(4, 2))
+	cleric.mp = 20
+	var ally := _spawn(Unit.Team.ALLY, Vector2i(5, 2))
+	ally.hp = 5
+	check(Spells.targets_for(cleric, "Heal", b.units()).has(ally), "you can heal green allies")
+	await b.actions.cast_heal(cleric, ally, "Heal")
+	check(ally.hp > 5, "healed")
+	fighter.set_cell(Vector2i(4, 3))
+	check(not b.actions.trade_partners(cleric).has(ally), "but not trade with them")
+	ride(fighter, "Horse")
+	ally.set_cell(Vector2i(5, 3))
+	check(b.actions.rescue_targets(fighter).has(ally), "and you can rescue them")
+	check(not b.actions.shove_targets(fighter).has(ally), "not shove them")
+	var neutral := _spawn(Unit.Team.NEUTRAL, Vector2i(3, 3))
+	neutral.hp = 5
+	check(not Spells.targets_for(cleric, "Heal", b.units()).has(neutral), "neutrals aren't your allies")
+
+
+func test_provoking_neutrals() -> void:
+	var pair := await _duel()
+	var lord: Unit = pair[0]
+	var brig: Unit = pair[1]
+	var villager := _spawn(Unit.Team.NEUTRAL, Vector2i(5, 7))
+	villager.hp = 60
+	brig.set_cell(Vector2i(6, 7))
+	await b.actions.do_combat(brig, villager)
+	check(not Factions.hostile(Unit.Team.NEUTRAL, Unit.Team.PLAYER), "red attacking neutrals doesn't provoke them")
+	await b.actions.do_combat(lord, villager)
+	check(Factions.hostile(Unit.Team.NEUTRAL, Unit.Team.PLAYER), "your attack does: neutrals turn on you")
+	check(b.threats_to(Unit.Team.PLAYER).has(villager), "they're a threat now")
+	check(not Factions.hostile(Unit.Team.NEUTRAL, Unit.Team.ENEMY), "only to you")
+
+
+func test_green_allies_gain_exp() -> void:
+	var lord := unit_named("Lord")
+	isolate([lord])
+	await process_frame
+	var ally := _spawn(Unit.Team.ALLY, Vector2i(5, 6))
+	var red := _spawn(Unit.Team.ENEMY, Vector2i(6, 6))
+	ally.dexterity = 60
+	red.agility = 0
+	red.luck = 0
+	red.hp = 1
+	var before := ally.exp_points + ally.level * Experience.EXP_PER_LEVEL
+	await b.actions.do_combat(ally, red)
+	check(ally.exp_points + ally.level * Experience.EXP_PER_LEVEL > before, "green allies earn EXP for kills")
+	check_eq(b.state, b.State.IDLE, "with no level-up window to wait on")
+	check(Objectives.defeat_text({"type": "rout", "protect": ["Elder"]}).contains("or Elder falls"),
+		"a protect list is part of the defeat conditions")

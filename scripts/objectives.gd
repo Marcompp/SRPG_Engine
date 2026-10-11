@@ -7,6 +7,8 @@ extends RefCounted
 ##   {"type": "survive", "turns": N}                still standing when turn N ends
 ##   {"type": "defend", "turns": N, "cell": Vector2i} as survive, but an enemy on the cell loses
 ##   {"type": "escape", "cells": [Vector2i, ...]}   the Lord uses Escape on an exit tile
+## Any type can add "protect": ["Name", ...]: losing if one of those units falls
+## (green allies or neutrals to keep alive).
 ## Losing the Lord always loses. Routing the enemy also wins every type except
 ## seize and escape (as in Fire Emblem, those need the Lord's command).
 
@@ -34,9 +36,12 @@ static func victory_text(obj: Dictionary) -> String:
 
 
 static func defeat_text(obj: Dictionary) -> String:
+	var text := "Your Lord falls"
 	if obj.type == "defend":
-		return "Your Lord falls, or an enemy reaches the marked tile."
-	return "Your Lord falls."
+		text += ", or an enemy reaches the marked tile"
+	if obj.has("protect"):
+		text += ", or %s falls" % " or ".join(obj.protect)
+	return text + "."
 
 
 ## Cells the map marks for the objective (seize tile, defended tile, exits).
@@ -65,6 +70,9 @@ static func result(battle: Battle, turn_over := false) -> String:
 	var obj := of(Levels.get_level(Levels.selected))
 	if not _lord_alive(battle):
 		return "defeat"
+	for unit_name: String in obj.get("protect", []):
+		if not battle.all_units().any(func(u: Unit) -> bool: return u.unit_name == unit_name):
+			return "defeat"
 	if obj.type == "defend":
 		for e in battle.threats_to(Unit.Team.PLAYER):
 			if e.cell == obj.cell:

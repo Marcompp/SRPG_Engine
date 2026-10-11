@@ -1,6 +1,6 @@
 # Factions (design notes)
 
-Design notes. Step 1 of the build order is built (`scripts/factions.gd`). Today a unit is on one of two teams, player (blue) or
+Design notes. Steps 1 and 2 of the build order are built (`scripts/factions.gd`). Today a unit is on one of two teams, player (blue) or
 enemy (red). This adds three AI factions, each with its own phase:
 
 | Faction | Color | Default stance | Phase |
@@ -32,10 +32,13 @@ Phases with no units are skipped. Each has a banner ("Ally Phase"...).
 
 - Fully AI-controlled, on their own phase, using the existing enemy AI (presets,
   healing, retreating) against whatever they're hostile to.
-- Your units can support them: Heal, Restore, Dance, Rescue (and Drop), Talk. No
-  Trade and no Shove. They can't be selected.
-- They earn EXP and level up on their kills (a popup, no level-up window). They
-  don't join the campaign army unless recruited.
+- Your units can support them: Heal, Restore, Rescue (and Drop), Talk. No Trade,
+  Shove or Inspire, and no Dance: they act on their own phase, so they haven't acted
+  yet during yours. They can't be selected. (In general, support works on any side
+  friendly to yours: `BattleActions.friendly_units`.)
+- They earn EXP like your units (combat, healing...) and level up with a popup, no
+  level-up window. No EXP for fighting a side that's no foe (Berserk). They don't
+  join the campaign army unless recruited.
 
 ## Yellow neutrals
 

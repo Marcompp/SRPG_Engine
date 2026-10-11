@@ -47,6 +47,28 @@ func trade_partners(u: Unit) -> Array[Unit]:
 	return result
 
 
+## Units on sides friendly to `u`'s (its own, and green allies for the player's): the
+## ones it can support (Heal, Rescue). Trade, Shove, Inspire and Dance stay within
+## its own side.
+func friendly_units(u: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	for o in battle.units():
+		if Factions.friendly(u.team, o.team):
+			result.append(o)
+	return result
+
+
+## Provoking: the player's side attacking a neutral turns all neutrals hostile to
+## the player (they fight back on their phase).
+func provoke(attacker: Unit, target: Unit) -> void:
+	if attacker.team != Unit.Team.PLAYER or target.team != Unit.Team.NEUTRAL \
+			or Factions.hostile(Unit.Team.NEUTRAL, Unit.Team.PLAYER):
+		return
+	Factions.set_hostile(Unit.Team.NEUTRAL, Unit.Team.PLAYER, true)
+	target.popup("Provoked!", Color.ORANGE_RED, 10.0)
+	battle.refresh_threat()
+
+
 ## Adjacent allies who have already acted this phase.
 func dance_targets(u: Unit) -> Array[Unit]:
 	var result: Array[Unit] = []
@@ -196,6 +218,7 @@ func steal_targets(u: Unit) -> Array[Unit]:
 
 
 func do_steal(u: Unit, foe: Unit, index: int) -> void:
+	provoke(u, foe)
 	var item: Dictionary = foe.items[index]
 	foe.items.remove_at(index)
 	await u.lunge(foe.cell)
@@ -206,7 +229,7 @@ func do_steal(u: Unit, foe: Unit, index: int) -> void:
 		Campaign.convoy.append(item)
 		u.popup(item.name + " to convoy", Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
-	if u.team == Unit.Team.PLAYER and earns_exp(u):
+	if gains_exp(u):
 		await gain_exp(u, Experience.STEAL_EXP)
 
 
@@ -317,7 +340,7 @@ func rescue_targets(u: Unit) -> Array[Unit]:
 	var result: Array[Unit] = []
 	if not u.can_carry() or u.carrying:
 		return result
-	for ally in battle.units_of(u.team):
+	for ally in friendly_units(u):
 		if ally != u and ally.can_be_carried() and not ally.carrying \
 				and BattleMap.distance(u.cell, ally.cell) == 1:
 			result.append(ally)
@@ -434,7 +457,7 @@ func do_inspire(u: Unit) -> void:
 		ally.inspire_bonus = maxi(ally.inspire_bonus, bonus)
 		ally.popup("STR/DEF +%d" % bonus, Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
-	if u.team == Unit.Team.PLAYER and earns_exp(u):
+	if gains_exp(u):
 		await gain_exp(u, Experience.INSPIRE_EXP)
 
 
@@ -496,13 +519,14 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 		target.heal(amount)
 		target.popup("+%d" % amount, Color.PALE_GREEN)
 	await get_tree().create_timer(0.5).timeout
-	if caster.team == Unit.Team.PLAYER and earns_exp(caster):
+	if gains_exp(caster):
 		await gain_exp(caster, spell.exp)
 
 
 # --- Combat -------------------------------------------------------------------
 
 func do_combat(attacker: Unit, defender: Unit) -> void:
+	provoke(attacker, defender)
 	await battle.events.before_battle(attacker, defender)
 	# A weapon that breaks stays equipped, weakened, for the rest of the fight.
 	var dealt: Array[Unit] = []
@@ -525,6 +549,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 
 ## Single-target damage spell: one cast (never doubles), then the target may counter once.
 func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
+	provoke(caster, target)
 	await battle.events.before_battle(caster, target)
 	var spell := Spells.get_spell(spell_name)
 	var dealt: Array[Unit] = []
@@ -551,6 +576,8 @@ func cast_area(caster: Unit, center: Vector2i, spell_name: String) -> void:
 	var spell := Spells.get_spell(spell_name)
 	var victims := Spells.area_targets(caster, spell_name, center, battle.units(), battle.map)
 	for v in victims:
+		provoke(caster, v)
+	for v in victims:
 		v.notify_attacked()
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
@@ -569,7 +596,7 @@ func cast_area(caster: Unit, center: Vector2i, spell_name: String) -> void:
 	battle.map.clear_ranges()
 	# EXP: sum of what each target would give, capped at one level.
 	var awards: Array = []
-	if caster.team == Unit.Team.PLAYER and earns_exp(caster) and not victims.is_empty():
+	if gains_exp(caster) and not victims.is_empty():
 		var total := 0
 		for v in victims:
 			total += Experience.combat_exp(caster, v, damaged.has(v), v.hp <= 0)
@@ -674,8 +701,8 @@ func _finish_exchange(attacker: Unit, defender: Unit, dealt: Array[Unit]) -> voi
 	for pair in [[attacker, defender], [defender, attacker]]:
 		var u: Unit = pair[0]
 		var foe: Unit = pair[1]
-		# No EXP for fighting your own side (Berserk).
-		if u.team == Unit.Team.PLAYER and u.team != foe.team and u.hp > 0 and earns_exp(u):
+		# No EXP for fighting a side that's no foe either way (your own, when Berserk).
+		if gains_exp(u) and not Factions.friendly(u.team, foe.team) and u.hp > 0:
 			var mount_exp := 0 if u.mount.is_empty() \
 				else Experience.mount_combat_exp(u.mount, foe, dealt.has(u), foe.hp <= 0)
 			awards.append([u, Experience.combat_exp(u, foe, dealt.has(u), foe.hp <= 0), mount_exp])
@@ -782,6 +809,12 @@ func _remove_dead_and_award(involved: Array[Unit], awards: Array, how := "Fell")
 
 ## Whether `u` still gets anything from EXP: its own levels, or its mount's (a
 ## level-20 rider's mount keeps learning).
+## The player's units and green allies earn EXP (allies level up without the
+## level-up window), if they still can (see earns_exp).
+func gains_exp(u: Unit) -> bool:
+	return (u.team == Unit.Team.PLAYER or u.team == Unit.Team.ALLY) and earns_exp(u)
+
+
 func earns_exp(u: Unit) -> bool:
 	return u.level < Experience.LEVEL_CAP or (not u.mount.is_empty() and u.mount.level < Mounts.LEVEL_CAP)
 
@@ -805,7 +838,11 @@ func gain_exp(u: Unit, amount: int, mount_amount := -1) -> void:
 		for key in Experience.STATS:
 			before[key] = u.get(Experience.STATS[key])
 		Experience.apply_level_up(u, gains)
-		await battle.ui.show_level_up(u, before, gains)
+		if u.team == Unit.Team.PLAYER:
+			await battle.ui.show_level_up(u, before, gains)
+		else:
+			u.popup("Level %d!" % u.level, Color.AQUAMARINE, 10.0)
+			await get_tree().create_timer(0.5).timeout
 		for skill in u.skills_learned_at(u.level):
 			await learn_skill(u, skill)
 	if u.level >= Experience.LEVEL_CAP:

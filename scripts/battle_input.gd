@@ -409,7 +409,7 @@ func _can_act_on_from(u: Unit, target: Unit, dist: int) -> bool:
 		for w in u.weapons():
 			if u.reaches(w, dist):
 				return true
-	elif target.team != u.team or target.hp >= target.max_hp:
+	elif not Factions.friendly(u.team, target.team) or target.hp >= target.max_hp:
 		return false
 	for s in u.spells if u.can_use_magic() else []:
 		var spell := Spells.get_spell(s)
