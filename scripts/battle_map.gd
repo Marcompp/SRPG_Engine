@@ -144,9 +144,10 @@ var arrow_path: Array[Vector2i] = []:
 	set(value):
 		arrow_path = value
 		queue_redraw()
-## Map objects from the level's "objects": dictionaries with "type" ("village" or
-## "chest"), "cell", "item" (the reward) and "state": "intact", "visited" (village
-## a player visited), "looted" (village an enemy destroyed) or "opened" (chest).
+## Map objects from the level's "objects": dictionaries with "type" ("village",
+## "chest" or "shop"), "cell", "item" and/or "gold" (the reward; see docs/economy.md),
+## "stock" (a shop's item names) and "state": "intact", "visited" (village a player
+## visited), "looted" (village an enemy destroyed) or "opened" (chest).
 var objects: Array = []
 ## Objective tiles to outline (see Objectives.marked_cells) and the objective type.
 var objective_cells: Array[Vector2i] = []
@@ -236,9 +237,9 @@ func object_at(cell: Vector2i) -> Dictionary:
 	return {}
 
 
-## Villages not yet visited or looted, and chests not yet opened.
+## Villages not yet visited or looted, and chests not yet opened (not shops).
 func lootable_objects() -> Array:
-	return objects.filter(func(o): return o.state == "intact")
+	return objects.filter(func(o): return o.state == "intact" and o.type != "shop")
 
 
 func in_bounds(cell: Vector2i) -> bool:
@@ -487,6 +488,10 @@ func _draw_objects() -> void:
 					"looted":  # burned down
 						draw_rect(Rect2(p + Vector2(2, 2), Vector2(12, 12)), Color(0.15, 0.1, 0.08, 0.75))
 						draw_line(p + Vector2(4, 12), p + Vector2(12, 4), Color("ff7030"), 1.0)
+			"shop":  # blue awning with a gold coin
+				draw_rect(Rect2(p + Vector2(2, 2), Vector2(12, 3)), Color("3a6fd8"))
+				draw_rect(Rect2(p + Vector2(2, 2), Vector2(12, 3)), Color.BLACK, false, 1.0)
+				draw_circle(p + Vector2(8, 10), 2.5, Color("f0c030"))
 			"chest":
 				var body := Color("8b5a2b")
 				draw_rect(Rect2(p + Vector2(4, 7), Vector2(8, 6)), body)

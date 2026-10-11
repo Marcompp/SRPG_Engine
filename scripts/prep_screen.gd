@@ -2,6 +2,8 @@ extends Control
 ## Battle preparations for the next campaign chapter (see Campaign):
 ##   Pick Units: who deploys (the Lord always does; up to the chapter's slots).
 ##   Items:      move items between a unit and the convoy (also how units swap items).
+##   Shop:       buy into the convoy (left: the chapter's stock, see Shop) and sell
+##               from it (right) for gold (docs/economy.md).
 ##   Repair:     restore any worn weapon in the army or convoy to full uses, for the
 ##               price of the uses it restores (Items.repair_cost).
 ##   Stable:     every mount: Z on a ridden one takes its rider off; Z on a free one
@@ -17,10 +19,10 @@ const BATTLE_SCENE := "res://scenes/main.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 const DIM := Color(0.7, 0.75, 0.95)
 ## Entries are ids, translated where shown.
-const MENU: Array[String] = ["Pick Units", "Items", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!",  # i18n
+const MENU: Array[String] = ["Pick Units", "Items", "Shop", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!",  # i18n
 	"Level Select"]
 
-## "menu", "pick", "items_unit", "items", "repair", "promote_unit", "promote_class", "status_unit", "status"
+## "menu", "pick", "items_unit", "items", "shop", "repair", "promote_unit", "promote_class", "status_unit", "status"
 var mode := "menu"
 var index := 0
 ## Items mode: 0 = the unit's inventory, 1 = the convoy.
@@ -122,7 +124,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if up or down:
 		index = wrapi(index + (1 if down else -1), 0, maxi(1, _row_count()))
-	elif (left or right) and mode == "items":
+	elif (left or right) and mode in ["items", "shop"]:
 		column = 1 - column
 		index = 0
 	elif accept:
@@ -140,6 +142,9 @@ func _accept() -> void:
 					_enter("pick")
 				"Items":
 					_enter("items_unit")
+				"Shop":
+					column = 0
+					_enter("shop")
 				"Repair":
 					_enter("repair")
 				"Stable":
@@ -163,6 +168,8 @@ func _accept() -> void:
 			_enter("items")
 		"items":
 			_move_item()
+		"shop":
+			_shop()
 		"repair":
 			_repair()
 		"stable":
@@ -273,6 +280,35 @@ func _repairables() -> Array:
 	return result
 
 
+## Buys the highlighted stock item into the convoy (left), or sells the highlighted
+## convoy item (right).
+func _shop() -> void:
+	if column == 0:
+		var stock := Shop.stock_for(Campaign.chapter_data())
+		if index >= stock.size():
+			return
+		var item_name: String = stock[index]
+		if not Shop.can_afford(item_name, Campaign.gold):
+			message = tr("Not enough gold for {item}.").format({"item": item_name})
+			return
+		Campaign.gold -= Items.cost(item_name)
+		Campaign.convoy.append(Items.make(item_name))
+		message = tr("Bought {item}: it's in the convoy.").format({"item": item_name})
+	else:
+		if index >= Campaign.convoy.size():
+			return
+		var item: Dictionary = Campaign.convoy[index]
+		var price := Items.sell_price(item)
+		if price <= 0:
+			message = tr("{item} can't be sold.").format({"item": item.name})
+			return
+		Campaign.gold += price
+		Campaign.convoy.remove_at(index)
+		message = tr("Sold {item} for {price} gold.").format({"item": item.name, "price": price})
+		index = clampi(index, 0, maxi(0, Campaign.convoy.size() - 1))
+	Campaign.save()
+
+
 func _repair() -> void:
 	var list := _repairables()
 	if index >= list.size():
@@ -348,6 +384,8 @@ func _row_count() -> int:
 			return Campaign.army.size()
 		"items":
 			return Campaign.army_unit(current_unit).items.size() if column == 0 else Campaign.convoy.size()
+		"shop":
+			return Shop.stock_for(Campaign.chapter_data()).size() if column == 0 else Campaign.convoy.size()
 		"repair":
 			return _repairables().size()
 		"stable":
@@ -408,6 +446,16 @@ func _render() -> void:
 				side.append(_row(i, Items.label(Campaign.convoy[i], " "), column == 1))
 			if Campaign.convoy.is_empty():
 				side.append("   " + tr("(empty)"))
+		"shop":
+			var stock := Shop.stock_for(Campaign.chapter_data())
+			lines.append(tr("Buy  Gold %d") % Campaign.gold)
+			for i in stock.size():
+				lines.append(_row(i, Shop.buy_label(stock[i], Campaign.gold), column == 0))
+			side.append(tr("Sell (convoy)"))
+			for i in Campaign.convoy.size():
+				side.append(_row(i, Shop.sell_label(Campaign.convoy[i]), column == 1))
+			if Campaign.convoy.is_empty():
+				side.append("   " + tr("(empty)"))
 		"repair":
 			var list := _repairables()
 			if list.is_empty():
@@ -458,6 +506,7 @@ func _render() -> void:
 		"menu": "Up/Down: choose  Z: select",
 		"pick": "Z: deploy / bench  X: back",
 		"items": "Z: move item  Left/Right: unit/convoy  X: back",
+		"shop": "Z: buy / sell  Left/Right: buy/sell  X: back",
 		"repair": "Z: repair  X: back",
 		"stable": "Z: assign / unassign  D: rename  X: back",
 		"stable_rider": "Z: ride  X: back",

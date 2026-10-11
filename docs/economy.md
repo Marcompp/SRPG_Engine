@@ -1,7 +1,7 @@
 # Gold, shops and services (design notes)
 
-Design notes. Step 1 of the build order (gold) is built: `Campaign.gold`,
-`Battle.gold`, `Items.PRICES`.
+Design notes. Steps 1 (gold) and 2 (shops) of the build order are built:
+`Campaign.gold`, `Battle.gold`, `Items.PRICES`, `scripts/shop.gd`.
 
 ## Gold
 
@@ -44,8 +44,9 @@ nothing (it isn't your army's purse).
   inventory (full: the campaign's convoy, outside it no room means no buying), sell
   from its inventory. Buying or selling ends the unit's turn; leaving without one goes
   back to the unit menu.
-- The shop screen lists the stock with prices and the funds; items you can't afford
-  are greyed out.
+- Prices and the funds are shown; items you can't afford are marked (x). On the map
+  the shop is the unit menu's Shop > Buy / Sell; on the prep screen, one screen with
+  the stock on the left and the convoy on the right (Left/Right to switch).
 
 ## Services
 

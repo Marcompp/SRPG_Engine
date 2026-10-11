@@ -89,3 +89,62 @@ func test_repair_costs_gold() -> void:
 	check_eq(sword.uses, Weapons.max_uses(sword), "repaired")
 	check_eq(Campaign.gold, 10, "for the price of its missing uses")
 	prep.queue_free()
+
+
+func test_prep_shop() -> void:
+	await start_chapter(1)
+	var prep: Control = load("res://scenes/prep.tscn").instantiate()
+	root.add_child(prep)
+	check(prep.MENU.has("Shop"), "prep has a Shop")
+	Campaign.gold = 500
+	Campaign.convoy.clear()
+	prep.column = 0
+	prep._enter("shop")
+	var stock := Shop.stock_for(Campaign.chapter_data())
+	prep.index = stock.find("Iron Sword")
+	prep._shop()
+	check_eq(Campaign.gold, 40, "buying costs its price")
+	check(Campaign.convoy.size() == 1 and Campaign.convoy[0].name == "Iron Sword", "into the convoy")
+	prep._shop()
+	check_eq(Campaign.convoy.size(), 1, "not without the gold")
+	prep.column = 1
+	prep.index = 0
+	prep._shop()
+	check_eq(Campaign.gold, 270, "selling pays half")
+	check(Campaign.convoy.is_empty(), "and takes it from the convoy")
+	Campaign.convoy.append({"name": "Old Letter", "kind": "key"})
+	prep._shop()
+	check_eq(Campaign.convoy.size(), 1, "items with no price can't be sold")
+	check(Campaign.load_save() and Campaign.gold == 270, "saved at once")
+	prep.queue_free()
+
+
+func test_map_shop() -> void:
+	var lord := unit_named("Lord")
+	var shop_cell := Vector2i(4, 2)
+	b.map.objects.append({"type": "shop", "cell": shop_cell, "stock": ["Potion", "Silver Sword"], "state": "intact"})
+	check(not b.map.lootable_objects().any(func(o): return o.type == "shop"), "enemies don't loot shops")
+	b.gold = 500
+	lord.set_cell(shop_cell)
+	lord.items.assign([Items.make("Iron Sword")])
+	# Just looking doesn't use up the turn.
+	await open_menu_in_place(lord)
+	await pick("Shop")
+	await pick("Buy")
+	check(b.ui.menu_options.has("Silver Sword  1500G  (x)"), "what you can't afford is marked")
+	await press(KEY_X)
+	await press(KEY_X)
+	check_eq(b.input.menus.context, "unit", "leaving without buying: back to the unit menu")
+	# Buying, then selling.
+	await pick("Shop")
+	await pick("Buy")
+	await pick("Potion  300G")
+	check_eq(b.gold, 200, "bought")
+	check(lord.items.any(func(it): return it.name == "Potion"), "into the unit's inventory")
+	await press(KEY_X)
+	await pick("Sell")
+	await pick("Iron Sword 46  230G")
+	check_eq(b.gold, 430, "sold")
+	await press(KEY_X)
+	await press(KEY_X)
+	check(lord.has_acted, "shopping ends the turn")

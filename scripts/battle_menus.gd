@@ -25,6 +25,10 @@ var steal_target: Unit
 var steal_choices: Array[int] = []
 ## Passengers behind the Unload menu's entries.
 var passenger_choices: Array[Unit] = []
+## Shop on the map: the item names behind the Buy menu's entries, and whether the
+## unit bought or sold anything this visit (then leaving ends its turn).
+var shop_stock: Array = []
+var shop_used := false
 
 
 func _init(owner: BattleInput) -> void:
@@ -49,6 +53,8 @@ func open_unit_menu() -> void:
 		options.append("Visit")  # i18n
 	if here.get("type", "") == "chest" and here.state == "intact" and battle.actions.can_open_chest(selected):
 		options.append("Open")  # i18n
+	if here.get("type", "") == "shop":
+		options.append("Shop")  # i18n
 	if not battle.actions.adjacent_doors(selected).is_empty() and battle.actions.can_open_chest(selected):
 		options.append("Open Door")  # i18n
 	if battle.actions.can_attack_any(selected):
@@ -253,6 +259,9 @@ func accept() -> void:
 					_act(battle.actions.do_visit.bind(selected))
 				"Open":
 					_act(battle.actions.do_open.bind(selected))
+				"Shop":
+					shop_used = false
+					open_shop_menu()
 				"Attack":
 					open_attack_menu()
 				"Break":
@@ -290,6 +299,15 @@ func accept() -> void:
 						targeting.start_ability(choice)
 		"canto":
 			input.finish_action(true)
+		"shop":
+			if battle.ui.menu_choice() == "Buy":
+				open_shop_buy()
+			else:
+				open_shop_sell()
+		"shop_buy":
+			_buy(shop_stock[battle.ui.menu_index])
+		"shop_sell":
+			_sell(battle.ui.menu_index)
 		"attack":
 			selected.equip(weapon_choices[battle.ui.menu_index])
 			targeting.start_units("attack", battle.actions.enemies_in_range(selected, selected.weapon))
@@ -340,10 +358,74 @@ func cancel() -> void:
 			input.undo_move()
 		"attack", "magic", "items", "unload", "break":
 			open_unit_menu()
+		"shop":
+			# Buying or selling ends the turn; just looking doesn't.
+			if shop_used:
+				input.finish_action()
+			else:
+				open_unit_menu()
+		"shop_buy", "shop_sell":
+			open_shop_menu()
 		"steal":
 			input.targeting.start_units("steal", battle.actions.steal_targets(selected))
 		"repair":
 			open_items_menu()
+
+
+# --- Shop on the map (see Shop) -------------------------------------------------
+
+func open_shop_menu() -> void:
+	var options: Array[String] = ["Buy", "Sell"]  # i18n
+	open("shop", options, tr("Shop  Gold %d") % battle.gold)
+
+
+func open_shop_buy() -> void:
+	shop_stock = battle.map.object_at(selected.cell).get("stock", [])
+	var options: Array[String] = []
+	for item_name: String in shop_stock:
+		options.append(Shop.buy_label(item_name, battle.gold))
+	if options.is_empty():
+		open_shop_menu()
+		return
+	open("shop_buy", options, tr("Buy  Gold %d") % battle.gold)
+
+
+func open_shop_sell() -> void:
+	var options: Array[String] = []
+	for item in selected.items:
+		options.append(Shop.sell_label(item))
+	if options.is_empty():
+		open_shop_menu()
+		return
+	open("shop_sell", options, tr("Sell  Gold %d") % battle.gold)
+
+
+## Into the unit's inventory, or the campaign's convoy when it's full.
+func _buy(item_name: String) -> void:
+	var full := selected.items.size() >= Unit.MAX_ITEMS
+	if not Shop.can_afford(item_name, battle.gold):
+		selected.popup(tr("Not enough gold"), Color.LIGHT_GRAY)
+	elif full and not Campaign.active:
+		selected.popup(tr("No room"), Color.LIGHT_GRAY)
+	else:
+		battle.gold -= Items.cost(item_name)
+		selected.popup(battle.actions.give_item(selected, item_name), Color.GOLD)
+		shop_used = true
+		input.move_committed = true
+	open_shop_buy()
+
+
+func _sell(index: int) -> void:
+	var price := Items.sell_price(selected.items[index])
+	if price <= 0:
+		selected.popup(tr("Can't sell"), Color.LIGHT_GRAY)
+	else:
+		battle.gold += price
+		selected.items.remove_at(index)
+		selected.popup(tr("+%d gold") % price, Color.GOLD)
+		shop_used = true
+		input.move_committed = true
+	open_shop_sell()
 
 
 ## A scroll is used up (and ends the turn) only if the skill was learned.
