@@ -556,6 +556,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 		if a.weapon.is_empty():
 			continue
 		var result := Combat.strike(a, d, battle.map, attacker)
+		result["counter"] = a != attacker
 		await a.lunge(d.cell)
 		_apply_strike(a, d, result, dealt)
 		if result.hit and a.use_weapon():
@@ -579,6 +580,7 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 	await get_tree().create_timer(0.45).timeout
 	if target.hp > 0 and not spell.get("status_only", false) and Combat.can_counter(caster, target, battle.map):
 		var counter := Combat.strike(target, caster, battle.map, caster)
+		counter["counter"] = true
 		await target.lunge(caster.cell)
 		_apply_strike(target, caster, counter, dealt)
 		if counter.hit and target.use_weapon():
@@ -702,7 +704,14 @@ func _record_kill(a: Unit, d: Unit, result: Dictionary) -> void:
 		return
 	a.kills += 1
 	if not result.get("spell", false) and not a.weapon.is_empty():
-		a.weapon["kills"] = a.weapon.get("kills", 0) + 1
+		var alone := not battle.units().any(func(o: Unit) -> bool:
+			return o != a and o.team == a.team and BattleMap.distance(o.cell, a.cell) == 1)
+		var weapon_name: String = a.weapon.name
+		var earned := WeaponTraits.record_kill(a.weapon, a, d, result, alone)
+		if earned != "":
+			a.popup(tr("{weapon}: {trait}!").format({"weapon": weapon_name, "trait": tr(earned)}), Color.GOLD, 20.0)
+			_note(a, Text.entry("Their {weapon} earned {trait} at {map}, after {kills} kills.",
+				{"weapon": weapon_name, "trait": earned, "map": map_title(), "kills": WeaponTraits.KILLS_FOR_TRAIT}))
 	if d.is_boss:
 		var text := "Defeated {foe} with a critical hit at {map}." if result.crit else "Defeated {foe} at {map}."  # i18n
 		_note(a, Text.entry(text, {"foe": foe_label(d), "map": map_title()}))

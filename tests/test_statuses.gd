@@ -210,7 +210,7 @@ func _sure_hit_duel() -> Array[Unit]:
 	lord.dexterity = 60
 	brig.agility = 0
 	brig.luck = 0
-	brig.base_max_hp = 80
+	brig.base_max_hp = 200
 	brig.hp = brig.max_hp
 	return pair
 

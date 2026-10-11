@@ -109,8 +109,10 @@ static func item(it: Dictionary) -> String:
 		for skill: String in it.get("skills", []):
 			text += " " + TranslationServer.translate("Equipped: {skill} ({description})").format({"skill": skill,
 				"description": Skills.get_data(skill).description})
-		if it.get("kills", 0) > 0:
+		if it.has("trait"):
 			text += " " + TranslationServer.translate("Kills: %d.") % it.kills
+		elif it.get("kills", 0) > 0:
+			text += " " + TranslationServer.translate("Kills: %d (a trait at %d).") % [it.kills, WeaponTraits.KILLS_FOR_TRAIT]
 		if Weapons.is_broken(it):
 			text += " " + TranslationServer.translate("BROKEN: half Mt, -%d Hit, no Crit until repaired.") % Weapons.BROKEN_HIT_PENALTY
 		return text

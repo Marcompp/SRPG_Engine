@@ -174,6 +174,17 @@ const DATA := {
 		"after_combat": {"effect": "damage_foe", "value": 0.2}, "if": {"initiating": true}},
 	"Envenom": {"description": "A foe it attacks is poisoned after combat, if still standing.",
 		"after_combat": {"effect": "inflict", "value": "Poison"}, "if": {"initiating": true}},
+	# Weapon traits (see WeaponTraits): earned by weapons, also usable as skills.
+	"Armorbane": {"description": "+5 Atk against armored foes.", "battle": {"atk": 5}, "if": {"foe_tag": "heavy"}},
+	"Horsebane": {"description": "+5 Atk against horseback foes.", "battle": {"atk": 5}, "if": {"foe_tag": "horse"}},
+	"Skybane": {"description": "+5 Atk against flying foes.", "battle": {"atk": 5}, "if": {"foe_tag": "flying"}},
+	"Wyrmbane": {"description": "+5 Atk against reptiles and dragons.", "battle": {"atk": 5}, "if": {"foe_tag": "reptile"}},
+	"Grimbane": {"description": "+5 Atk against the undead and spirits.", "battle": {"atk": 5}, "if": {"foe_tag": ["undead", "spirit"]}},
+	"Faebane": {"description": "+5 Atk against the fae.", "battle": {"atk": 5}, "if": {"foe_tag": "fae"}},
+	"Orcbane": {"description": "+5 Atk against greenskins.", "battle": {"atk": 5}, "if": {"foe_tag": "greenskin"}},
+	"Tidebane": {"description": "+5 Atk against aquatic foes.", "battle": {"atk": 5}, "if": {"foe_tag": "aquatic"}},
+	"Woodsplitter": {"description": "+5 Atk against wooden foes.", "battle": {"atk": 5}, "if": {"foe_tag": "wooden"}},
+	"Far Shot": {"description": "+15 Hit at range 2 or more.", "battle": {"hit": 15}, "if": {"range": [2, 99]}},
 	"Savage Blow": {"description": "Foes within 2 tiles of the one it attacks lose 20% of max HP (never below 1).",
 		"after_combat": {"effect": "damage_near_foe", "value": 0.2}, "if": {"initiating": true}},
 	# Turn start.
