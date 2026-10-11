@@ -1,0 +1,10 @@
+# Status Trials: a test map for status effects. Format: scripts/event_script.gd
+# (and docs/events.md; statuses: docs/status_effects.md).
+
+== start ==
+@narrate A training field. The instructors have been... thorough.
+@status Knight, Petrify
+Cleric: The Knight's been turned to stone! Restore can fix that, or a Panacea.
+Lord: My blade's coated in venom. Watch the Orc, though: it won't take.
+Witch: Their Brigands are packed together. One Berserk should sort them out.
+Witch: And that Mender will heal them all day unless someone Silences it.

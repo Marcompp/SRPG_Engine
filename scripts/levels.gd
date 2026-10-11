@@ -11,7 +11,7 @@ static var selected := "river_crossing"
 ## Set by the level select to resume the suspended battle instead of starting fresh.
 static var resume := false
 
-const ORDER: Array[String] = ["river_crossing", "coastal_raid", "desert_outpost", "frozen_pass", "castle_keep", "ruined_fort", "great_valley", "loyal_steeds"]
+const ORDER: Array[String] = ["river_crossing", "coastal_raid", "desert_outpost", "frozen_pass", "castle_keep", "ruined_fort", "great_valley", "loyal_steeds", "status_trials"]
 
 const DATA := {
 	"river_crossing": {
@@ -506,6 +506,60 @@ to fell across the river) and skills: Sol, Pavise, Vantage, a ring, a scroll.",
 				"skills": ["Wrath"],
 				"hp": 20, "str": 5, "dex": 1, "agi": 4, "lck": 0, "def": 3, "mp": 0, "mov": 5,
 				"ai": {"preset": "ambusher"}},
+		],
+	},
+	"status_trials": {
+		"name": "Status Trials",
+		"description": "Status effects: Poison, Silence, Sleep, Paralyse, Berserk
+and Petrify, and how to cure them.",
+		"layout": [
+			"..............",
+			"...F......F...",
+			"..............",
+			".....FF.......",
+			"..............",
+			"..............",
+			".......FF.....",
+			"..F...........",
+			"...........F..",
+			"..............",
+		],
+		"players": [
+			{"name": "Lord", "cell": Vector2i(1, 4), "class": "Swordsman", "lord": true, "items": ["Venom Edge", "Iron Sword", "Potion"],
+				"lv": 5, "skills": ["Envenom"],
+				"hp": 24, "str": 8, "dex": 9, "agi": 9, "lck": 7, "def": 6, "mov": 5, "mp": 4,
+				"growths": {"hp": 80, "str": 45, "dex": 50, "agi": 40, "lck": 45, "def": 30, "mp": 30}},
+			{"name": "Witch", "cell": Vector2i(1, 5), "class": "Mage", "items": ["Quarterstaff", "Ether"], "lv": 5,
+				"spells": ["Sleep", "Silence", "Bind", "Berserk"],
+				"hp": 17, "str": 2, "dex": 9, "agi": 7, "lck": 5, "def": 2, "int": 9, "mov": 5, "mp": 30,
+				"growths": {"hp": 50, "str": 10, "dex": 50, "agi": 45, "lck": 40, "def": 10, "int": 60, "mp": 70}},
+			{"name": "Cleric", "cell": Vector2i(0, 4), "class": "Cleric", "items": ["Quarterstaff", "Antitoxin", "Panacea"], "lv": 5,
+				"spells": ["Heal", "Restore"],
+				"hp": 16, "str": 2, "dex": 6, "agi": 6, "lck": 8, "def": 2, "int": 7, "mov": 5, "mp": 24,
+				"growths": {"hp": 50, "str": 10, "dex": 40, "agi": 45, "lck": 55, "def": 10, "int": 50, "mp": 70}},
+			{"name": "Knight", "cell": Vector2i(2, 4), "class": "Guard", "items": ["Iron Spear", "Javelin"], "lv": 5,
+				"hp": 26, "str": 9, "dex": 5, "agi": 2, "lck": 2, "def": 10, "mov": 4, "mp": 1,
+				"growths": {"hp": 90, "str": 40, "dex": 30, "agi": 30, "lck": 35, "def": 55, "mp": 15}},
+			{"name": "Archer", "cell": Vector2i(0, 5), "class": "Archer", "items": ["Iron Bow"], "lv": 5,
+				"hp": 20, "str": 7, "dex": 9, "agi": 7, "lck": 4, "def": 3, "mov": 5, "mp": 1,
+				"growths": {"hp": 60, "str": 40, "dex": 50, "agi": 60, "lck": 50, "def": 15, "mp": 25}},
+		],
+		"enemies": [
+			{"name": "Hexer", "cell": Vector2i(12, 2), "class": "Mage", "items": ["Quarterstaff"], "spells": ["Fire"], "lv": 5,
+				"hp": 18, "str": 2, "dex": 7, "agi": 6, "lck": 2, "def": 2, "int": 9, "mov": 5, "mp": 18,
+				"ai": {"preset": "ambusher"}},
+			{"name": "Mender", "cell": Vector2i(13, 4), "class": "Cleric", "items": ["Quarterstaff"], "spells": ["Heal"], "lv": 5,
+				"hp": 16, "str": 2, "dex": 5, "agi": 5, "lck": 4, "def": 2, "int": 7, "mov": 5, "mp": 20},
+			{"name": "Grukk", "cell": Vector2i(10, 7), "race": "Orc", "class": "Brigand", "items": ["Iron Axe"], "lv": 5,
+				"hp": 28, "str": 10, "dex": 4, "agi": 4, "lck": 1, "def": 5, "mov": 5, "mp": 0},
+			{"name": "Viper", "cell": Vector2i(9, 2), "class": "Swordsman", "items": ["Venom Edge"], "lv": 4,
+				"hp": 20, "str": 6, "dex": 8, "agi": 9, "lck": 3, "def": 3, "mov": 5, "mp": 0},
+			{"name": "Brigand", "cell": Vector2i(10, 4), "class": "Brigand", "items": ["Iron Axe"], "lv": 4,
+				"hp": 24, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 4, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
+			{"name": "Brigand", "cell": Vector2i(11, 4), "class": "Brigand", "items": ["Iron Axe"], "lv": 4,
+				"hp": 24, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 4, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
+			{"name": "Brigand", "cell": Vector2i(10, 5), "class": "Brigand", "items": ["Iron Axe"], "lv": 4,
+				"hp": 24, "str": 8, "dex": 3, "agi": 4, "lck": 0, "def": 4, "mov": 5, "mp": 0, "ai": {"preset": "sentry"}},
 		],
 	},
 }

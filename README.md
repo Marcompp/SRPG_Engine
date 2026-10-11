@@ -27,6 +27,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Ruined Fort | Breakable terrain: a cracked wall and fence, a locked door (the Scout opens it) and trunks to fell across the river. Skills: the Lord has Sol, the Warden boss Pavise and Vantage; a Power Ring and a Celerity Scroll |
 | Great Valley | A 30x20 map: the camera scrolls with the cursor (and follows moving units), stopping at the map edges |
 | Loyal Steeds | Mounts: a Loyal horse and pegasus on your side (the mount takes a fatal blow once), a Loyal enemy Lancer, and a level 20 rider whose level 1 horse still levels up |
+| Status Trials | Status effects: the Knight starts petrified (Restore or a Panacea), the Lord poisons with a Venom Edge and Envenom (not the Orc), the Witch casts Sleep, Silence, Bind and Berserk (try it on the packed Brigands, or Silence the Mender), and an enemy Venom Edge poisons you back (Antitoxin) |
 
 ## Campaign
 

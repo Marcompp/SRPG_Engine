@@ -314,3 +314,13 @@ func test_berserk_enemy() -> void:
 	check(other.was_attacked, "a berserk enemy attacks its own side")
 	check_eq(brig.statuses.Berserk, 2, "counting down on its phases")
 	check(Spells.DATA.Berserk.inflict.status == "Berserk", "the Berserk spell inflicts it")
+
+
+func test_status_trials_map() -> void:
+	await start_level("status_trials")
+	check(unit_named("Knight").statuses.has("Petrify"), "the opening scene petrifies the Knight")
+	check(Skills.has(unit_named("Lord"), "Envenom"), "the Lord has Envenom")
+	check(Skills.is_immune(unit_named("Grukk", Unit.Team.ENEMY), "Poison"), "the Orc can't be poisoned")
+	var witch := unit_named("Witch")
+	check_eq(witch.spells, ["Sleep", "Silence", "Bind", "Berserk"] as Array[String], "the Witch's status spells")
+	await run_enemy_phases()
