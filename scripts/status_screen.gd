@@ -197,11 +197,19 @@ func _render_left() -> void:
 	portrait.position = Vector2(16, 6)
 	portrait.size = Vector2(48, 48)
 	_left.add_child(portrait)
-	var initial := _label(portrait, unit.token_letter(), Vector2.ZERO)
-	initial.add_theme_font_size_override("font_size", 28)
-	initial.size = portrait.size
-	initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var icon := ClassIcon.for_class(unit.unit_class)
+	if not icon.is_empty():
+		var view := ClassIcon.new()
+		view.pixels = icon
+		view.position = Vector2(6, 6)
+		view.size = portrait.size - Vector2(12, 12)
+		portrait.add_child(view)
+	else:
+		var initial := _label(portrait, unit.token_letter(), Vector2.ZERO)
+		initial.add_theme_font_size_override("font_size", 28)
+		initial.size = portrait.size
+		initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	if Unit.MOVE_TYPE_BADGES.has(unit.move_type):
 		var badge := ColorRect.new()
 		badge.color = Unit.MOVE_TYPE_BADGES[unit.move_type]

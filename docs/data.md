@@ -14,6 +14,7 @@ and per-campaign feature toggles.
 | `items.cfg` | `Items.CONSUMABLES` | consumables and held items (rings) |
 | `economy.cfg` | `Items.PRICES`, `Shop.DEFAULT_STOCK` | `[prices]`, `[shop]` default stock |
 | `classes.cfg` | `Classes.DATA` | classes |
+| `icons.cfg` | `ClassIcon.ICONS` | placeholder class icons (7x7 pixel rows) |
 | `class_stats.cfg` | `Classes.DEFAULT_CAPS`, `DEFAULT_PROMOTION_BONUS` | `[default_caps]`, `[default_promotion_bonus]` |
 | `promotion_bonuses.cfg` | `Classes.PROMOTION_BONUS` | per promoted class |
 | `races.cfg` | `Races.DATA` | races |

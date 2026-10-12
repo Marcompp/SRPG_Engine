@@ -363,7 +363,8 @@ func badge_key() -> String:
 	return "_".join(parts) if not parts.is_empty() else "foot"
 
 
-## The letter on the unit's map token (and stats screen portrait).
+## The unit's letter: its dialogue portrait, and its map token and status screen
+## portrait when its class has no icon (see ClassIcon).
 func token_letter() -> String:
 	return unit_class.left(1) if generic else unit_name.left(1)
 
@@ -727,6 +728,13 @@ func _draw() -> void:
 	var body: Color = ACTED_COLOR if has_acted else Factions.COLORS[team]
 	draw_rect(Rect2(2, 1, 12, 11), body)
 	draw_rect(Rect2(2, 1, 12, 11), Color.BLACK, false, 1.0)
+	# Its class's icon (the marks below stay on top), or its initial if it has none.
+	var icon := ClassIcon.for_class(unit_class)
+	if not icon.is_empty():
+		ClassIcon.paint(self, icon, Vector2(4, 3), 1.0)
+	else:
+		draw_string(ThemeDB.fallback_font, Vector2(2, 10), token_letter(),
+			HORIZONTAL_ALIGNMENT_CENTER, 12, 9, Color.WHITE)
 	if is_lord:
 		draw_rect(Rect2(5, 0, 6, 2), Color.GOLD)
 	if MOVE_TYPE_BADGES.has(badge_key()):
@@ -744,8 +752,6 @@ func _draw() -> void:
 		var flag: Color = Factions.COLORS[aboard.team]
 		draw_rect(Rect2(3, 2, 3, 3), Color.WHITE)
 		draw_rect(Rect2(3.5, 2.5, 2, 2), flag.lightened(0.3))
-	draw_string(ThemeDB.fallback_font, Vector2(2, 10), token_letter(),
-		HORIZONTAL_ALIGNMENT_CENTER, 12, 9, Color.WHITE)
 	if _flash > 0.0:
 		draw_rect(Rect2(2, 1, 12, 11), Color(HIT_FLASH_COLOR, HIT_FLASH_COLOR.a * _flash))
 	draw_set_transform(Vector2.ZERO)

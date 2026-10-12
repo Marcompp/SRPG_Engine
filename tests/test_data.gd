@@ -28,6 +28,13 @@ func test_data_references_exist() -> void:
 		var c: Dictionary = Classes.DATA[id]
 		for s: String in c.get("skills", []) + c.get("learn", {}).values():
 			skill.call(s, "class " + id)
+	for id: String in Classes.DATA:
+		var icon: String = Classes.DATA[id].get("icon", "")
+		check(icon == "" or ClassIcon.ICONS.has(icon), "class %s: unknown icon %s" % [id, icon])
+	for id: String in ClassIcon.ICONS:
+		var rows: Array = ClassIcon.ICONS[id].pixels
+		check(rows.all(func(r: String) -> bool: return r.length() == rows[0].length() \
+			and r.replace("#", "").replace(".", "") == ""), "icon %s: equal rows of # and ." % id)
 	for id: String in Races.DATA:
 		var r: Dictionary = Races.DATA[id]
 		for s: String in r.get("skills", []):

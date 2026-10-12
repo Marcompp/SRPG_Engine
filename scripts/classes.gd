@@ -4,6 +4,7 @@ extends RefCounted
 ## wield, how it moves and its special abilities; stats stay per unit.
 ##
 ## weapons:     weapon types the class can equip (see Weapons).
+## icon:        its placeholder icon on map tokens (data/icons.cfg; see ClassIcon).
 ## Mounted classes (Equestrian, Cavalry, Raider, Nomad, Battlemage and their
 ## promotions) are what a unit becomes on a mount (see Mounts): shared by every
 ## species, which supplies their move type, tags and display name ("Cavalry" on a
