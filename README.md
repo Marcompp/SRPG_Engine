@@ -33,7 +33,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 
 ## Campaign
 
-**New Campaign** on the level select starts five chapters played by one army (`data/chapters/`, format in `scripts/chapters.gd`, state in `scripts/campaign.gd`, saved to `user://campaign.save`):
+Campaigns live in `data/campaigns/<id>/` (`campaign.cfg`: name, description, chapter order, starting gold; `chapters/`: one file per chapter; format in `scripts/chapters.gd`, state in `scripts/campaign.gd`). The level select has a **New** entry for each, and a **Continue** entry for each one with a save (`user://campaign_<id>.save`; a save from before there were several campaigns becomes the Border March's). **The Border March** is five chapters played by one army:
 
 | Chapter | Objective | Also introduces | Recruits |
 |---|---|---|---|
@@ -217,7 +217,7 @@ Movement types: **foot** (most units), **heavy** (armor), **horse**, **mermaid**
 
 ## Enemy behaviors
 
-Each enemy roster entry in a map (`data/levels/`, `data/chapters/`) can have an `"ai"` dictionary: a preset, a preset plus overrides, or raw settings (all documented in `scripts/ai_profiles.gd`).
+Each enemy roster entry in a map (`data/levels/`, a campaign's `chapters/`) can have an `"ai"` dictionary: a preset, a preset plus overrides, or raw settings (all documented in `scripts/ai_profiles.gd`).
 
 ```gdscript
 "ai": {"preset": "boss"}

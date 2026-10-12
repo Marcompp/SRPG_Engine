@@ -44,10 +44,7 @@ static func collect() -> Dictionary:
 	for path in _files(EVENTS_DIR, "txt"):
 		for found in scan_events(FileAccess.get_file_as_string(path)):
 			_add(messages, found, path)
-	var data_files := _files(DATA_DIR, "cfg")
-	for dir in DirAccess.get_directories_at(DATA_DIR):
-		data_files.append_array(_files(DATA_DIR + dir + "/", "cfg"))
-	for path in data_files:
+	for path in _files_deep(DATA_DIR, "cfg"):
 		var file := path.trim_prefix(DATA_DIR).get_basename()
 		for found in scan_data(FileAccess.get_file_as_string(path), NAMED_DATA.has(file), file == "mounts"):
 			_add(messages, found, path)
@@ -181,6 +178,14 @@ static func _files(dir: String, extension: String) -> Array[String]:
 		if f.get_extension() == extension:
 			result.append(dir + f)
 	result.sort()
+	return result
+
+
+## Files with `extension` in `dir` and every folder under it.
+static func _files_deep(dir: String, extension: String) -> Array[String]:
+	var result := _files(dir, extension)
+	for sub in DirAccess.get_directories_at(dir):
+		result.append_array(_files_deep(dir + sub + "/", extension))
 	return result
 
 

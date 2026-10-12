@@ -1,14 +1,16 @@
 extends Control
 ## Level select (for testing): Up/Down to pick a level, Z to play it. When a
-## battle was suspended, a "Resume" entry at the top picks it back up; "Options"
-## at the bottom opens the options menu.
+## battle was suspended, a "Resume" entry at the top picks it back up; then each
+## campaign (Chapters.CAMPAIGNS) gets a Continue entry (if it has a save) and a New
+## one; "Options" at the bottom opens the options menu.
 
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const PREP_SCENE := "res://scenes/prep.tscn"
 const DIM := Color(0.7, 0.75, 0.95)
 
 var index := 0
-## [{"label", "description", "level", "resume"}], in display order.
+## [{"label", "description", and "level"+"resume", "campaign"+"campaign_id" or
+## "options"}], in display order.
 var choices: Array = []
 ## Rows of the choice list shown at once.
 const LIST_ROWS := 5
@@ -60,22 +62,28 @@ func _ready() -> void:
 
 func _build_choices() -> void:
 	choices.clear()
+	Campaign.migrate_old_save()
 	var suspended := SaveGame.read_suspend()
 	if not suspended.is_empty() and (Levels.DATA.has(suspended.level) or Chapters.DATA.has(suspended.level)):
 		var level := Levels.get_level(suspended.level)
 		choices.append({"label": tr("Resume: %s, Turn %d") % [tr(level.name), suspended.turn],
 			"description": tr("Continue the suspended battle."), "level": suspended.level, "resume": true})
-	if Campaign.load_save():
-		if Campaign.is_complete():
-			choices.append({"label": tr("Campaign complete!"), "description": tr("Every chapter cleared. Start a new campaign below."),
-				"campaign": "none"})
-		else:
-			var chapter_name := tr(Campaign.chapter_data().name)
-			choices.append({"label": tr("Continue Campaign: %s") % chapter_name.get_slice(":", 0),
-				"description": tr("Back to the preparations for %s.") % chapter_name, "campaign": "continue"})
-	choices.append({"label": tr("New Campaign"), "campaign": "new",
-		"description": tr("Five chapters with one army. Overwrites the current campaign.") if Campaign.has_save()
-			else tr("Five chapters with one army, permadeath included.")})
+	for campaign_id: String in Chapters.CAMPAIGNS:
+		Campaign.select(campaign_id)
+		var campaign_name := tr(Campaign.info().name)
+		if Campaign.load_save():
+			if Campaign.is_complete():
+				choices.append({"label": tr("%s: complete!") % campaign_name, "campaign": "none",
+					"campaign_id": campaign_id, "description": tr("Every chapter cleared. Start it again below.")})
+			else:
+				var chapter_name := tr(Campaign.chapter_data().name)
+				choices.append({"label": tr("Continue %s: %s") % [campaign_name, chapter_name.get_slice(":", 0)],
+					"description": tr("Back to the preparations for %s.") % chapter_name, "campaign": "continue",
+					"campaign_id": campaign_id})
+		var about := tr(Campaign.info().get("description", ""))
+		choices.append({"label": tr("New: %s") % campaign_name, "campaign": "new", "campaign_id": campaign_id,
+			"description": (about + " " + tr("Overwrites your progress in it.")).strip_edges() if Campaign.has_save()
+				else about})
 	for id in Levels.ORDER:
 		var level := Levels.get_level(id)
 		choices.append({"label": tr(level.name), "description": tr(level.description), "level": id, "resume": false})
@@ -113,17 +121,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		if choice.get("options", false):
 			_options.open()
 			return
+		if choice.has("campaign_id"):
+			Campaign.select(choice.campaign_id)
 		match choice.get("campaign", ""):
 			"none":
 				return
 			"continue":
+				Campaign.load_save()
 				get_tree().change_scene_to_file(PREP_SCENE)
 				return
 			"new":
 				# Overwriting a campaign takes a second press.
 				if Campaign.has_save() and not _confirm_new:
 					_confirm_new = true
-					_description.text = tr("Press Z again to start over (the current campaign is lost).")
+					_description.text = tr("Press Z again to start over (your progress in it is lost).")
 					return
 				Campaign.start_new()
 				get_tree().change_scene_to_file(PREP_SCENE)

@@ -89,5 +89,5 @@ rule, statuses, reinforcements.
   company with the King's grudging blessing? Default: goes home.
 - **Permadeath:** keep it with soft wording ("too hurt to go on"), or have demo units
   retreat instead of dying? Undecided.
-- **Replacing the current 5-chapter campaign:** the demo would take its place; the test
-  maps stay.
+- **The current 5-chapter campaign:** kept. The demo becomes a second campaign
+  (`data/campaigns/`), and the Border March stays as the test suite's campaign.

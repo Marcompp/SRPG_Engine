@@ -51,6 +51,7 @@ static func capture(battle: Battle, with_history := true) -> Dictionary:
 		"version": VERSION,
 		"level": Levels.selected,
 		"campaign": Campaign.active,
+		"campaign_id": Campaign.id,
 		"turn": battle.turn,
 		"grid": _encode(battle.map.grid, ids),
 		"tile_hp": battle.map.tile_hp.duplicate(),

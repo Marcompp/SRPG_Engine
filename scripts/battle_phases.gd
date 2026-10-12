@@ -268,6 +268,8 @@ func suspend() -> void:
 func resume_suspended() -> void:
 	var data := SaveGame.read_suspend()
 	# A campaign chapter needs the campaign it belongs to (army, convoy, chapter).
+	if data.get("campaign", false):
+		Campaign.select(data.get("campaign_id", Campaign.LEGACY_ID))
 	Campaign.active = data.get("campaign", false) and Campaign.load_save()
 	battle.events.load_for(data.level)
 	SaveGame.restore(battle, data)

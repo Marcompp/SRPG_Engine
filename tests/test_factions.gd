@@ -132,6 +132,7 @@ func test_provoking_neutrals() -> void:
 	var lord: Unit = pair[0]
 	var brig: Unit = pair[1]
 	var villager := _spawn(Unit.Team.NEUTRAL, Vector2i(5, 7))
+	villager.max_hp = 60  # so no crit can fell it mid-test
 	villager.hp = 60
 	brig.set_cell(Vector2i(6, 7))
 	await b.actions.do_combat(brig, villager)

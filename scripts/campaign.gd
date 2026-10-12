@@ -1,12 +1,13 @@
 class_name Campaign
 extends RefCounted
-## The campaign: a fixed run of chapters (Chapters.ORDER) played by one army that
-## carries levels, EXP and items from map to map.
+## The campaign being played: one of Chapters.CAMPAIGNS (`id`, picked with select), a
+## fixed run of chapters (Chapters.ORDER) played by one army that carries levels, EXP
+## and items from map to map. Each campaign has its own save (save_path).
 ##
 ## Permadeath: a unit that falls leaves the army for good. It's kept in `fallen`
 ## (its data plus where and when) so later mechanics can interact with death.
-## Saved to `path` when a campaign starts and after each completed chapter, so a
-## lost chapter is retried with the army as it was before it.
+## Saved when a campaign starts and after each completed chapter, so a lost chapter
+## is retried with the army as it was before it.
 
 ## Biography line for each way a unit can fall (Battle.campaign_deaths "how").
 const DEATH_TEXTS := {  # i18n
@@ -14,7 +15,14 @@ const DEATH_TEXTS := {  # i18n
 	"Succumbed to poison": "Succumbed to poison in {map}, turn {turn}.",
 }
 
-static var path := "user://campaign.save"
+## Each campaign saves to save_prefix + its id + ".save" (tests use their own prefix).
+static var save_prefix := "user://campaign_"
+## Where campaigns were saved before there were several: that save belongs to
+## LEGACY_ID (see migrate_old_save). Tests point it elsewhere.
+static var old_path := "user://campaign.save"
+const LEGACY_ID := "border_march"
+## The selected campaign (a key of Chapters.CAMPAIGNS).
+static var id: String = Chapters.CAMPAIGNS.keys()[0]
 ## True while the battle being played is a campaign chapter.
 static var active := false
 ## Index into Chapters.ORDER of the chapter being prepared or played.
@@ -39,18 +47,43 @@ static var checking_map := false
 static var stable: Array = []
 
 
-## The army's funds (docs/economy.md); a new campaign starts with START_GOLD.
+## The army's funds (docs/economy.md); a new campaign starts with its "start_gold",
+## or START_GOLD.
 static var gold := 0
 const START_GOLD := 1000
 
 
+## Makes `campaign_id` the campaign being played (its chapters become Chapters.ORDER).
+## Its state is loaded with load_save or reset with start_new.
+static func select(campaign_id: String) -> void:
+	assert(Chapters.CAMPAIGNS.has(campaign_id), "unknown campaign: " + campaign_id)
+	id = campaign_id
+	Chapters.ORDER = Chapters.order_of(campaign_id)
+
+
+## The selected campaign's campaign.cfg keys (name, description...).
+static func info() -> Dictionary:
+	return Chapters.CAMPAIGNS[id]
+
+
+static func save_path() -> String:
+	return save_prefix + id + ".save"
+
+
 static func has_save() -> bool:
-	return FileAccess.file_exists(path)
+	return FileAccess.file_exists(save_path())
+
+
+## A save from before there were several campaigns becomes LEGACY_ID's.
+static func migrate_old_save() -> void:
+	var legacy := save_prefix + LEGACY_ID + ".save"
+	if FileAccess.file_exists(old_path) and not FileAccess.file_exists(legacy):
+		DirAccess.rename_absolute(old_path, legacy)
 
 
 static func start_new() -> void:
 	chapter = 0
-	gold = START_GOLD
+	gold = info().get("start_gold", START_GOLD)
 	army = []
 	convoy = []
 	fallen = []
@@ -62,21 +95,21 @@ static func start_new() -> void:
 
 
 static func save() -> void:
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	file.store_var({"version": SaveGame.VERSION, "chapter": chapter, "gold": gold, "army": army, "convoy": convoy,
+	var file := FileAccess.open(save_path(), FileAccess.WRITE)
+	file.store_var({"version": SaveGame.VERSION, "campaign": id, "chapter": chapter, "gold": gold, "army": army, "convoy": convoy,
 		"fallen": fallen, "recruited": recruited, "stable": stable})
 
 
 ## Loads the saved campaign (the state before the current chapter). False if none.
 static func load_save() -> bool:
-	var file := FileAccess.open(path, FileAccess.READ)
+	var file := FileAccess.open(save_path(), FileAccess.READ)
 	if file == null:
 		return false
 	var data = file.get_var()
 	if not data is Dictionary or data.get("version", 0) != SaveGame.VERSION:
 		return false
 	chapter = data.chapter
-	gold = data.get("gold", START_GOLD)
+	gold = data.get("gold", info().get("start_gold", START_GOLD))
 	army = data.army
 	convoy = data.convoy
 	fallen = data.fallen
@@ -150,7 +183,7 @@ static func clear_deployment() -> void:
 
 static func delete_save() -> void:
 	if has_save():
-		DirAccess.remove_absolute(path)
+		DirAccess.remove_absolute(save_path())
 
 
 static func is_complete() -> bool:

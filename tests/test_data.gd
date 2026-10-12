@@ -14,7 +14,14 @@ func test_data_loads_like_constants() -> void:
 		"ints stay ints and floats stay floats")
 	check(Levels.DATA["river_crossing"].players[0].cell is Vector2i, "cells load as Vector2i")
 	check_eq(Levels.DATA.keys(), Array(Levels.ORDER), "maps load in index order")
-	check_eq(Chapters.DATA.keys(), Array(Chapters.ORDER), "chapters load in index order")
+	check_eq(Chapters.DATA.keys().slice(0, Chapters.ORDER.size()), Array(Chapters.ORDER),
+		"the first campaign's chapters load in its order")
+	for campaign: String in Chapters.CAMPAIGNS:
+		var info: Dictionary = Chapters.CAMPAIGNS[campaign]
+		check(info.has("name") and not info.chapters.is_empty(), "campaign %s: a name and chapters" % campaign)
+		for chapter: String in info.chapters:
+			check(Chapters.DATA.has(chapter) and not Levels.DATA.has(chapter),
+				"campaign %s: chapter %s loads, and isn't also a test map's id" % [campaign, chapter])
 
 
 func test_data_references_exist() -> void:

@@ -383,3 +383,36 @@ func test_prep_screen_repair() -> void:
 	check_eq(Campaign.convoy[-1].uses, Weapons.max_uses(Campaign.convoy[-1]), "and the convoy's")
 	check_eq(prep._row_count(), 0, "nothing left to repair")
 	prep.queue_free()
+
+
+# --- Several campaigns -------------------------------------------------------
+
+func test_campaigns_select_and_save_apart() -> void:
+	var first: String = Chapters.CAMPAIGNS.keys()[0]
+	Campaign.select(first)
+	check_eq(Array(Chapters.ORDER), Array(Chapters.CAMPAIGNS[first].chapters), "select sets the chapter order")
+	check_eq(Campaign.save_path(), Campaign.save_prefix + first + ".save", "each campaign has its own save")
+	Campaign.start_new()
+	check(Campaign.has_save(), "a new campaign saves")
+	var file := FileAccess.open(Campaign.save_path(), FileAccess.READ)
+	check_eq(file.get_var().get("campaign", ""), first, "and the save says which campaign it is")
+	file.close()
+	# A save from before there were several campaigns is the Border March's.
+	Campaign.delete_save()
+	FileAccess.open(Campaign.old_path, FileAccess.WRITE).store_var({"version": SaveGame.VERSION})
+	Campaign.migrate_old_save()
+	check(not FileAccess.file_exists(Campaign.old_path), "the old save is moved")
+	Campaign.select(Campaign.LEGACY_ID)
+	check(Campaign.has_save(), "to the Border March's save")
+	Campaign.delete_save()
+
+
+func test_level_select_lists_campaigns() -> void:
+	Campaign.select(Chapters.CAMPAIGNS.keys()[0])
+	Campaign.delete_save()
+	var screen = load("res://scripts/level_select.gd").new()
+	screen._build_choices()
+	var news: Array = screen.choices.filter(func(c): return c.get("campaign", "") == "new")
+	check_eq(news.size(), Chapters.CAMPAIGNS.size(), "a New entry per campaign")
+	check(news.all(func(c): return Chapters.CAMPAIGNS.has(c.campaign_id)), "each naming its campaign")
+	screen.free()

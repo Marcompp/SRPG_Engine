@@ -30,11 +30,12 @@ static func strings(file: String, section_name: String, key: String) -> Array[St
 	return result
 
 
-## A folder of one-file-per-entry data (data/levels/, data/chapters/): {id: data}, in
-## the order its index.cfg lists. Each entry file holds its keys outside any section.
-static func folder(dir: String) -> Dictionary:
+## A folder of one-file-per-entry data (data/levels/, a campaign's chapters/): {id:
+## data}, in the order `ids` lists, or by default the order its index.cfg lists. Each
+## entry file holds its keys outside any section.
+static func folder(dir: String, ids: Array = []) -> Dictionary:
 	var result := {}
-	for id in strings(dir + "/index", "", "order"):
+	for id: String in ids if not ids.is_empty() else Array(strings(dir + "/index", "", "order")):
 		result[id] = _section(_load(dir + "/" + id), "")
 	return _frozen(result)
 

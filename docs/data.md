@@ -29,7 +29,7 @@ and per-campaign feature toggles.
 | `terrain.cfg` | `BattleMap.TERRAIN` | terrain, by layout key |
 | `combat.cfg` | `Combat.TRIANGLE`, `TAG_TRAITS` | `[triangle]`, `[tag_traits]` |
 | `levels/` | `Levels.DATA`, `Levels.ORDER` | test maps: one file each, `index.cfg` lists them in order |
-| `chapters/` | `Chapters.DATA`, `Chapters.ORDER` | campaign chapters, the same way |
+| `campaigns/` | `Chapters.CAMPAIGNS`, `Chapters.DATA`, `Chapters.ORDER` | campaigns: `index.cfg` lists them; each `<id>/` has a `campaign.cfg` (name, description, `chapters` in play order, optional `start_gold`) and a `chapters/` folder, one file per chapter. Chapter ids are unique across campaigns and test maps |
 
 What each field means is documented where the code uses it, at the top of the
 script that reads the file (`scripts/weapons.gd` for weapons, and so on). Engine
@@ -56,7 +56,7 @@ effective=["horse"]
   `[.]` for the plain terrain). The order of sections is the order in game.
 - **Keys** that aren't plain lowercase names need quotes: `"Iron Sword"=460`.
   Unquoted, ConfigFile drops their spaces.
-- **Map files** (`levels/`, `chapters/`) are one entry each, with their keys at the
+- **Map files** (`levels/`, a campaign's `chapters/`) are one entry each, with their keys at the
   top and no section header.
 - **Comments** start with `;`. A `#` is not a comment.
 - **Colors** are hex strings (`color="b050e0"`): any key named `color` is read as a
@@ -102,7 +102,8 @@ to the export preset's "Filters to export non-resource files".
 
 ## Later
 
-- **Several campaigns:** a campaign folder overriding or adding to `data/`.
+- **Per-campaign data:** campaigns have their own folders now (chapters, settings); a
+  campaign folder could also override or add to the shared tables (classes, items...).
   `GameData` is the one place that would need to know.
 - **Database editor:** it can read and write these files with `ConfigFile`. Saving
   through `ConfigFile` drops comments and reflows values, so the editor should keep

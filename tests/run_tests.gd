@@ -28,7 +28,8 @@ func _initialize() -> void:
 	DirAccess.remove_absolute(Settings.path)
 	Settings.reload()
 	# ...or a real campaign.
-	Campaign.path = "user://test_campaign.save"
+	Campaign.save_prefix = "user://test_campaign_"
+	Campaign.old_path = "user://test_campaign.save"
 	Campaign.delete_save()
 	_run_all()
 
