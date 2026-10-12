@@ -397,6 +397,43 @@ func test_danger_zone_toggle_and_coverage() -> void:
 	check(b.map.danger_cells.is_empty(), "C again hides it")
 
 
+func test_danger_zone_follows_a_move_before_acting() -> void:
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	isolate([lord, brig])
+	await process_frame
+	lord.set_cell(Vector2i(5, 2))
+	brig.set_cell(Vector2i(10, 2))
+	await press(KEY_C)
+	var before: Dictionary = b.map.danger_cells.duplicate()
+	check(before.has(Vector2i(4, 2)), "the Brigand can cross the river at row 2 and reach the west bank")
+	# Move the Lord onto the crossing (7, 2) without acting yet: it blocks the way.
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	await press(KEY_RIGHT)
+	await press(KEY_RIGHT)
+	await press(KEY_Z)
+	check_eq(b.state, b.State.MENU, "moved, picking an action")
+	check_eq(lord.cell, Vector2i(7, 2), "on the crossing")
+	check(not b.map.danger_cells.has(Vector2i(4, 2)), "the danger zone updates: the crossing is blocked")
+	await press(KEY_X)
+	check_eq(b.map.danger_cells, before, "undoing the move restores it")
+
+
+func test_status_spell_range() -> void:
+	var lord := unit_named("Lord")
+	clear_board([lord])
+	lord.spells.assign(["Sleep"])  # range 1-3, no damage
+	check(not b.offense_ranges(lord).has(Spells.reach_ranges("Sleep", lord)), "status spells aren't attack range")
+	b.cursor.cell = lord.cell + Vector2i.UP
+	await press(KEY_DOWN)
+	check(not b.map.status_cells.is_empty(), "hover shows the status spell range")
+	check(b.map.status_cells.all(func(c: Vector2i) -> bool: return not b.map.attack_cells.has(c)),
+		"apart from the attack range (red wins where both reach)")
+	check(b.map.support_cells.all(func(c: Vector2i) -> bool: return not b.map.status_cells.has(c)),
+		"and the support range")
+
+
 func test_hover_and_mark_enemy() -> void:
 	var sold := unit_named("Soldier", Unit.Team.ENEMY)
 	var brig := unit_named("Brigand", Unit.Team.ENEMY)

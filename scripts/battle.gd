@@ -229,17 +229,30 @@ func nearest_free_cell(u: Unit, from: Vector2i) -> Vector2i:
 	return best
 
 
-## Weapon ranges plus offensive spell reach. Spells the unit can't afford are
-## skipped when `affordable_only` (used for enemy threat, which must be accurate).
+## Weapon ranges plus damaging spell reach (status-only spells: see status_ranges).
+## Spells the unit can't afford are skipped when `affordable_only` (used for enemy
+## threat, which must be accurate).
 func offense_ranges(u: Unit, affordable_only := false) -> Array[Vector2i]:
 	var offense := u.weapon_ranges()
 	for s in u.attack_spells():
-		if Spells.is_support(s) or (affordable_only and not Spells.can_afford(u, s)):
+		if Spells.is_support(s) or Spells.get_spell(s).get("status_only", false) 				or (affordable_only and not Spells.can_afford(u, s)):
 			continue
 		var r := Spells.reach_ranges(s, u)
 		if not offense.has(r):
 			offense.append(r)
 	return offense
+
+
+## Reach of the unit's status-only spells (Sleep, Silence...): offensive, but no damage.
+func status_ranges(u: Unit) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for s in u.attack_spells():
+		if not Spells.get_spell(s).get("status_only", false):
+			continue
+		var r := Spells.reach_ranges(s, u)
+		if not result.has(r):
+			result.append(r)
+	return result
 
 
 ## "Turn N", or "Turn N / M" on maps with a turn limit.

@@ -40,6 +40,8 @@ static func cost_for(key: String, move_type: String) -> float:
 const MOVE_COLOR := Color(0.3, 0.5, 1.0, 0.5)
 const ATTACK_COLOR := Color(1.0, 0.25, 0.25, 0.45)
 const SUPPORT_COLOR := Color(0.3, 1.0, 0.4, 0.4)
+## Status-only spells (Sleep, Silence...): yellow, since purple is the danger zone.
+const STATUS_COLOR := Color(1.0, 0.85, 0.15, 0.45)
 const AREA_COLOR := Color(1.0, 0.6, 0.1, 0.55)
 const DANGER_COLOR := Color(0.6, 0.1, 0.75, 0.3)
 const DANGER_EDGE_COLOR := Color(0.85, 0.3, 1.0, 0.9)
@@ -63,6 +65,7 @@ var grid: Array[String] = []
 var move_cells: Array = []
 var attack_cells: Array = []
 var support_cells: Array = []
+var status_cells: Array = []
 var area_cells: Array = []
 ## Threat overlays, drawn under the other highlights: every enemy (purple,
 ## toggled by the player) and the enemies the player has marked (red).
@@ -109,13 +112,13 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if not (move_cells.is_empty() and attack_cells.is_empty() and support_cells.is_empty()):
+	if not (move_cells.is_empty() and attack_cells.is_empty() and support_cells.is_empty() and status_cells.is_empty()):
 		_shimmer.queue_redraw()
 
 
 func _draw_shimmer() -> void:
 	var t := Time.get_ticks_msec() / 1000.0 * SHIMMER_SPEED
-	for cells in [move_cells, attack_cells, support_cells]:
+	for cells in [move_cells, attack_cells, support_cells, status_cells]:
 		for c: Vector2i in cells:
 			var a := SHIMMER_ALPHA * (0.5 + 0.5 * sin(t - (c.x + c.y) * SHIMMER_SPREAD))
 			_shimmer.draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), Color(1, 1, 1, a))
@@ -381,10 +384,13 @@ func cost_field(target: Vector2i, mover: Variant = "foot", extra := {}) -> Dicti
 	return costs
 
 
-func show_ranges(moves: Array, attacks: Array, supports: Array = []) -> void:
+## Move, attack, support and status spell ranges. A cell shows its most hostile
+## use: attack, then status, then support.
+func show_ranges(moves: Array, attacks: Array, supports: Array = [], statuses: Array = []) -> void:
 	move_cells = moves
 	attack_cells = attacks
-	support_cells = supports.filter(func(c: Vector2i) -> bool: return not attacks.has(c))
+	status_cells = statuses.filter(func(c: Vector2i) -> bool: return not attacks.has(c))
+	support_cells = supports.filter(func(c: Vector2i) -> bool: return not attacks.has(c) and not statuses.has(c))
 	queue_redraw()
 
 
@@ -392,6 +398,7 @@ func show_ranges(moves: Array, attacks: Array, supports: Array = []) -> void:
 func show_area(cast_cells: Array, blast: Array) -> void:
 	move_cells = []
 	support_cells = []
+	status_cells = []
 	attack_cells = cast_cells
 	area_cells = blast
 	queue_redraw()
@@ -401,6 +408,7 @@ func clear_ranges() -> void:
 	move_cells = []
 	attack_cells = []
 	support_cells = []
+	status_cells = []
 	area_cells = []
 	arrow_path = []
 	queue_redraw()
@@ -422,6 +430,8 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), ATTACK_COLOR)
 	for c in support_cells:
 		draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), SUPPORT_COLOR)
+	for c in status_cells:
+		draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), STATUS_COLOR)
 	for c in area_cells:
 		draw_rect(Rect2(Vector2(c * TILE), Vector2(TILE, TILE)), AREA_COLOR)
 	if held_cell.x >= 0:

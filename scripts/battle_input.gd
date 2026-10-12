@@ -312,10 +312,13 @@ func select(u: Unit) -> void:
 	_start_path()
 
 
-## Shows a unit's move (blue), attack (red) and support (green) ranges.
+## Shows a unit's move (blue), attack (red), status spell (yellow) and support
+## (green) ranges.
 func show_unit_ranges(u: Unit, unit_reach: Dictionary) -> void:
-	battle.map.show_ranges(unit_reach.cells.keys(), battle.map.get_attack_cells(unit_reach.cells, battle.offense_ranges(u)),
-		battle.map.get_attack_cells(unit_reach.cells, u.spell_ranges(true)))
+	var cells: Dictionary = unit_reach.cells
+	battle.map.show_ranges(cells.keys(), battle.map.get_attack_cells(cells, battle.offense_ranges(u)),
+		battle.map.get_attack_cells(cells, u.spell_ranges(true)),
+		battle.map.get_attack_cells(cells, battle.status_ranges(u)))
 
 
 ## Starts picking where the selected unit moves (SELECTED), from where it stands.
@@ -358,6 +361,9 @@ func move_selected(dest: Vector2i) -> void:
 		else battle.map.build_path(reach.parents, selected.cell, dest)
 	moved_cost = path_cost(path)
 	await selected.move_along(path)
+	# The danger zone as it would be with the unit here (it blocks enemies' paths
+	# now, and its old cell is free), while it still picks its action.
+	battle.refresh_threat()
 	# An area event's scene commits the move (it can't be undone after a cutscene).
 	if await battle.events.on_area(selected):
 		move_committed = true
@@ -375,6 +381,7 @@ func move_selected(dest: Vector2i) -> void:
 ## X at the unit menu: back to where it started its move, picking where to go again.
 func undo_move() -> void:
 	selected.set_cell(origin_cell)
+	battle.refresh_threat()
 	if canto_move:
 		_pick_canto_move()
 	else:
