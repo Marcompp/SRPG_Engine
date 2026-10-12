@@ -100,6 +100,7 @@ func _check_map(id: String, skill: Callable, item: Callable) -> void:
 		roster += level.get(key, [])
 	for wave: Dictionary in level.get("reinforcements", []):
 		roster += wave.units
+	roster += level.get("event_units", {}).values()
 	for u: Dictionary in roster:
 		var where := "%s: %s" % [id, u.get("name", "?")]
 		for it: String in u.get("items", []):

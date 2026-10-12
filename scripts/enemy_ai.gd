@@ -169,7 +169,7 @@ static func take_turn(enemy: Unit, battle: Battle) -> void:
 	var map: BattleMap = battle.map
 	# "players": whoever its side is hostile to (the player's units, for enemies).
 	var players: Array[Unit] = battle.foes_of(enemy)
-	if players.is_empty():
+	if players.is_empty() and current_move(enemy) != "follow":
 		return
 
 	battle.cursor.cell = enemy.cell
@@ -216,8 +216,24 @@ static func take_turn(enemy: Unit, battle: Battle) -> void:
 			"goto":
 				if enemy.ai.destination != Vector2i(-1, -1):
 					await _move_toward(enemy, battle, reach, enemy.ai.destination)
+			"follow":
+				var quarry := follow_target(enemy, battle)
+				if quarry:
+					await _move_toward(enemy, battle, reach, quarry.cell)
 			# "hold" and "in_range" stay put.
 	_finish(enemy)
+
+
+## The unit a "follow" unit heads for: the one named by its `target`, else the
+## player's Lord (the nearest, if there are several). Null if there's none on the map.
+static func follow_target(u: Unit, battle: Battle) -> Unit:
+	var best: Unit = null
+	for o in battle.units():
+		if o == u or not (o.unit_name == u.ai.target if u.ai.target != "" else o.is_lord and o.team == Unit.Team.PLAYER):
+			continue
+		if best == null or BattleMap.distance(u.cell, o.cell) < BattleMap.distance(u.cell, best.cell):
+			best = o
+	return best
 
 
 ## Berserk (either side): attacks the nearest unit of any side it can reach (by

@@ -9,6 +9,10 @@ extends RefCounted
 ##                  "hold"     - never move; attack only from its own tile
 ##                  "guard"    - stay within guard_radius of its starting tile; drift back when idle
 ##                  "goto"     - head for `destination`
+##                  "follow"   - head for the unit named `target` (default: the player's
+##                               Lord). Moves even when its side has no foes (yellow
+##                               neutrals), so with attack false it's a pure pursuer
+##                               (see the "pursuer" preset, and Objectives "caught_by")
 ## attack:          false = never starts a fight (it still counters)
 ## wake:            while asleep the unit uses `move`; the first condition met wakes it for
 ##                  good and it switches to `awake_move`. Conditions (any subset):
@@ -32,6 +36,7 @@ const DEFAULTS := {
 	"move": "charge",
 	"guard_radius": 3,
 	"destination": Vector2i(-1, -1),
+	"target": "",
 	"attack": true,
 	"wake": {},
 	"awake_move": "charge",

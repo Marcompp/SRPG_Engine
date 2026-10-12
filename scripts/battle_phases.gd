@@ -184,7 +184,7 @@ func spawn_reinforcements() -> void:
 			continue
 		for data in wave.units:
 			var u := Unit.create(data.name, Unit.Team.ENEMY, data.cell, data)
-			var cell := _free_cell_near(u, data.cell)
+			var cell := free_cell_near(u, data.cell)
 			if cell == Vector2i(-1, -1):
 				u.free()
 				continue
@@ -197,7 +197,9 @@ func spawn_reinforcements() -> void:
 		await battle.ui.show_banner(tr("Reinforcements!"), Color("b02828"))
 
 
-func _free_cell_near(u: Unit, origin: Vector2i) -> Vector2i:
+## The free cell within 2 of `origin` nearest to it that `u` can stand on, or
+## (-1, -1) if there's none (reinforcements, and units spawned by events).
+func free_cell_near(u: Unit, origin: Vector2i) -> Vector2i:
 	var best := Vector2i(-1, -1)
 	for dy in range(-2, 3):
 		for dx in range(-2, 3):

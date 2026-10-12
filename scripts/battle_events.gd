@@ -8,6 +8,8 @@ extends Node
 const EVENTS_DIR := "res://events/"
 
 var battle: Battle
+## The map these events belong to (its "event_units" are what @spawn adds).
+var level_id := ""
 ## Every event of this map (see EventScript for the shape).
 var events: Array = []
 ## Indices of events that already ran (once-only events don't run again).
@@ -20,9 +22,10 @@ var skipping := false
 var _last_side := 1
 
 
-func load_for(level_id: String) -> void:
-	events = EventScript.load_file(EVENTS_DIR + level_id + ".txt")
-	events.append_array(Levels.get_level(level_id).get("events", []))
+func load_for(id: String) -> void:
+	level_id = id
+	events = EventScript.load_file(EVENTS_DIR + id + ".txt")
+	events.append_array(Levels.get_level(id).get("events", []))
 	fired = []
 	flags = {}
 
@@ -177,12 +180,19 @@ func _run_command(c: Array) -> void:
 			else:
 				await u.move_along(path)
 		"spawn":
-			var data: Dictionary = Levels.get_level(Levels.selected).get("event_units", {}).get(c[1], {})
+			var data: Dictionary = Levels.get_level(level_id).get("event_units", {}).get(c[1], {}) if level_id != "" else {}
 			if data.is_empty():
 				push_error("event: no event_units entry for %s" % c[1])
 				return
 			var team: Unit.Team = maxi(Factions.from_key(data.get("team", "enemy")), 0) as Unit.Team
-			battle.units_root.add_child(Unit.create(data.get("name", c[1]), team, c[2], data))
+			var u := Unit.create(data.get("name", c[1]), team, c[2], data)
+			# Someone on the cell already: the nearest free one (as reinforcements do).
+			var cell: Vector2i = c[2] if battle.unit_at(c[2]) == null else battle.phases.free_cell_near(u, c[2])
+			if cell == Vector2i(-1, -1):
+				u.free()
+				return
+			u.set_cell(cell)
+			battle.units_root.add_child(u)
 			battle.refresh_threat()
 		"remove":
 			var u := find_unit(c[1])

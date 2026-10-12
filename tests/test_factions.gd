@@ -195,7 +195,10 @@ func test_three_armies_map() -> void:
 	# Losing the Elder loses the map.
 	Levels.selected = "three_armies"  # (start_level points it back at the default map)
 	check_eq(Objectives.result(b), "", "(still going)")
-	remove_unit(unit_named("Elder", Unit.Team.NEUTRAL))
+	var elder := unit_named("Elder", Unit.Team.NEUTRAL)
+	elder.hp = 0
+	var dead: Array[Unit] = [elder]
+	await b.actions.remove_dead(dead)
 	check_eq(Objectives.result(b), "defeat", "the Elder falls: defeat")
 	Levels.selected = "river_crossing"
 
@@ -203,3 +206,72 @@ func test_three_armies_map() -> void:
 func test_three_armies_phases_run() -> void:
 	await start_level("three_armies")
 	await run_enemy_phases()
+
+
+# --- The Royal Guard (objective "caught_by", AI preset "pursuer") ------------
+
+func test_royal_guard_catches_the_lord() -> void:
+	Levels.selected = "royal_pursuit"
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	var obj := Objectives.of(Levels.get_level(Levels.selected))
+	check(Objectives.defeat_text(obj).contains("Neutral"), "the defeat text names the side")
+	await b.events.on_turn(3, "player")
+	var pell := unit_named("Pell", Unit.Team.NEUTRAL)
+	var rosalind := unit_named("Rosalind")
+	check(pell != null and unit_named("Captain Thorne", Unit.Team.NEUTRAL) != null, "the Guard arrives on turn 3")
+	# The danger zone shows where they could catch her.
+	await press(KEY_C)
+	check(not b.catch_zone().is_empty(), "a catch zone")
+	check(b.catch_zone().keys().all(func(c: Vector2i) -> bool: return b.map.danger_cells.has(c)),
+		"inside the danger zone")
+	# A pursuer heads for the Lord even though its side has no foes, and never attacks.
+	pell.set_cell(Vector2i(6, 4))
+	var hp := rosalind.hp
+	check_eq(Objectives.result(b), "", "four tiles away isn't caught")
+	await EnemyAI.take_turn(pell, b)
+	check_eq(BattleMap.distance(pell.cell, rosalind.cell), 1, "Pell walks up to her (%s)" % pell.cell)
+	check_eq(rosalind.hp, hp, "without attacking")
+	check_eq(Objectives.result(b), "defeat", "and catches her")
+	pell.set_cell(rosalind.cell + Vector2i(2, 0))
+	check_eq(Objectives.result(b), "", "two tiles away isn't caught")
+	# Nor is she while an ally carries her.
+	var bex := unit_named("Bex")
+	bex.set_class("Cavalry")
+	bex.set_cell(rosalind.cell + Vector2i.DOWN)
+	await b.actions.do_rescue(bex, rosalind)
+	pell.set_cell(bex.cell + Vector2i.LEFT)
+	check_eq(Objectives.result(b), "", "a carried Lord can't be caught")
+	Levels.selected = "river_crossing"
+
+
+func test_blocking_the_guard() -> void:
+	Levels.selected = "royal_pursuit"
+	b.queue_free()
+	await process_frame
+	await _fresh_battle()
+	await b.events.on_turn(3, "player")
+	var thorne := unit_named("Captain Thorne", Unit.Team.NEUTRAL)
+	var doran := unit_named("Doran")
+	var rosalind := unit_named("Rosalind")
+	# Rosalind across the river, Doran on the bridge: the only way over is blocked.
+	rosalind.set_cell(Vector2i(10, 2))
+	doran.set_cell(Vector2i(7, 2))
+	thorne.set_cell(Vector2i(5, 2))
+	unit_named("Ives", Unit.Team.NEUTRAL).set_cell(Vector2i(0, 9))
+	unit_named("Pell", Unit.Team.NEUTRAL).set_cell(Vector2i(0, 0))
+	for e in b.units_of(Unit.Team.ENEMY):
+		remove_unit(e)
+	await EnemyAI.take_turn(thorne, b)
+	check(thorne.cell.x < 7, "the Guard can't pass a unit on the bridge (%s)" % thorne.cell)
+	check_eq(doran.hp, doran.max_hp, "and doesn't fight it")
+	Levels.selected = "river_crossing"
+
+
+func test_royal_pursuit_phases_run() -> void:
+	await start_level("royal_pursuit")
+	Levels.selected = "royal_pursuit"  # (start_level points it back at the default map)
+	await run_enemy_phases()
+	check(not b.units_of(Unit.Team.NEUTRAL).is_empty(), "the Guard arrived")
+	Levels.selected = "river_crossing"

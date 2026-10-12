@@ -8,7 +8,10 @@ extends RefCounted
 ##   {"type": "defend", "turns": N, "cell": Vector2i} as survive, but an enemy on the cell loses
 ##   {"type": "escape", "cells": [Vector2i, ...]}   the Lord uses Escape on an exit tile
 ## Any type can add "protect": ["Name", ...]: losing if one of those units falls
-## (green allies or neutrals to keep alive).
+## (green allies or neutrals to keep alive; units that haven't arrived yet count as fine), and "caught_by": a side key ("neutral",
+## "yellow"...): losing if a unit of that side is ever next to the player's Lord (the
+## Royal Guard catching a runaway princess; see the "pursuer" AI preset). The danger
+## zone shows where they could catch it.
 ## Losing the Lord always loses. Routing the enemy also wins every type except
 ## seize and escape (as in Fire Emblem, those need the Lord's command).
 
@@ -45,6 +48,9 @@ static func defeat_text(obj: Dictionary) -> String:
 	if obj.has("protect"):
 		ways.append(TranslationServer.translate("{units} falls").format({
 			"units": TranslationServer.translate(" or ").join(obj.protect)}))
+	if obj.has("caught_by"):
+		ways.append(TranslationServer.translate("a {side} unit gets next to your Lord").format({
+			"side": TranslationServer.translate(Factions.NAMES[Factions.from_key(obj.caught_by)])}))
 	return TranslationServer.translate(", or ").join(ways) + "."
 
 
@@ -75,12 +81,14 @@ static func result(battle: Battle, turn_over := false) -> String:
 	if not _lord_alive(battle):
 		return "defeat"
 	for unit_name: String in obj.get("protect", []):
-		if not battle.all_units().any(func(u: Unit) -> bool: return u.unit_name == unit_name):
+		if battle.fallen_names.has(unit_name):
 			return "defeat"
 	if obj.type == "defend":
 		for e in battle.threats_to(Unit.Team.PLAYER):
 			if e.cell == obj.cell:
 				return "defeat"
+	if obj.has("caught_by") and is_caught(battle, obj):
+		return "defeat"
 	if battle.objective_done:
 		return "victory"
 	# Every unit hostile to the player: red, purple, provoked yellow (see Factions).
@@ -99,6 +107,23 @@ static func result(battle: Battle, turn_over := false) -> String:
 			if routed:
 				return "victory"
 	return ""
+
+
+## Whether a unit of the "caught_by" side stands next to a player Lord on the map.
+static func is_caught(battle: Battle, obj: Dictionary) -> bool:
+	for u in catchers(battle, obj):
+		for lord in battle.units_of(Unit.Team.PLAYER):
+			if lord.is_lord and BattleMap.distance(u.cell, lord.cell) == 1:
+				return true
+	return false
+
+
+## The units of the objective's "caught_by" side (none without one).
+static func catchers(battle: Battle, obj: Dictionary) -> Array[Unit]:
+	var result: Array[Unit] = []
+	if obj.has("caught_by"):
+		result = battle.units_of(Factions.from_key(obj.caught_by))
+	return result
 
 
 ## A carried or escaped Lord is still alive, so this looks past units().

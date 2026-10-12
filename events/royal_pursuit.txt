@@ -1,0 +1,22 @@
+# Royal Pursuit: a test map for the Royal Guard (objective "caught_by", AI preset
+# "pursuer"). Format: scripts/event_script.gd (and docs/events.md).
+
+== start ==
+@narrate The road east, the morning after the escape.
+Doran: Bandits on both bridges. Lovely.
+Rosalind: And the Royal Guard somewhere behind us! Isn't this exciting?
+Fennick: That's one word for it.
+
+== turn 3 ==
+@spawn Captain Thorne (0, 2)
+@spawn Pell (0, 4)
+@spawn Ives (0, 7)
+@banner The Royal Guard!
+Captain Thorne: Your Highness! Kindly stop running!
+Rosalind: Never! ...Doran, which way is east?
+
+== victory ==
+@narrate Some time later, at the far bank...
+Captain Thorne: Gone. Again.
+Pell: Should we write to the King, Captain?
+Captain Thorne: Absolutely not.

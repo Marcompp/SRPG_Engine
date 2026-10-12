@@ -26,6 +26,8 @@ var enemy_phase := false
 var objective_done := false
 ## Player units that fell this battle ({"name", "turn"}), for campaign permadeath.
 var campaign_deaths: Array = []
+## Names of the units of every side that fell this battle (objective "protect").
+var fallen_names: Array[String] = []
 ## "victory" or "defeat" once the battle has ended.
 var battle_result := ""
 ## Turn rewind: a snapshot (SaveGame.capture without history) from the start of each
@@ -281,6 +283,20 @@ func threat_of(enemies: Array[Unit]) -> Dictionary:
 	return cells
 
 
+## Cells where the objective's "caught_by" side (the Royal Guard) could catch the
+## Lord next phase: next to anywhere they can move.
+func catch_zone() -> Dictionary:
+	var cells := {}
+	for u in Objectives.catchers(self, Objectives.of(Levels.get_level(Levels.selected))):
+		if Statuses.restricts(u, "act"):
+			continue
+		for c in EnemyAI.movement_cells(u, self):
+			for d in BattleMap.DIRS:
+				if map.in_bounds(c + d):
+					cells[c + d] = true
+	return cells
+
+
 ## Recomputes the purple (all enemies) and red (marked enemies) overlays. Called
 ## whenever positions may have changed, and drops marks on enemies that died.
 func refresh_threat() -> void:
@@ -291,7 +307,11 @@ func refresh_threat() -> void:
 		if is_instance_valid(e) and e.hp > 0:
 			alive.append(e)
 	marked = alive
-	map.danger_cells = threat_of(threats_to(Unit.Team.PLAYER)) if danger_on else {}
+	var danger := {}
+	if danger_on:
+		danger = threat_of(threats_to(Unit.Team.PLAYER))
+		danger.merge(catch_zone())
+	map.danger_cells = danger
 	map.marked_cells = threat_of(marked)
 
 

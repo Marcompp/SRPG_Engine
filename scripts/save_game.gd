@@ -58,6 +58,7 @@ static func capture(battle: Battle, with_history := true) -> Dictionary:
 		"danger_on": battle.danger_on,
 		"marked": _encode(battle.marked, ids),
 		"campaign_deaths": _encode(battle.campaign_deaths, ids),
+		"fallen_names": battle.fallen_names.duplicate(),
 		"units": units,
 		"rewinds_left": battle.rewinds_left,
 		"events_fired": battle.events.fired.duplicate(),
@@ -78,6 +79,7 @@ static func restore(battle: Battle, data: Dictionary) -> void:
 	battle.map.load_objects(data.objects, Objectives.of(Levels.get_level(data.level)))
 	battle.turn = data.turn
 	battle.campaign_deaths.assign(data.campaign_deaths)
+	battle.fallen_names.assign(data.get("fallen_names", []))
 	var all: Array[Unit] = []
 	for entry in data.units:
 		var u := Unit.new()

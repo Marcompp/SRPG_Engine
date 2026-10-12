@@ -822,6 +822,7 @@ func _remove_dead_and_award(involved: Array[Unit], awards: Array, how := "Fell")
 		if u.hp <= 0 and u.team == Unit.Team.PLAYER:
 			battle.campaign_deaths.append({"name": u.unit_name, "turn": battle.turn, "how": how})
 		if u.hp <= 0:
+			battle.fallen_names.append(u.unit_name)
 			await battle.events.on_death(u)
 			var cell := u.cell
 			var carried := u.carrying
@@ -838,6 +839,7 @@ func _remove_dead_and_award(involved: Array[Unit], awards: Array, how := "Fell")
 				var land := battle.nearest_free_cell(p, cell)
 				if land == Vector2i(-1, -1):
 					p.hp = 0
+					battle.fallen_names.append(p.unit_name)
 					p.queue_free()
 					continue
 				p.set_cell(land)

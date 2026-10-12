@@ -28,6 +28,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Great Valley | A 30x20 map: the camera scrolls with the cursor (and follows moving units), stopping at the map edges |
 | Loyal Steeds | Mounts: a Loyal horse and pegasus on your side (the mount takes a fatal blow once), a Loyal enemy Lancer, and a level 20 rider whose level 1 horse still levels up |
 | Status Trials | Status effects: the Knight starts petrified (Restore or a Panacea), the Lord poisons with a Venom Edge and Envenom (not the Orc), the Witch casts Sleep, Silence, Bind and Berserk (try it on the packed Brigands, or Silence the Mender), and an enemy Venom Edge poisons you back (Antitoxin) |
+| Royal Pursuit | The Royal Guard (demo campaign mechanic): escape east across the river while bandits hold the bridges. On turn 3 the Guard (yellow) arrives behind you and follows Rosalind without attacking; if one gets next to her she's caught and the map is lost, and none of them may fall. Block the bridges to hold them back. The danger zone shows where they could catch her |
 | Three Armies | Factions: green militia guarding a village, purple mercenaries hunting the raiders (until Gorr buys them on turn 3; the Lord can talk Varga's band over to your side), and villagers to keep alive: defeat Gorr, and the Elder must not fall |
 
 ## Campaign
@@ -50,7 +51,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 - **Check Map** opens the chapter's map before it starts, with the deploy cells outlined: look around as in battle (ranges, danger zone, marks, status, unit list, objective), and Z on a unit then Z on a deploy cell to move it there (swapping with whoever is on it). The layout is kept for the battle, for restarts and for retries after a defeat. Z on an empty tile: Fight! (start from the map), Units, Objective, Options, Back to Prep; X also goes back to prep
 - **Biography** logs joining, promotion, seizing and falling, plus moments from play: a unit's first kill, defeating a boss (noting a critical finishing blow), barely surviving a hit (10% HP or less, once per battle) and being saved by Miracle.
 - **Generic enemies** (roster `"generic": true`, all non-boss campaign enemies) get a random name by race and gender (`data/names.cfg`; races without their own lists use the default ones).
-- **Objectives** (`scripts/objectives.gd`) work on any level: `"objective": {"type": "rout" | "boss" | "seize" | "survive" | "defend" | "escape", ...}`, plus `"objects"` (villages, chests) and `"reinforcements"` (enemies arriving on a given turn).
+- **Objectives** (`scripts/objectives.gd`) work on any level: `"objective": {"type": "rout" | "boss" | "seize" | "survive" | "defend" | "escape", ...}` (any type can add `"protect": [names]`, losing if one of them falls, and `"caught_by": side`, losing if a unit of that side is ever next to the Lord; the danger zone shows where they could catch it), plus `"objects"` (villages, chests) and `"reinforcements"` (enemies arriving on a given turn).
 
 ## Tests
 
@@ -226,7 +227,7 @@ Each enemy roster entry in a map (`data/levels/`, `data/chapters/`) can have an 
 
 | Setting | Options |
 |---|---|
-| `move` | `charge`, `in_range` (only moves to attack), `hold` (never moves), `guard` (stays within `guard_radius`), `goto` (heads for `destination`) |
+| `move` | `charge`, `in_range` (only moves to attack), `hold` (never moves), `guard` (stays within `guard_radius`), `goto` (heads for `destination`), `follow` (heads for the unit named `target`, default the player's Lord; moves even on a side with no foes) |
 | `attack` | `false` = never starts fights |
 | `wake` | `radius`, `in_threat`, `turn`, `attacked`, `group`: switches to `awake_move` for good once any is met |
 | `targeting` / `priority` | `damage`, `kill`, `weakest`; plus a list of unit names to prefer |
@@ -234,7 +235,7 @@ Each enemy roster entry in a map (`data/levels/`, `data/chapters/`) can have an 
 | `retreat_below` / `retreat_until` / `retreat_to` / `retreat_attacks` | Retreat at low HP to a healer, a healing tile, or away from players |
 | `breaks` | Default `true`: when moving, opens doors (if it could open a chest) and breaks breakable tiles that block a shorter way to its goal |
 
-Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`, `reinforcement`, `coward`, `thief`.
+Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`, `reinforcement`, `coward`, `thief`, `pursuer` (follows the Lord, never attacks, breaks nothing: the Royal Guard).
 
 ## Layout
 
