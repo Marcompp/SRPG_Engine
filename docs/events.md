@@ -22,6 +22,7 @@ otherwise.
 | `talk` (A, B) | A has a **Talk** command next to B | Conversations, recruiting an enemy |
 | `battle` (unit, optionally with whom) | Before a fight involving the unit | Boss quotes, special matchups |
 | `death` (unit) | The unit falls | Death quotes |
+| `wake` (optionally unit) | A sleeping unit (AI `wake` settings) wakes up, at the start of its side's phase | "Who goes there?!" |
 | `area` (cells, optionally who) | A unit ends its move there | Ambush triggers, "the gate is open" |
 | `visit` (cell) | A village is visited | Village text (the item reward is separate) |
 | `victory` | The map is won, before the end screen | Closing scene |
@@ -93,7 +94,7 @@ multi-line string per event) or in one text file per chapter.
   `events/ch1.txt`). Data lists are the fallback for anything the text can't
   express: a level's `"events"` entry can hold scripts as lists of commands.
 - **Triggers built:** `start`, `turn`, `talk` (with recruiting), `battle`, `death`,
-  `area`, `visit`, `victory`, plus `defeat`. An `area` scene fires when a unit ends
+  `wake`, `area`, `visit`, `victory`, plus `defeat`. An `area` scene fires when a unit ends
   its move there (player units: right after moving, and it commits the move;
   enemies: after their turn).
 - **Speakers:** a unit's name when one matches, otherwise a free label ("Messenger")

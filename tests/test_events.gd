@@ -35,6 +35,15 @@ Messenger: Hurry!
 	# Mistakes are reported with line numbers.
 	r = EventScript.parse("Lord: no header\n== dance ==\n== start ==\n@fly away\nno colon here\n@move Thief")
 	check_eq(r.errors.size(), 5, "every mistake reported: %s" % [r.errors])
+	var wake := EventScript.parse("== wake ==
+@flag any
+== wake Hobb ==
+@flag hobb
+")
+	check(wake.errors.is_empty() and wake.events.size() == 2, "wake: any sleeper, or a named one")
+	wake = EventScript.parse("== wake Hobb, Tull ==
+")
+	check(wake.errors[0].contains("at most one"), "but only one")
 	check(r.errors[0].begins_with("line 1:"), "with its line number")
 	# Every event file in the project parses cleanly.
 	for file in DirAccess.get_files_at(BattleEvents.EVENTS_DIR):

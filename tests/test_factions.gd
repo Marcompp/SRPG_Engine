@@ -276,3 +276,56 @@ func test_royal_pursuit_phases_run() -> void:
 	await run_enemy_phases()
 	check(not b.units_of(Unit.Team.NEUTRAL).is_empty(), "the Guard arrived")
 	Levels.selected = "river_crossing"
+
+
+# --- Sleeping watchmen (demo chapter 1: Over the Wall) -------------------------
+
+func _start_over_the_wall() -> void:
+	Campaign.select("princess")
+	await start_chapter(0)
+	Levels.selected = Chapters.ORDER[0]  # (start_chapter's battle loads it; keep it for Objectives)
+
+
+func test_sleeping_watchmen() -> void:
+	await _start_over_the_wall()
+	var rosalind := unit_named("Rosalind")
+	var hobb := unit_named("Watchman Hobb", Unit.Team.NEUTRAL)
+	check(rosalind != null and rosalind.cell == Vector2i(2, 2), "Rosalind starts in her tower")
+	check(EnemyAI.is_asleep(hobb), "the watch dozes")
+	await press(KEY_C)
+	check(b.catch_zone().has(Vector2i(11, 3)) and not b.catch_zone().has(Vector2i(12, 3)),
+		"the danger zone shows a sleeper's wake radius, not its reach")
+	rosalind.set_cell(hobb.cell + Vector2i.LEFT)
+	check_eq(Objectives.result(b), "", "a sleeping watchman catches nobody")
+	# Lingering near one wakes it (neutrals notice the player's units), with its group.
+	var woke: Array = b.events.load_text("== wake Watchman Hobb ==\n@flag hobb_woke\n")
+	check_eq(woke, [], "a wake event parses")
+	rosalind.set_cell(Vector2i(7, 3))
+	await b.phases.ai_phase(Unit.Team.NEUTRAL)
+	check(not EnemyAI.is_asleep(hobb), "Hobb wakes")
+	check(not EnemyAI.is_asleep(unit_named("Watchman Tull", Unit.Team.NEUTRAL)), "and wakes Tull too (same group)")
+	check(EnemyAI.is_asleep(unit_named("Watchman Ede", Unit.Team.NEUTRAL)), "but not the gate watch")
+	check(b.events.flags.has("hobb_woke"), "the wake event ran")
+	check_eq(b.battle_result, "defeat", "then he walks up to her: caught")
+	Levels.selected = "river_crossing"
+
+
+func test_talking_to_doran_recruits_the_company() -> void:
+	await _start_over_the_wall()
+	var rosalind := unit_named("Rosalind")
+	var doran := unit_named("Doran", Unit.Team.ALLY)
+	check(doran != null, "the company starts green")
+	rosalind.set_cell(Vector2i(12, 6))
+	b.input.selected = rosalind
+	check(b.events.talk_targets(rosalind).has(doran), "Rosalind can talk to Doran")
+	await b.events.run_talk(rosalind, doran)
+	for n in ["Doran", "Bex", "Fennick", "Mags"]:
+		check(unit_named(n) != null, "%s joins" % n)
+	Levels.selected = "river_crossing"
+
+
+func test_over_the_wall_phases_run() -> void:
+	await _start_over_the_wall()
+	check_eq(Campaign.gold, 0, "the company is broke")
+	await run_enemy_phases()
+	Levels.selected = "river_crossing"

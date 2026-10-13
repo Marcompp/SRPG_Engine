@@ -27,12 +27,22 @@ static func current_move(u: Unit) -> String:
 	return u.ai.move
 
 
+## Whether `u` is a sleeper (AI "wake" settings) that hasn't woken yet.
+static func is_asleep(u: Unit) -> bool:
+	return not u.ai.wake.is_empty() and not u.ai_awake
+
+
 ## Checks a sleeping unit's wake conditions; waking also wakes the rest of its group.
 static func update_wake(u: Unit, battle: Battle) -> void:
 	var wake: Dictionary = u.ai.wake
 	if wake.is_empty() or u.ai_awake:
 		return
-	var players: Array[Unit] = battle.foes_of(u)
+	# Whoever isn't on friendly terms with its side: a neutral sentry with no foes
+	# still notices the player's units.
+	var players: Array[Unit] = []
+	for o in battle.units():
+		if not Factions.friendly(u.team, o.team):
+			players.append(o)
 	var woke := false
 	if wake.get("attacked", false) and u.was_attacked:
 		woke = true

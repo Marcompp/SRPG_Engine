@@ -33,7 +33,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 
 ## Campaign
 
-Campaigns live in `data/campaigns/<id>/` (`campaign.cfg`: name, description, chapter order, starting gold; `chapters/`: one file per chapter; format in `scripts/chapters.gd`, state in `scripts/campaign.gd`). The level select has a **New** entry for each, and a **Continue** entry for each one with a save (`user://campaign_<id>.save`; a save from before there were several campaigns becomes the Border March's). **The Border March** is five chapters played by one army:
+Campaigns live in `data/campaigns/<id>/` (`campaign.cfg`: name, description, chapter order, starting gold; `chapters/`: one file per chapter; format in `scripts/chapters.gd`, state in `scripts/campaign.gd`). The level select has a **New** entry for each, and a **Continue** entry for each one with a save (`user://campaign_<id>.save`; a save from before there were several campaigns becomes the Border March's). **The Princess Is Out** is the demo campaign in progress (outline: [docs/demo_outline.md](docs/demo_outline.md)); chapter 1, Over the Wall, is built: sneak Rosalind out of the palace past dozing watchmen (yellow pursuers that wake when a unit lingers near them), and talk to Doran in the kitchen to bring the Copper Kettle Company over. **The Border March** is five chapters played by one army:
 
 | Chapter | Objective | Also introduces | Recruits |
 |---|---|---|---|
@@ -229,7 +229,7 @@ Each enemy roster entry in a map (`data/levels/`, a campaign's `chapters/`) can 
 |---|---|
 | `move` | `charge`, `in_range` (only moves to attack), `hold` (never moves), `guard` (stays within `guard_radius`), `goto` (heads for `destination`), `follow` (heads for the unit named `target`, default the player's Lord; moves even on a side with no foes) |
 | `attack` | `false` = never starts fights |
-| `wake` | `radius`, `in_threat`, `turn`, `attacked`, `group`: switches to `awake_move` for good once any is met |
+| `wake` | `radius`, `in_threat`, `turn`, `attacked`, `group`: switches to `awake_move` for good once any is met. `radius` counts any unit not friendly to its side, so a neutral sentry notices the player. Waking fires `wake` events. A sleeping `caught_by` unit catches nobody, and the danger zone shows its wake radius |
 | `targeting` / `priority` | `damage`, `kill`, `weakest`; plus a list of unit names to prefer |
 | `caution` | Weight on expected counter damage (0 = reckless) |
 | `retreat_below` / `retreat_until` / `retreat_to` / `retreat_attacks` | Retreat at low HP to a healer, a healing tile, or away from players |

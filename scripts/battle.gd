@@ -284,11 +284,20 @@ func threat_of(enemies: Array[Unit]) -> Dictionary:
 
 
 ## Cells where the objective's "caught_by" side (the Royal Guard) could catch the
-## Lord next phase: next to anywhere they can move.
+## Lord next phase: next to anywhere they can move. For a sleeper with a wake radius,
+## the cells where ending a turn would wake it instead.
 func catch_zone() -> Dictionary:
 	var cells := {}
 	for u in Objectives.catchers(self, Objectives.of(Levels.get_level(Levels.selected))):
 		if Statuses.restricts(u, "act"):
+			continue
+		if EnemyAI.is_asleep(u):
+			var radius: int = u.ai.wake.get("radius", -1)
+			for y in range(-radius, radius + 1):
+				for x in range(-radius, radius + 1):
+					var c := u.cell + Vector2i(x, y)
+					if absi(x) + absi(y) <= radius and map.in_bounds(c):
+						cells[c] = true
 			continue
 		for c in EnemyAI.movement_cells(u, self):
 			for d in BattleMap.DIRS:

@@ -154,7 +154,11 @@ func ai_phase(side: Unit.Team) -> bool:
 	if side == Unit.Team.ENEMY:
 		await spawn_reinforcements()
 	await battle.events.on_turn(battle.turn, Factions.key(side))
+	var sleepers := battle.units_of(side).filter(EnemyAI.is_asleep)
 	EnemyAI.update_all_wake(battle, side)
+	for u: Unit in sleepers:
+		if is_instance_valid(u) and u.ai_awake:
+			await battle.events.on_wake(u)
 	for e in battle.units_of(side):
 		# has_acted: reinforcements that just arrived wait for the next phase.
 		if not is_instance_valid(e) or e.hp <= 0 or e.has_acted:

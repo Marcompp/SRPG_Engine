@@ -52,7 +52,7 @@ Rosalind gets a pegasus in chapter 7.
 
 | # | Chapter | Gameplay concept | Story beat | Joins |
 |---|---|---|---|---|
-| 1 | Over the Wall | **Sneaking out.** Escape: Rosalind to the gate. Palace guards doze at their posts (sleeper AI with a wake radius); waking them closes routes. The enemies are burglars who broke in the same night | She climbs out and meets the company, who are robbing the kitchen of what they were owed | Rosalind, Doran, Bex, Fennick, Mags |
+| 1 | Over the Wall (built) | **Sneaking out.** Escape: Rosalind to the gate. Palace guards doze at their posts (sleeper AI with a wake radius); waking them closes routes. The enemies are burglars who broke in the same night | She climbs out and meets the company, who are robbing the kitchen of what they were owed | Rosalind, Doran, Bex, Fennick, Mags |
 | 2 | Honest Work | **First job, with the Guard clock.** Rout bandits from a farmstead before the Guard arrives on turn 8. Teaches the caught rule | Rosalind insists on helping, badly. The Guard finds a grateful farmer | Juniper |
 | 3 | Market Day | **Steal it back.** A market town full of neutral townsfolk; a thief steals her tiara and runs for the gate (lose if he reaches it). Shop on the prep screen | Her first shopping; she doesn't understand money | – |
 | 4 | The Ferry | **Ships.** Ferry the army across a wide river (Board, Unload) while river pirates raid. The Guard arrives on the far bank | The Guard watches the ferry leave | – |
@@ -73,8 +73,9 @@ the reckoning.
   zone), the `pursuer` AI preset (`move: "follow"`, no attacks), and `protect` now
   meaning "falls" so the Guard can be protected before it arrives. The Guard arrives by
   `@spawn` with `event_units` (team "neutral"). Test map: Royal Pursuit.
-- **Ch 1:** an event trigger when a sleeping unit wakes (to check whether events can see
-  that).
+- **Ch 1: built.** A `wake` event trigger; sleepers' wake radius counts any unit not
+  friendly to their side (so neutral watchmen notice the player); a sleeping catcher
+  catches nobody, and the danger zone shows its wake radius instead.
 - **Ch 9:** two separate starting groups for the player (deploy cells may already do it).
 
 Everything else exists: escape, defend a tile, sleeper AI, thieves, shops, ships,

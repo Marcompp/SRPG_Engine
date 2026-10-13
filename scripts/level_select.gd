@@ -68,6 +68,8 @@ func _build_choices() -> void:
 		var level := Levels.get_level(suspended.level)
 		choices.append({"label": tr("Resume: %s, Turn %d") % [tr(level.name), suspended.turn],
 			"description": tr("Continue the suspended battle."), "level": suspended.level, "resume": true})
+	# Listing reads every campaign's save; the selected campaign is put back after.
+	var was_selected := Campaign.id
 	for campaign_id: String in Chapters.CAMPAIGNS:
 		Campaign.select(campaign_id)
 		var campaign_name := tr(Campaign.info().name)
@@ -84,6 +86,7 @@ func _build_choices() -> void:
 		choices.append({"label": tr("New: %s") % campaign_name, "campaign": "new", "campaign_id": campaign_id,
 			"description": (about + " " + tr("Overwrites your progress in it.")).strip_edges() if Campaign.has_save()
 				else about})
+	Campaign.select(was_selected)
 	for id in Levels.ORDER:
 		var level := Levels.get_level(id)
 		choices.append({"label": tr(level.name), "description": tr(level.description), "level": id, "resume": false})

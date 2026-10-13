@@ -1,0 +1,55 @@
+# The Princess Is Out, chapter 1: Over the Wall. Format: scripts/event_script.gd
+# (and docs/events.md). Outline: docs/demo_outline.md.
+
+== start ==
+@narrate The royal palace, well past midnight.
+Rosalind: Ten days until the ceremony. Ten days, and then a lifetime of ribbons and bridges.
+Rosalind: Unless... someone simply left. Tonight. To see the sea.
+Rosalind: The watch sleeps at its posts. If I don't linger near them, they'll never know.
+@camera (13, 6)
+@narrate Meanwhile, in the palace kitchen...
+Doran: Three months' pay, and the steward says "come back next season". Fine. We'll take it in hams.
+Bex: Captain! Someone else is robbing the kitchen!
+Fennick: Burglars. Ours is the honest kind of theft, at least.
+Mags: Less talking. More hitting.
+@camera (2, 2)
+
+== talk Rosalind, Doran ==
+Rosalind: Excuse me! Are you burglars? Real ones?
+Doran: We're the Copper Kettle Company, and we're collecting what we're owed. Who's asking?
+Rosalind: Rose. A, um, commoner. Of the common sort. I need an escort to the coast, and I can pay. Later.
+Fennick: (Commoner. In a silk nightgown. With a tiara in her pocket.)
+Doran: "Later" is how the palace pays, too. ...Fine. Anything beats hams. Company, we're leaving.
+@recruit Doran
+@recruit Bex
+@recruit Fennick
+@recruit Mags
+@flag joined
+
+== wake Watchman Hobb ==
+Watchman Hobb: Mm? ...Who goes there?
+Watchman Hobb: Your Highness?! Tull, wake up! The princess is out of bed!
+@banner The watch is awake!
+
+== wake Watchman Ede ==
+Watchman Ede: Hm? Something at the gate... Wim! Up!
+@banner The gate watch is awake!
+
+== wake Watchman Pim ==
+Watchman Pim: Who's tramping about in the roses at this hour?
+@banner The garden watch is awake!
+
+== victory | unless joined ==
+Doran: Hey! You, by the wall! Where are you off to at this hour?
+Rosalind: The coast! I need an escort, and I can pay. Later.
+Doran: ...We're owed three months anyway. Company, follow the lady.
+@recruit Doran
+@recruit Bex
+@recruit Fennick
+@recruit Mags
+
+== victory ==
+@narrate By dawn, the palace is a speck behind them.
+@narrate An hour later, the Royal Guard arrives at the empty gate.
+Captain Thorne: Footprints. Small ones, and four sets of boots. Mercenaries.
+Captain Thorne: Saddle up. She can't have gone far.

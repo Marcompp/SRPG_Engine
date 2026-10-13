@@ -30,7 +30,7 @@ func _initialize() -> void:
 	# ...or a real campaign.
 	Campaign.save_prefix = "user://test_campaign_"
 	Campaign.old_path = "user://test_campaign.save"
-	Campaign.delete_save()
+	_delete_campaign_saves()
 	_run_all()
 
 func _run_all() -> void:
@@ -52,6 +52,7 @@ func _run_all() -> void:
 			Battle.speed_boost = SPEED_BOOST
 			Campaign.active = false
 			Campaign.clear_deployment()
+			Campaign.select(Chapters.CAMPAIGNS.keys()[0])  # the test campaign, whatever a test chose
 			await suite._fresh_battle()
 			var before := failures.size()
 			await suite.call(t)
@@ -61,7 +62,7 @@ func _run_all() -> void:
 			await process_frame
 	SaveGame.delete_suspend()
 	DirAccess.remove_absolute(Settings.path)
-	Campaign.delete_save()
+	_delete_campaign_saves()
 	print("")
 	if failures.is_empty():
 		print("All %d tests passed." % count)
@@ -71,3 +72,11 @@ func _run_all() -> void:
 		for f in failures:
 			print("  " + f)
 		quit(1)
+
+
+## Every campaign's test save (tests may play any campaign).
+func _delete_campaign_saves() -> void:
+	for id: String in Chapters.CAMPAIGNS:
+		Campaign.select(id)
+		Campaign.delete_save()
+	Campaign.select(Chapters.CAMPAIGNS.keys()[0])

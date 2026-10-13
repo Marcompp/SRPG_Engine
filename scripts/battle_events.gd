@@ -83,6 +83,11 @@ func on_death(u: Unit) -> void:
 	await _fire(func(e): return e.trigger == "death" and e.args[0] == u.unit_name)
 
 
+## A sleeping unit (AI "wake" settings) just woke up: "wake" events for it, or for any.
+func on_wake(u: Unit) -> void:
+	await _fire(func(e): return e.trigger == "wake" and (e.args.is_empty() or e.args[0] == u.unit_name))
+
+
 ## A unit ended its move on `u.cell`. Returns whether a scene played.
 func on_area(u: Unit) -> bool:
 	var test := func(e: Dictionary) -> bool:

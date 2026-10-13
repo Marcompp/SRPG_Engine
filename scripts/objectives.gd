@@ -109,9 +109,12 @@ static func result(battle: Battle, turn_over := false) -> String:
 	return ""
 
 
-## Whether a unit of the "caught_by" side stands next to a player Lord on the map.
+## Whether a unit of the "caught_by" side stands next to a player Lord on the map. A
+## sleeping one (AI "wake", or a status that stops it acting) catches nobody.
 static func is_caught(battle: Battle, obj: Dictionary) -> bool:
 	for u in catchers(battle, obj):
+		if EnemyAI.is_asleep(u) or Statuses.restricts(u, "act"):
+			continue
 		for lord in battle.units_of(Unit.Team.PLAYER):
 			if lord.is_lord and BattleMap.distance(u.cell, lord.cell) == 1:
 				return true

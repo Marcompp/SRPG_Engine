@@ -49,7 +49,8 @@ extends RefCounted
 ## that same shape (with "script" written as command arrays) for anything the text
 ## can't express.
 
-const TRIGGERS: Array[String] = ["start", "turn", "talk", "battle", "death", "area", "visit", "victory", "defeat"]
+const TRIGGERS: Array[String] = ["start", "turn", "talk", "battle", "death", "wake", "area", "visit", "victory",
+	"defeat"]
 const COMMANDS: Array[String] = ["say", "narrate", "move", "spawn", "remove", "recruit", "give", "status",
 	"cure", "hostile", "peace", "side", "camera", "wait", "flag", "banner"]
 
@@ -128,6 +129,10 @@ static func _header(text: String, n: int, errors: Array) -> Dictionary:
 		"death":
 			if args.size() != 1:
 				errors.append("line %d: \"death\" needs a unit name" % n)
+				return {}
+		"wake":
+			if args.size() > 1:
+				errors.append("line %d: \"wake\" takes at most one unit name" % n)
 				return {}
 		"area":
 			if args[0].is_empty():
