@@ -329,3 +329,16 @@ func test_over_the_wall_phases_run() -> void:
 	check_eq(Campaign.gold, 0, "the company is broke")
 	await run_enemy_phases()
 	Levels.selected = "river_crossing"
+
+
+func test_honest_work_guard_arrives() -> void:
+	Campaign.select("princess")
+	await start_chapter(1)
+	Levels.selected = Chapters.ORDER[1]
+	check(unit_named("Juniper") != null, "Juniper joins for chapter 2")
+	check(unit_named("Farmer Hal", Unit.Team.ALLY) != null, "the farmer is green, so he can't catch anyone")
+	await run_enemy_phases()
+	await b.events.on_turn(8, "player")
+	check_eq(b.units_of(Unit.Team.NEUTRAL).size(), 3, "the Guard rides in on turn 8")
+	check(b.events.flags.has("guard_here"), "and the ending knows")
+	Levels.selected = "river_crossing"

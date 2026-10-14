@@ -1,0 +1,47 @@
+# The Princess Is Out, chapter 2: Honest Work. Format: scripts/event_script.gd
+# (and docs/events.md). Outline: docs/demo_outline.md.
+
+== start ==
+@narrate A farmstead a day's ride from the palace.
+Doran: Bandits on Hal's farm, ten silver a head, payment on delivery. Honest work.
+Rosalind: I'll help! I've read every book on tactics in the royal library.
+Bex: Have you ever hit anyone?
+Rosalind: ...In theory.
+Juniper: Riders on the west road this morning. Royal colours. A few hours behind us.
+Fennick: Then let's be gone before they get here. If they catch up to "Rose" here, the trip ends early.
+Doran: Clear the farm, collect our pay, keep moving. Save the houses if you can.
+@camera (11, 4)
+Farmer Hal: Help! They're after the barns!
+
+== turn 6 ==
+Juniper: Dust on the west road. Two turns out, maybe less.
+Doran: Then we hurry.
+
+== turn 8 ==
+@spawn Captain Thorne (0, 6)
+@spawn Pell (0, 5)
+@spawn Ives (0, 7)
+@banner The Royal Guard!
+Captain Thorne: Your Highness! I can see you!
+Rosalind: She can't! Doran, she can't, can she?
+@flag guard_here
+
+== death Farmer Hal ==
+Farmer Hal: My... barns...
+
+== victory | unless guard_here ==
+Farmer Hal: You saved the farm! Here, your pay, and a pie for the road.
+Rosalind: My first pie earned by honest work!
+Doran: Eat it on the move.
+@narrate That evening, the Royal Guard reaches the farmstead.
+Farmer Hal: A young lady? With mercenaries? Lovely girl. Terrible with a staff. They went that way.
+Captain Thorne: ...Which way?
+Farmer Hal: Well, they said east. But they looked north. Then they went west.
+Captain Thorne: Wonderful.
+
+== victory | if guard_here ==
+Farmer Hal: You saved the farm! Here, your pay, and a pie for the road.
+Doran: No time for pie. Out the back, everyone!
+@narrate Moments later, Captain Thorne rides into an empty yard.
+Captain Thorne: Farmer. Where did they go?
+Farmer Hal: Would you like some pie?

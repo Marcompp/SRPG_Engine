@@ -6,7 +6,7 @@ extends "res://tests/test_base.gd"
 
 
 func test_all_chapters_are_valid() -> void:
-	for id in Chapters.ORDER:
+	for id: String in Chapters.DATA:
 		var level := Levels.get_level(id)
 		var layout: Array = level.layout
 		var at := func(c: Vector2i) -> String: return layout[c.y][c.x]
