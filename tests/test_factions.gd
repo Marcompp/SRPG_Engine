@@ -373,3 +373,14 @@ func test_market_day_phases_run() -> void:
 	Levels.selected = Chapters.ORDER[2]
 	await run_enemy_phases()
 	Levels.selected = "river_crossing"
+
+
+func test_honest_work_farmer_lasts_a_turn() -> void:
+	Campaign.select("princess")
+	await start_chapter(1)
+	var hal := unit_named("Farmer Hal", Unit.Team.ALLY)
+	b.phases.end_player_phase()
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+	check(is_instance_valid(hal) and hal.hp > 0, "Hal lives through the first enemy phase, before the company can reach him")
+	Levels.selected = "river_crossing"
