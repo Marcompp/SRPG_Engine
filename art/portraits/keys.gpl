@@ -1,0 +1,48 @@
+GIMP Palette
+Name: Portrait keys (from data/portraits.cfg)
+Columns: 4
+#
+  0   0   0	(transparent)
+ 34  32  52	outline
+ 34  32  52	outline
+ 34  32  52	outline
+112  88  88	skin 0
+200 112  56	skin 1
+240 160  88	skin 2
+248 227 187	skin 3
+ 48  80 152	iris 0
+ 32 104 216	iris 1
+ 72 136 248	iris 2
+152 208 224	iris 3
+ 92 100 116	sclera 0
+124 140 156	sclera 1
+155 173 183	sclera 2
+240 248 248	sclera 3
+ 88  65  96	hair 0
+120 120  96	hair 1
+160 176 104	hair 2
+192 216  88	hair 3
+ 72  80 120	cloth1 0
+ 88  96 152	cloth1 1
+104 128 192	cloth1 2
+144 168 224	cloth1 3
+105 111 150	cloth2 0
+160 184 216	cloth2 1
+208 224 240	cloth2 2
+248 248 248	cloth2 3
+ 64  72  32	cloth3 0
+ 96 104  56	cloth3 1
+120 152  56	cloth3 2
+168 192  88	cloth3 3
+128  96  32	trim 0
+192 184 136	trim 1
+248 216  72	trim 2
+248 240 160	trim 3
+ 80  88  96	trim2 0
+136 144 160	trim2 1
+192 200 208	trim2 2
+232 240 248	trim2 3
+128  32  80	accent 0
+176  48 112	accent 1
+224  80 144	accent 2
+248 160 200	accent 3

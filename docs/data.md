@@ -28,6 +28,7 @@ and per-campaign feature toggles.
 | `weapon_traits.cfg` | `WeaponTraits.LEANINGS`, `GENERIC` | `[leanings]`, `[generic]` |
 | `terrain.cfg` | `BattleMap.TERRAIN` | terrain, by layout key |
 | `sounds.cfg` | `Sound.MUSIC`, `Sound.EFFECTS` | `[music]` tracks and `[effects]`: names to files under `audio/` |
+| `portraits.cfg`, `portrait_ramps.cfg`, `portrait_presets.cfg` | `Portraits.STACK`, `ROLES`, `SLOTS`, `RAMPS`, `PRESETS` | portrait parts' stacking, key colors and slot settings; the color ramps; named characters' recipes (written by `tools/portrait_editor.tscn`). Design: `docs/portraits.md` |
 | `combat.cfg` | `Combat.TRIANGLE`, `TAG_TRAITS` | `[triangle]`, `[tag_traits]` |
 | `levels/` | `Levels.DATA`, `Levels.ORDER` | test maps: one file each, `index.cfg` lists them in order |
 | `campaigns/` | `Chapters.CAMPAIGNS`, `Chapters.DATA`, `Chapters.ORDER` | campaigns: `index.cfg` lists them; each `<id>/` has a `campaign.cfg` (name, description, `chapters` in play order, optional `start_gold`) and a `chapters/` folder, one file per chapter. Chapter ids are unique across campaigns and test maps |
@@ -99,7 +100,7 @@ The English text is the key, as everywhere else.
 ## Exporting
 
 `.cfg` files aren't Godot resources, so an export must include them: add `data/*`
-to the export preset's "Filters to export non-resource files".
+to the export preset's "Filters to export non-resource files", and `portraits/*` too (the composer reads the part PNGs as files, to get their exact pixels).
 
 ## Later
 
