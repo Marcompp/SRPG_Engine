@@ -27,6 +27,7 @@ and per-campaign feature toggles.
 | `ai_presets.cfg` | `AIProfiles.PRESETS` | enemy behavior presets |
 | `weapon_traits.cfg` | `WeaponTraits.LEANINGS`, `GENERIC` | `[leanings]`, `[generic]` |
 | `terrain.cfg` | `BattleMap.TERRAIN` | terrain, by layout key |
+| `sounds.cfg` | `Sound.MUSIC`, `Sound.EFFECTS` | `[music]` tracks and `[effects]`: names to files under `audio/` |
 | `combat.cfg` | `Combat.TRIANGLE`, `TAG_TRAITS` | `[triangle]`, `[tag_traits]` |
 | `levels/` | `Levels.DATA`, `Levels.ORDER` | test maps: one file each, `index.cfg` lists them in order |
 | `campaigns/` | `Chapters.CAMPAIGNS`, `Chapters.DATA`, `Chapters.ORDER` | campaigns: `index.cfg` lists them; each `<id>/` has a `campaign.cfg` (name, description, `chapters` in play order, optional `start_gold`) and a `chapters/` folder, one file per chapter. Chapter ids are unique across campaigns and test maps |

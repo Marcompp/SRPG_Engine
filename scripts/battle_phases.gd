@@ -24,6 +24,7 @@ func start_player_phase() -> void:
 	for u in battle.units_of(Unit.Team.PLAYER):
 		u.regen_mp(u.mp_regen())
 	battle.turn += 1
+	start_phase_music(Unit.Team.PLAYER)
 	await battle.ui.show_banner(tr(Factions.PHASE_BANNERS[Unit.Team.PLAYER]) + "\n" + battle.turn_text(), Color("2850b0"))
 	await heal_on_tiles(Unit.Team.PLAYER)
 	await tick_statuses(Unit.Team.PLAYER)
@@ -140,9 +141,22 @@ func end_player_phase() -> void:
 	start_player_phase()
 
 
+## The phase's track and sound (see Sound): the map's "music" entry for the side
+## ({"enemy": "boss_theme"}), or "<side>_phase".
+func start_phase_music(side: Unit.Team) -> void:
+	Sound.music(phase_track(side))
+	Sound.play("phase")
+
+
+func phase_track(side: Unit.Team) -> String:
+	var key := Factions.key(side)
+	return Levels.get_level(Levels.selected).get("music", {}).get(key, key + "_phase")
+
+
 ## One AI side's phase: start-of-phase effects, then each of its units' turns.
 ## Returns false if the battle ended during it.
 func ai_phase(side: Unit.Team) -> bool:
+	start_phase_music(side)
 	await battle.ui.show_banner(tr(Factions.PHASE_BANNERS[side]), Factions.BANNER_COLORS[side])
 	clear_inspire(side)
 	for e in battle.units_of(side):
@@ -240,6 +254,7 @@ func check_game_over(turn_over := false) -> bool:
 ## The map's victory/defeat scene (if any), then the end screen.
 func _show_end(won: bool, hint: String) -> void:
 	await battle.events.on_end(battle.battle_result)
+	Sound.music("victory" if won else "defeat")
 	battle.ui.show_end(tr("Victory!") if won else tr("Defeat..."), Color("2850b0") if won else Color("602020"), hint)
 
 
@@ -311,6 +326,7 @@ func rewind_to(index: int) -> void:
 
 
 func _resume_player_phase() -> void:
+	Sound.music(phase_track(Unit.Team.PLAYER))
 	var players := battle.units_of(Unit.Team.PLAYER)
 	battle.cursor.cell = players[0].cell if not players.is_empty() else Vector2i.ZERO
 	battle.enemy_phase = false

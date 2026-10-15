@@ -5,6 +5,8 @@ extends Control
 
 const DIM := Color(0.7, 0.75, 0.95)
 const SELECTED := Color(1.0, 0.85, 0.25)
+## Rows shown at once; the list scrolls to keep the selection in view.
+const ROWS := 8
 
 var index := 0
 var _rows: Label
@@ -43,10 +45,12 @@ func open() -> void:
 func close() -> void:
 	Settings.save()
 	visible = false
+	Sound.play("cancel")
 
 
 func move(step: int) -> void:
 	index = wrapi(index + step, 0, Settings.OPTIONS.size())
+	Sound.play("cursor")
 	_render()
 
 
@@ -54,12 +58,15 @@ func change(step: int) -> void:
 	var option: Dictionary = Settings.OPTIONS[index]
 	var i := wrapi(Settings.choice_index(option) + step, 0, option.choices.size())
 	Settings.set_value(option.key, option.choices[i][0])
+	Sound.apply_volumes()
+	Sound.play("cursor")  # also a sample of the new effects volume
 	_render()
 
 
 func _render() -> void:
 	var lines: Array[String] = []
-	for i in Settings.OPTIONS.size():
+	var first := clampi(index - ROWS / 2, 0, maxi(0, Settings.OPTIONS.size() - ROWS))
+	for i in range(first, mini(first + ROWS, Settings.OPTIONS.size())):
 		var option: Dictionary = Settings.OPTIONS[i]
 		var text: String = option.choices[Settings.choice_index(option)][1]
 		lines.append("%s%s:  < %s >" % ["> " if i == index else "   ", tr(option.label), tr(text)])

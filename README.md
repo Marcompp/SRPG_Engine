@@ -10,7 +10,7 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 |---|---|
 | Units | Sortable table of every unit (Left/Right: sort column, Z: go to unit, D: status) |
 | Objective | Victory/defeat conditions, turn, units left |
-| Options | Game speed, fast-forward speed, danger zone at start, auto-end turn, end turn warning, level-up window, auto save, turn rewinds (saved to `user://settings.cfg`) |
+| Options | Game speed, fast-forward speed, danger zone at start, auto-end turn, end turn warning, level-up window, auto save, turn rewinds, music and sound effects volume (saved to `user://settings.cfg`) |
 | Rewind | Back to the start of any earlier player phase on this map (this turn's included), newest first. Uses per map come from Options (3 by default; 1, 5, unlimited or off); history and uses are kept in suspends |
 | Suspend | Saves the battle to `user://suspend.save` and returns to the level select (deleted when the map ends) |
 | Restart | Restarts the map (asks first) |
@@ -30,6 +30,10 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 | Status Trials | Status effects: the Knight starts petrified (Restore or a Panacea), the Lord poisons with a Venom Edge and Envenom (not the Orc), the Witch casts Sleep, Silence, Bind and Berserk (try it on the packed Brigands, or Silence the Mender), and an enemy Venom Edge poisons you back (Antitoxin) |
 | Royal Pursuit | The Royal Guard (demo campaign mechanic): escape east across the river while bandits hold the bridges. On turn 3 the Guard (yellow) arrives behind you and follows Rosalind without attacking; if one gets next to her she's caught and the map is lost, and none of them may fall. Block the bridges to hold them back. The danger zone shows where they could catch her |
 | Three Armies | Factions: green militia guarding a village, purple mercenaries hunting the raiders (until Gorr buys them on turn 3; the Lord can talk Varga's band over to your side), and villagers to keep alive: defeat Gorr, and the Elder must not fall |
+
+## Sound
+
+`data/sounds.cfg` names every music track and sound effect the game plays, each a file under `audio/` (`audio/music/`, `audio/effects/`). A sound whose file is missing plays nothing, so dropping a file in at the listed path (and letting the editor import it) is all it takes. There's no music yet. The effects are placeholders made by `tools/generate_sounds.gd`, a small retro synth: each effect is a recipe of voices (wave, pitch sweep, length, envelope) at the top of the script; edit one and run `godot --headless --path . --script res://tools/generate_sounds.gd -- hit` to remake it. Tracks loop unless the entry says `"loop": false`, and an entry can set its own volume. `scripts/sound.gd` plays them: the battle switches tracks at each phase (`player_phase`, `enemy_phase`...; a map's `"music": {"enemy": "boss_theme"}` picks others), plays `victory` or `defeat` at the end, `title` on the level select and `prep` on the prep screen. Effects cover the cursor and menus, strikes (hit, crit, miss), deaths, spells, heals, statuses, breaking, items and gold, level-ups, phase starts and dialogue typing. Events can switch tracks with `@music <track>` (until the next phase; `@music stop` for silence) and play effects with `@sound <effect>`.
 
 ## Campaign
 
@@ -55,7 +59,7 @@ Campaigns live in `data/campaigns/<id>/` (`campaign.cfg`: name, description, cha
 
 ## Tests
 
-Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills`, `events`, `mounts`, `statuses`, `factions`, `text` (translation groundwork), `economy`, `weapons` and `data` (the data files and the names they use for each other). Every method named `test_*` in a suite runs on a fresh battle; there's no list to update. Battles run 60x faster than normal in tests (`SPEED_BOOST` in `tests/run_tests.gd`, via `Battle.speed_boost`); tests that check the game speed itself set it back to 1. The whole suite takes about a minute.
+Headless test suite, split by topic in `tests/test_*.gd` (shared helpers in `tests/test_base.gd`): `core` (combat, magic, items, trade), `ai`, `units` (movement, classes, races), `ui` (screens, suspend, options, rewind), `campaign` (including the prep screen and Check Map), `maps` (breakable terrain, the camera), `skills`, `events`, `mounts`, `statuses`, `factions`, `text` (translation groundwork), `economy`, `weapons`, `data` (the data files and the names they use for each other) and `sound` (track and effect names, phase music, volumes). Every method named `test_*` in a suite runs on a fresh battle; there's no list to update. Battles run 60x faster than normal in tests (`SPEED_BOOST` in `tests/run_tests.gd`, via `Battle.speed_boost`); tests that check the game speed itself set it back to 1. The whole suite takes about a minute.
 
 ```
 GODOT=/path/to/godot tests/run_tests.sh            # everything

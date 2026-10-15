@@ -9,7 +9,7 @@ extends SceneTree
 ## suite names as extra arguments to run only those (e.g. "-- skills events").
 
 const SUITES: Array[String] = ["core", "ai", "units", "ui", "campaign", "maps", "skills", "events", "mounts", "statuses", "factions",
-	"text", "economy", "weapons", "data"]
+	"text", "economy", "weapons", "data", "sound"]
 
 ## How much faster than normal the battle runs in tests (see Battle.speed_boost).
 const SPEED_BOOST := 60.0
@@ -68,6 +68,9 @@ func _run_all() -> void:
 	SaveGame.delete_suspend()
 	DirAccess.remove_absolute(Settings.path)
 	_delete_campaign_saves()
+	# Sounds still playing at exit would be reported as leaks.
+	Sound.silence()
+	await create_timer(0.1, true, false, true).timeout  # real time: the audio thread lets go
 	print("")
 	if failures.is_empty():
 		print("All %d tests passed." % count)

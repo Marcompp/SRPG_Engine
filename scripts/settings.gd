@@ -7,7 +7,8 @@ extends RefCounted
 static var path := "user://settings.cfg"
 
 ## Every option, in display order: key, label, and its choices as [value, text]
-## (texts translated where shown). The first choice is the default.
+## (texts translated where shown). The first choice is the default, unless "default"
+## gives another's index.
 const OPTIONS := [  # i18n
 	{"key": "game_speed", "label": "Game speed",
 		"choices": [[1.0, "Normal"], [1.5, "Fast"], [2.0, "Faster"]]},
@@ -25,6 +26,10 @@ const OPTIONS := [  # i18n
 		"choices": [[true, "Each turn"], [false, "Off"]]},
 	{"key": "rewinds", "label": "Turn rewinds",
 		"choices": [[3, "3 per map"], [5, "5 per map"], [1, "1 per map"], [-1, "Unlimited"], [0, "Off"]]},
+	{"key": "music_volume", "label": "Music", "default": 4,
+		"choices": [[0.0, "Off"], [0.25, "25%"], [0.5, "50%"], [0.75, "75%"], [1.0, "100%"]]},
+	{"key": "effects_volume", "label": "Sound effects", "default": 4,
+		"choices": [[0.0, "Off"], [0.25, "25%"], [0.5, "50%"], [0.75, "75%"], [1.0, "100%"]]},
 ]
 
 static var _values := {}
@@ -70,7 +75,7 @@ static func _ensure_loaded() -> void:
 	_loaded = true
 	_values.clear()
 	for option in OPTIONS:
-		_values[option.key] = option.choices[0][0]
+		_values[option.key] = option.choices[option.get("default", 0)][0]
 	var cfg := ConfigFile.new()
 	if cfg.load(path) != OK:
 		return

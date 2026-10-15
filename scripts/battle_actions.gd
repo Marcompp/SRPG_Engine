@@ -151,6 +151,7 @@ func _spend_key(u: Unit) -> void:
 ## Puts a new item in `u`'s inventory, or the convoy when it's full (campaign only).
 ## Returns the popup text.
 func give_item(u: Unit, item_name: String) -> String:
+	Sound.play("item")
 	if u.items.size() < Unit.MAX_ITEMS:
 		u.items.append(Items.make(item_name))
 		return tr("Got {item}").format({"item": item_name})
@@ -289,12 +290,14 @@ func do_break(u: Unit, cell: Vector2i) -> void:
 	var amount := tile_damage(u)
 	var tile_name: String = battle.map.terrain_at(cell).name
 	await u.lunge(cell)
+	Sound.play("hit")
 	u.popup(tr("{tile} -{damage}").format({"tile": tile_name, "damage": amount}), Color.WHITE)
 	if u.use_weapon():
 		u.popup(tr("Broke!"), Color.LIGHT_GRAY)
 	var broke := battle.map.damage_tile(cell, amount, u.cell)
 	if broke:
 		await get_tree().create_timer(0.3).timeout
+		Sound.play("break")
 		u.popup(tr("{tile} broken!").format({"tile": tile_name}), Color.GOLD)
 	await get_tree().create_timer(0.5).timeout
 
@@ -528,6 +531,7 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 	var amount := Spells.heal_amount(caster, spell, target)
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
+	Sound.play("spell")
 	await caster.lunge(target.cell)
 	if spell.get("cures", false):
 		Statuses.cure(target)
@@ -535,6 +539,7 @@ func cast_heal(caster: Unit, target: Unit, spell_name: String) -> void:
 	else:
 		target.heal(amount)
 		target.popup("+%d" % amount, Color.PALE_GREEN)
+	Sound.play("heal")
 	await get_tree().create_timer(0.5).timeout
 	if gains_exp(caster):
 		await gain_exp(caster, spell.exp)
@@ -561,6 +566,7 @@ func do_combat(attacker: Unit, defender: Unit) -> void:
 		_apply_strike(a, d, result, dealt)
 		if result.hit and a.use_weapon():
 			a.popup(tr("Broke!"), Color.LIGHT_GRAY)
+			Sound.play("break")
 		await get_tree().create_timer(0.45).timeout
 	await _finish_exchange(attacker, defender, dealt)
 
@@ -574,6 +580,7 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 	target.notify_attacked()
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
+	Sound.play("spell")
 	var result := Combat.spell_strike(caster, target, spell, battle.map)
 	await caster.lunge(target.cell, result.crit)
 	_apply_strike(caster, target, result, dealt)
@@ -585,6 +592,7 @@ func do_spell_attack(caster: Unit, target: Unit, spell_name: String) -> void:
 		_apply_strike(target, caster, counter, dealt)
 		if counter.hit and target.use_weapon():
 			target.popup(tr("Broke!"), Color.LIGHT_GRAY)
+			Sound.play("break")
 		await get_tree().create_timer(0.45).timeout
 	await _finish_exchange(caster, target, dealt)
 
@@ -600,6 +608,7 @@ func cast_area(caster: Unit, center: Vector2i, spell_name: String) -> void:
 		v.notify_attacked()
 	caster.spend_mp(spell.mp)
 	caster.popup(spell_name, Color.LIGHT_SKY_BLUE)
+	Sound.play("spell")
 	await caster.lunge(center)
 	battle.map.show_area([], Spells.area_cells(spell_name, center, battle.map))
 	var damaged: Array[Unit] = []
@@ -644,6 +653,7 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 		d.take_damage(result.dmg)
 		if result.dmg > 0 and not dealt.has(a):
 			dealt.append(a)
+		Sound.play("crit" if result.crit else "hit")
 		d.popup((tr("Crit! %d") if result.crit else "%d") % result.dmg,
 			Color.ORANGE if result.crit else Color.WHITE, 0.0, result.crit)
 		if result.dmg > 0:
@@ -660,6 +670,7 @@ func _apply_strike(a: Unit, d: Unit, result: Dictionary, dealt: Array[Unit]) -> 
 		elif result.dmg > 0:
 			_record_close_call(d, a)
 	else:
+		Sound.play("miss")
 		d.popup(tr("Miss"), Color.LIGHT_GRAY)
 		d.dodge(a.cell)
 	# After the damage, so a sleep-inducing hit isn't undone by its own damage.
@@ -807,6 +818,8 @@ func _after_combat(u, foe, foe_cell: Vector2i, effect: Dictionary) -> void:
 ## "Immune". Returns whether it took.
 func inflict(u: Unit, status: String, turns := 0) -> bool:
 	var took := Statuses.inflict(u, status, turns)
+	if took:
+		Sound.play("status")
 	u.popup(status if took else tr("Immune"), Statuses.get_data(status).color if took else Color.LIGHT_GRAY)
 	return took
 
@@ -879,6 +892,7 @@ func gain_exp(u: Unit, amount: int, mount_amount := -1) -> void:
 		for key in Experience.STATS:
 			before[key] = u.get(Experience.STATS[key])
 		Experience.apply_level_up(u, gains)
+		Sound.play("level_up")
 		if u.team == Unit.Team.PLAYER:
 			await battle.ui.show_level_up(u, before, gains)
 		else:

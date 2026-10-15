@@ -68,6 +68,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if dir == Vector2i.ZERO and not accept and not cancel and not danger and not info and not next and not skip:
 		return
 	get_viewport().set_input_as_handled()
+	_input_sound(dir, accept, cancel)
 
 	# Map-view shortcuts, available while browsing or choosing where to move.
 	if battle.state in [Battle.State.IDLE, Battle.State.SELECTED, Battle.State.FORMATION]:
@@ -223,6 +224,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_tree().change_scene_to_file(Battle.LEVEL_SELECT_SCENE)
 
 
+## Menu sounds for a key press. On the map, the cursor sounds only when it moves
+## (move_cursor); dialogue and the options screen make their own.
+func _input_sound(dir: Vector2i, accept: bool, cancel: bool) -> void:
+	var state := battle.state
+	if state in [Battle.State.DIALOGUE, Battle.State.OPTIONS]:
+		return
+	if accept:
+		Sound.play("confirm")
+	elif cancel and state != Battle.State.IDLE:
+		Sound.play("cancel")
+	elif dir != Vector2i.ZERO and not state in [Battle.State.IDLE, Battle.State.SELECTED, Battle.State.FORMATION]:
+		Sound.play("cursor")
+
+
 func _dir_from(event: InputEvent) -> Vector2i:
 	if event.is_action_pressed("ui_left", true):
 		return Vector2i.LEFT
@@ -236,7 +251,10 @@ func _dir_from(event: InputEvent) -> Vector2i:
 
 
 func move_cursor(dir: Vector2i) -> void:
-	battle.cursor.cell = (battle.cursor.cell + dir).clamp(Vector2i.ZERO, Vector2i(battle.map.cols - 1, battle.map.rows - 1))
+	var cell := (battle.cursor.cell + dir).clamp(Vector2i.ZERO, Vector2i(battle.map.cols - 1, battle.map.rows - 1))
+	if cell != battle.cursor.cell:
+		Sound.play("cursor")
+	battle.cursor.cell = cell
 	refresh_info()
 
 
@@ -256,6 +274,7 @@ func jump_to_next_unit() -> void:
 		return
 	var i := units.find(here)
 	battle.cursor.cell = units[(i + 1) % units.size()].cell
+	Sound.play("cursor")
 	refresh_info()
 
 

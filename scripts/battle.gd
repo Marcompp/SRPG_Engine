@@ -92,6 +92,7 @@ func _ready() -> void:
 
 ## Starts the battle: map start events, then the first player phase.
 func begin() -> void:
+	Sound.music(phases.phase_track(Unit.Team.PLAYER))
 	await events.on_start()
 	phases.start_player_phase()
 
@@ -174,6 +175,7 @@ func add_gold(amount: int, at: Unit) -> void:
 	if amount <= 0:
 		return
 	gold += amount
+	Sound.play("item")
 	at.popup(tr("+%d gold") % amount, Color.GOLD, 10.0)
 
 

@@ -246,6 +246,14 @@ func _run_command(c: Array) -> void:
 				await get_tree().create_timer(c[1]).timeout
 		"flag":
 			flags[c[1]] = true
+		"music":
+			if c[1] == "":
+				Sound.stop_music()
+			else:
+				Sound.music(c[1])
+		"sound":
+			if not skipping:
+				Sound.play(c[1])
 		"banner":
 			if not skipping:
 				battle.ui.dialogue.hide_box()

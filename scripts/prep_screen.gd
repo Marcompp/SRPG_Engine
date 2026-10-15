@@ -74,6 +74,7 @@ func _ready() -> void:
 	Campaign.active = true
 	picked = _kept_picks()
 	_render()
+	Sound.music("prep")
 
 
 func _label(pos: Vector2, color := Color.WHITE) -> Label:
@@ -108,6 +109,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (up or down or left or right or accept or cancel):
 		return
 	get_viewport().set_input_as_handled()
+	Sound.play("confirm" if accept else "cancel" if cancel else "cursor")
 	message = ""
 	if mode == "status":
 		if up or down:

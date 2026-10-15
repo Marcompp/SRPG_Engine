@@ -536,6 +536,7 @@ func show_level_up(unit: Unit, before: Dictionary, gains: Dictionary) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _level_up.visible and event.is_action_pressed("confirm"):
 		get_viewport().set_input_as_handled()
+		Sound.play("confirm")
 		level_up_confirmed.emit()
 
 

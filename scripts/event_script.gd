@@ -38,6 +38,9 @@ extends RefCounted
 ##   @wait 0.5                         pause, in seconds
 ##   @flag bridge_held                 set a flag (see "if"/"unless")
 ##   @banner Reinforcements!           a banner
+##   @music tension                    switch to a track (data/sounds.cfg [music]) until
+##                                     the next phase starts; "@music stop" for silence
+##   @sound item                       a sound effect (data/sounds.cfg [effects])
 ##
 ## Each event is {"trigger", "args", "repeat", "if": [flags], "unless": [flags],
 ## "script": [command arrays], "line"}. Commands are arrays: ["say", speaker, text],
@@ -45,14 +48,14 @@ extends RefCounted
 ## ["recruit", unit], ["give", unit, item], ["status", unit, status, turns (0: its
 ## default)], ["cure", unit, status ("": all)], ["hostile", side, side], ["peace", side,
 ## side], ["side", unit, side] (sides as Unit.Team), ["camera", cell], ["wait", seconds],
-## ["flag", name], ["banner", text]. A level's "events" entry can hold events in
+## ["flag", name], ["banner", text], ["music", track ("": stop)], ["sound", effect]. A level's "events" entry can hold events in
 ## that same shape (with "script" written as command arrays) for anything the text
 ## can't express.
 
 const TRIGGERS: Array[String] = ["start", "turn", "talk", "battle", "death", "wake", "area", "visit", "victory",
 	"defeat"]
 const COMMANDS: Array[String] = ["say", "narrate", "move", "spawn", "remove", "recruit", "give", "status",
-	"cure", "hostile", "peace", "side", "camera", "wait", "flag", "banner"]
+	"cure", "hostile", "peace", "side", "camera", "wait", "flag", "banner", "music", "sound"]
 
 
 ## Events in the file at `path`, or [] if there's none. Errors are pushed (and
@@ -219,6 +222,18 @@ static func _command(line: String, n: int, errors: Array) -> Array:
 				errors.append("line %d: @side needs \"Unit, side\" (player, ally, enemy, other, neutral)" % n)
 				return []
 			return ["side", parts[0].strip_edges(), Factions.from_key(parts[1].strip_edges())]
+		"music":
+			if rest != "stop" and not Sound.MUSIC.has(rest):
+				errors.append("line %d: @music needs a track from data/sounds.cfg or \"stop\" (tracks: %s)"
+					% [n, ", ".join(Sound.MUSIC.keys())])
+				return []
+			return ["music", "" if rest == "stop" else rest]
+		"sound":
+			if not Sound.EFFECTS.has(rest):
+				errors.append("line %d: @sound needs an effect from data/sounds.cfg (effects: %s)"
+					% [n, ", ".join(Sound.EFFECTS.keys())])
+				return []
+			return ["sound", rest]
 		"cure":
 			var parts := rest.split(",")
 			var status := parts[1].strip_edges() if parts.size() == 2 else ""

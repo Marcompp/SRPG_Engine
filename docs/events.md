@@ -47,6 +47,8 @@ is alive, a minimum turn.
 | wait | Pause |
 | flag | Sets a flag (kept for the map; campaign flags later) |
 | banner | Shows a banner like "Reinforcements!" |
+| music | Switches to a track (or silence) until the next phase starts |
+| sound | Plays a sound effect |
 
 ## Presentation
 

@@ -690,6 +690,7 @@ func popup(text: String, color: Color, raise := 0.0, big := false) -> void:
 
 ## Blinks white a few times, then fades out.
 func die() -> void:
+	Sound.play("death")
 	var tw := create_tween()
 	for i in 3:
 		tw.tween_callback(flash)

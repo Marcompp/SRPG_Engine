@@ -58,6 +58,7 @@ func _ready() -> void:
 
 	_build_choices()
 	_refresh()
+	Sound.music("title")
 
 
 func _build_choices() -> void:
@@ -115,11 +116,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_up", true):
 		index = wrapi(index - 1, 0, choices.size())
+		Sound.play("cursor")
 		_refresh()
 	elif event.is_action_pressed("ui_down", true):
 		index = wrapi(index + 1, 0, choices.size())
+		Sound.play("cursor")
 		_refresh()
 	elif event.is_action_pressed("confirm"):
+		Sound.play("confirm")
 		var choice: Dictionary = choices[index]
 		if choice.get("options", false):
 			_options.open()

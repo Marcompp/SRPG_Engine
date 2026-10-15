@@ -10,6 +10,8 @@ signal advanced
 const CHARS_PER_SECOND := 45.0
 ## Multiplier while cancel (X) is held.
 const FAST := 4.0
+## The "text" sound plays every this many letters while a line types out.
+const BLIP_EVERY := 3
 const BOX_HEIGHT := 46
 const PORTRAIT := 44
 const NARRATOR := ""
@@ -27,6 +29,8 @@ var _portraits: Array[ColorRect] = []
 var _letters: Array[Label] = []
 var _typing := false
 var _shown := 0.0
+## Letters shown when the "text" sound last played.
+var _blipped := 0
 
 
 func _ready() -> void:
@@ -79,6 +83,7 @@ func say(speaker: Dictionary, side: int, text: String) -> void:
 		_text.visible_characters = -1
 		return
 	_shown = 0.0
+	_blipped = -BLIP_EVERY
 	_text.visible_characters = 0
 	_typing = true
 	await advanced
@@ -113,6 +118,9 @@ func _process(delta: float) -> void:
 	var speed := CHARS_PER_SECOND * (FAST if Input.is_action_pressed("cancel") else 1.0)
 	_shown += delta * speed
 	_text.visible_characters = int(_shown)
+	if _text.visible_characters >= _blipped + BLIP_EVERY:
+		_blipped = _text.visible_characters
+		Sound.play("text")
 	if _text.visible_characters >= _text.get_total_character_count():
 		_typing = false
 		_text.visible_characters = -1
