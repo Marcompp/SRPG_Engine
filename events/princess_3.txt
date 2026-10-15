@@ -1,0 +1,30 @@
+# The Princess Is Out, chapter 3: Market Day. Format: scripts/event_script.gd
+# (and docs/events.md). Outline: docs/demo_outline.md.
+
+== start ==
+@narrate Market day in Fernwick, the first town on the road east.
+Rosalind: Doran, the man at the stall wants three silver for a pie. What's a silver?
+Doran: ...Small round thing. We have very few of them.
+Rosalind: Oh! I have something shiny. Will he take this?
+Fennick: Put the tiara AWAY—
+@camera (3, 5)
+Sly Tam: Much obliged, miss! I'll take that off your hands!
+@narrate A thin man snatches the tiara and darts into the crowd.
+Rosalind: That's my... that's a family heirloom! A common family's!
+Juniper: He's making for the east gate. If he gets out, it's gone.
+Doran: Then we get there first. The south road's quickest. Mind the crowd.
+
+== turn 2 ==
+Sly Tam: Make way, make way! Man with a shiny hat coming through!
+
+== battle Sly Tam ==
+Sly Tam: Now now, no need for violence. Unless you're offering a reward?
+
+== victory ==
+Rosalind: My tiara! Thank you, everyone. I'll never take it out in public again.
+Fennick: You'll never take it out at all.
+Mags: Tam had a purse on him, too. Consider it a fine for rudeness.
+@narrate That afternoon, the Royal Guard rides into Fernwick.
+Captain Thorne: A girl with a tiara? Mercenaries? A chase through the market?
+Townsfolk: Oh, yes. Lovely day for it. They left hours ago.
+Captain Thorne: Of course they did.

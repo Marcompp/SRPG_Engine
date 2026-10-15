@@ -11,7 +11,9 @@ extends RefCounted
 ## (green allies or neutrals to keep alive; units that haven't arrived yet count as fine), and "caught_by": a side key ("neutral",
 ## "yellow"...): losing if a unit of that side is ever next to the player's Lord (the
 ## Royal Guard catching a runaway princess; see the "pursuer" AI preset). The danger
-## zone shows where they could catch it.
+## zone shows where they could catch it. And "getaway": {"unit": "Name", "cells":
+## [Vector2i, ...]}: losing if that unit reaches one of the cells (a thief escaping
+## with the loot; the cells are marked on the map).
 ## Losing the Lord always loses. Routing the enemy also wins every type except
 ## seize and escape (as in Fire Emblem, those need the Lord's command).
 
@@ -48,6 +50,8 @@ static func defeat_text(obj: Dictionary) -> String:
 	if obj.has("protect"):
 		ways.append(TranslationServer.translate("{units} falls").format({
 			"units": TranslationServer.translate(" or ").join(obj.protect)}))
+	if obj.has("getaway"):
+		ways.append(TranslationServer.translate("{unit} gets away").format({"unit": obj.getaway.unit}))
 	if obj.has("caught_by"):
 		ways.append(TranslationServer.translate("a {side} unit gets next to your Lord").format({
 			"side": TranslationServer.translate(Factions.NAMES[Factions.from_key(obj.caught_by)])}))
@@ -62,6 +66,8 @@ static func marked_cells(obj: Dictionary) -> Array[Vector2i]:
 			result.append(obj.cell)
 		"escape":
 			result.assign(obj.cells)
+	if obj.has("getaway"):
+		result.append_array(obj.getaway.cells)
 	return result
 
 
@@ -89,6 +95,10 @@ static func result(battle: Battle, turn_over := false) -> String:
 				return "defeat"
 	if obj.has("caught_by") and is_caught(battle, obj):
 		return "defeat"
+	if obj.has("getaway"):
+		for u in battle.units():
+			if u.unit_name == obj.getaway.unit and obj.getaway.cells.has(u.cell):
+				return "defeat"
 	if battle.objective_done:
 		return "victory"
 	# Every unit hostile to the player: red, purple, provoked yellow (see Factions).

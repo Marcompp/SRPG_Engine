@@ -29,7 +29,8 @@ On some maps the Guard arrives as reinforcements on a set turn: yellow, never
 attacking, heading straight for Rosalind. If a guard ends its move next to her, she's
 **caught** and the chapter must be retried. Block them, Shove them aside, or just
 finish first; winning in time plays the arrived-too-late scene. The arrival turn is set
-per chapter. Used in chapters 2, 3, 4, 7 and 9, so it doesn't get stale.
+per chapter. Used in chapters 2, 4, 7 and 9, so it doesn't get stale (chapter 3 dropped it:
+its yellow crowd would count as catchers).
 
 ## Cast
 
@@ -54,7 +55,7 @@ Rosalind gets a pegasus in chapter 7.
 |---|---|---|---|---|
 | 1 | Over the Wall (built) | **Sneaking out.** Escape: Rosalind to the gate. Palace guards doze at their posts (sleeper AI with a wake radius); waking them closes routes. The enemies are burglars who broke in the same night | She climbs out and meets the company, who are robbing the kitchen of what they were owed | Rosalind, Doran, Bex, Fennick, Mags |
 | 2 | Honest Work (built) | **First job, with the Guard clock.** Rout bandits from a farmstead before the Guard arrives on turn 8. Teaches the caught rule | Rosalind insists on helping, badly. The Guard finds a grateful farmer | Juniper |
-| 3 | Market Day | **Steal it back.** A market town full of neutral townsfolk; a thief steals her tiara and runs for the gate (lose if he reaches it). Shop on the prep screen | Her first shopping; she doesn't understand money | – |
+| 3 | Market Day (built) | **Cut him off.** A market town full of neutral townsfolk, who let the thieves slip past but block the company; a thief steals her tiara and runs for the gate (objective `getaway`: lose if he reaches it). Shop on the prep screen and a stall on the map. No Guard clock (the crowd is yellow); Thorne has a cameo in the ending | Her first shopping; she doesn't understand money | – |
 | 4 | The Ferry | **Ships.** Ferry the army across a wide river (Board, Unload) while river pirates raid. The Guard arrives on the far bank | The Guard watches the ferry leave | – |
 | 5 | The Haunted Manor | **Dungeon crawl.** A paid job: evict the "ghosts". Doors, keys, Lockpick, cracked walls, chests; the ghosts are harmless, the burglars aren't. Seize the study | The company finally gets paid | Sir Hollow |
 | 6 | The Tourney | **Three-way fight.** Village tournament: the company, a rival company and bandits who crashed it. Talk a rival over. Thorne entered in disguise | Thorne almost catches her and loses on a technicality | Wren |

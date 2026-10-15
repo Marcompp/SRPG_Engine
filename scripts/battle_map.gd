@@ -100,6 +100,8 @@ var objects: Array = []
 ## Objective tiles to outline (see Objectives.marked_cells) and the objective type.
 var objective_cells: Array[Vector2i] = []
 var objective_type := ""
+## Cells a fleeing unit must not reach (objective "getaway"), outlined in red.
+var getaway_cells: Array = []
 ## Draws the shimmer on top of the highlights. Its own layer, so the shimmer
 ## doesn't redraw the whole map every frame.
 var _shimmer: Node2D
@@ -196,6 +198,7 @@ func load_objects(list: Array, objective: Dictionary) -> void:
 		objects.append(copy)
 	objective_type = objective.type
 	objective_cells = Objectives.marked_cells(objective)
+	getaway_cells = objective.get("getaway", {}).get("cells", [])
 	queue_redraw()
 
 
@@ -483,7 +486,7 @@ func _draw_objects() -> void:
 	var colors := {"seize": Color("f0c030"), "defend": Color("50a0ff"), "escape": Color("50e070")}
 	for c in objective_cells:
 		var p := Vector2(c * TILE)
-		var color: Color = colors.get(objective_type, Color.WHITE)
+		var color: Color = Color("e05050") if getaway_cells.has(c) else colors.get(objective_type, Color.WHITE)
 		draw_rect(Rect2(p + Vector2(1, 1), Vector2(TILE - 2, TILE - 2)), color, false, 2.0)
 
 

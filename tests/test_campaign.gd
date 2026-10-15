@@ -19,7 +19,7 @@ func test_all_chapters_are_valid() -> void:
 			check(inside.call(c) and BattleMap.cost_for(at.call(c), "foot") >= 0, "%s: deploy cell %s usable" % [id, c])
 			check(not taken.has(c), "%s: deploy cell %s listed once" % [id, c])
 			taken[c] = true
-		var all_units: Array = level.enemies + level.recruits
+		var all_units: Array = level.get("enemies", []) + level.get("recruits", [])
 		for wave in level.get("reinforcements", []):
 			all_units += wave.units
 		for data in all_units:

@@ -39,7 +39,12 @@ func _run_all() -> void:
 	for suite_name in SUITES:
 		if not wanted.is_empty() and not wanted.has(suite_name):
 			continue
-		var suite = load("res://tests/test_%s.gd" % suite_name).new()
+		# A suite that doesn't parse is a failure, not a hang.
+		var script: GDScript = load("res://tests/test_%s.gd" % suite_name)
+		if script == null or not script.can_instantiate():
+			failures.append("%s: the suite doesn't load (see the errors above)" % suite_name)
+			continue
+		var suite = script.new()
 		suite.setup(self)
 		for method in suite.get_script().get_script_method_list():
 			var t: String = method.name

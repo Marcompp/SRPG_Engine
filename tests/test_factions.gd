@@ -342,3 +342,34 @@ func test_honest_work_guard_arrives() -> void:
 	check_eq(b.units_of(Unit.Team.NEUTRAL).size(), 3, "the Guard rides in on turn 8")
 	check(b.events.flags.has("guard_here"), "and the ending knows")
 	Levels.selected = "river_crossing"
+
+
+# --- Market Day (demo chapter 3): objective "getaway" ------------------------
+
+func test_market_day_getaway() -> void:
+	Campaign.select("princess")
+	await start_chapter(2)
+	Levels.selected = Chapters.ORDER[2]
+	var tam := unit_named("Sly Tam", Unit.Team.ENEMY)
+	var obj := Objectives.of(Levels.get_level(Levels.selected))
+	check(Objectives.defeat_text(obj).contains("Sly Tam gets away"), "the defeat text says so")
+	check(b.map.objective_cells.has(Vector2i(21, 5)) and b.map.getaway_cells.has(Vector2i(21, 5)), "the gate is marked")
+	# He slips through the crowd: the townsfolk are friendly to his side.
+	var folk: Unit = b.unit_at(Vector2i(8, 6))
+	check(folk != null and Factions.friendly(tam.team, folk.team), "townsfolk let the thieves past")
+	check(not Factions.friendly(Unit.Team.PLAYER, folk.team), "but not the company")
+	await EnemyAI.take_turn(tam, b)
+	check(tam.cell.x > 3, "Tam runs east (%s)" % tam.cell)
+	check_eq(unit_named("Rosalind").hp, unit_named("Rosalind").max_hp, "without fighting")
+	check_eq(Objectives.result(b), "", "not out yet")
+	tam.set_cell(Vector2i(21, 5))
+	check_eq(Objectives.result(b), "defeat", "at the gate he's gone")
+	Levels.selected = "river_crossing"
+
+
+func test_market_day_phases_run() -> void:
+	Campaign.select("princess")
+	await start_chapter(2)
+	Levels.selected = Chapters.ORDER[2]
+	await run_enemy_phases()
+	Levels.selected = "river_crossing"

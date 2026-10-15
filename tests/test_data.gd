@@ -120,6 +120,9 @@ func _check_map(id: String, skill: Callable, item: Callable) -> void:
 			check(AIProfiles.PRESETS.has(u.ai.preset), "%s: unknown AI preset %s" % [where, u.ai.preset])
 		if u.has("mount"):
 			check(Mounts.SPECIES.has(u.mount.species), "%s: unknown mount species" % where)
+	for it: String in level.get("shop", []):
+		item.call(it, "%s: prep shop" % id)
+		check(Items.cost(it) > 0, "%s: prep shop sells %s, which has no price" % [id, it])
 	for o: Dictionary in level.get("objects", []):
 		for it: String in ([o.item] if o.has("item") else []) + o.get("stock", []):
 			item.call(it, "%s: %s" % [id, o.type])
