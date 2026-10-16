@@ -227,6 +227,52 @@ func test_prep_screen() -> void:
 	prep.queue_free()
 
 
+func _prep_press(prep: Control, code: Key) -> void:
+	var e := InputEventKey.new()
+	e.physical_keycode = code
+	e.keycode = code
+	e.pressed = true
+	prep._unhandled_input(e)
+
+
+func test_prep_screen_info_and_scrolling() -> void:
+	Campaign.start_new()
+	for i in 20:
+		Campaign.convoy.append(Items.make("Iron Sword"))
+	Campaign.save()  # the prep screen loads the campaign
+	var prep: Control = load("res://scenes/prep.tscn").instantiate()
+	root.add_child(prep)
+	await process_frame
+	# D on a unit: its status screen; D there: detail mode; X twice: back where it was.
+	prep._enter("pick")
+	prep.index = 1
+	_prep_press(prep, KEY_D)
+	check_eq(prep.mode, "status", "D on a unit opens its status screen")
+	check_eq(prep.current_unit, prep._army_names()[1], "for the highlighted unit")
+	_prep_press(prep, KEY_D)
+	check(prep._status.detail, "D on the status screen enters detail mode")
+	_prep_press(prep, KEY_X)
+	check(not prep._status.detail and prep.mode == "status", "X leaves detail mode first")
+	_prep_press(prep, KEY_X)
+	check_eq(prep.mode, "pick", "then goes back to the list it came from")
+	check_eq(prep.index, 1, "on the same unit")
+	# D on an item: its help; any key closes it.
+	prep._enter("shop")
+	prep.column = 1
+	_prep_press(prep, KEY_D)
+	check(prep._help.visible and prep._help_label.text.begins_with("Iron Sword"), "D on an item shows its help")
+	_prep_press(prep, KEY_X)
+	check(not prep._help.visible and prep.mode == "shop", "a key closes it without leaving the shop")
+	# Long lists scroll to keep the highlighted row on screen.
+	prep.index = 19
+	prep._render()
+	var shown: PackedStringArray = prep._right.text.split("\n")
+	check(shown[-1].begins_with("> "), "the last convoy row is shown, highlighted")
+	check(shown.size() * prep._right.get_line_height() <= prep.HINT_TOP - prep.LIST_TOP, "and the list fits above the hint")
+	check_eq(shown[1], "   ...", "rows above are marked hidden")
+	prep.queue_free()
+
+
 func test_check_map_formation() -> void:
 	Campaign.start_new()
 	Campaign.active = true

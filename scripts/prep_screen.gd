@@ -13,11 +13,22 @@ extends Control
 ##   Check Map:  the chapter's map, to look around and swap the deployed units'
 ##               starting cells (see BattleFormation.start); Fight! from there too.
 ##   Fight!:     start the chapter.
-## Up/Down: choose. Z: confirm. X: back. Changes are saved to the campaign at once.
+## Up/Down: choose. Z: confirm. X: back. D: info (the status screen for a unit, help
+## for an item; on the status screen, its detail mode). Long lists scroll. Changes
+## are saved to the campaign at once.
 
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
 const DIM := Color(0.7, 0.75, 0.95)
+## The two list columns: x and width (the left one gets the full width when the
+## right one is empty).
+const LEFT_X := 8.0
+const RIGHT_X := 122.0
+const COLUMN_W := 110.0
+const FULL_W := 224.0
+## The lists sit between here and the hint, which takes up to two lines at the bottom.
+const LIST_TOP := 34.0
+const HINT_TOP := 138.0
 ## Entries are ids, translated where shown.
 const MENU: Array[String] = ["Pick Units", "Items", "Shop", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!",  # i18n
 	"Level Select"]
@@ -38,6 +49,11 @@ var _right: Label
 var _hint: Label
 var _status: StatusScreen
 var _status_unit: Unit
+## Where X on the status screen goes back to.
+var _status_return := "status_unit"
+## Item help (D on an item); any key closes it.
+var _help: PanelContainer
+var _help_label: Label
 ## Stable: the mount being given a rider, and the name editor.
 var _mount: Dictionary = {}
 var _rename: LineEdit
@@ -47,6 +63,7 @@ func _ready() -> void:
 	Text.manual(self)  # the code translates what it shows
 	var theme := Theme.new()
 	theme.default_font_size = 8
+	theme.set_constant("line_spacing", "Label", 1)
 	self.theme = theme
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
@@ -56,9 +73,30 @@ func _ready() -> void:
 	_title = _label(Vector2(8, 4))
 	_title.add_theme_font_size_override("font_size", 10)
 	_objective = _label(Vector2(8, 18), DIM)
-	_left = _label(Vector2(8, 34))
-	_right = _label(Vector2(96, 34))
-	_hint = _label(Vector2(8, 148), DIM)
+	_left = _label(Vector2(LEFT_X, LIST_TOP))
+	_right = _label(Vector2(RIGHT_X, LIST_TOP))
+	for column_label in [_left, _right]:
+		column_label.size = Vector2(COLUMN_W, HINT_TOP - LIST_TOP)
+		column_label.clip_text = true
+		column_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_hint = _label(Vector2(LEFT_X, HINT_TOP), DIM)
+	_hint.size = Vector2(FULL_W, 160 - HINT_TOP)
+	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_help_label = Label.new()
+	_help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_help_label.custom_minimum_size.x = FULL_W - 6
+	_help = PanelContainer.new()
+	var box_style := StyleBoxFlat.new()
+	box_style.bg_color = Color(0.08, 0.1, 0.3)
+	box_style.border_color = Color(0.85, 0.85, 1.0)
+	box_style.set_border_width_all(1)
+	box_style.set_corner_radius_all(2)
+	box_style.set_content_margin_all(3)
+	_help.add_theme_stylebox_override("panel", box_style)
+	_help.visible = false
+	_help.add_child(_help_label)
+	add_child(_help)
 	_status = StatusScreen.new()
 	add_child(_status)
 	_rename = LineEdit.new()
@@ -102,17 +140,29 @@ func _unhandled_input(event: InputEvent) -> void:
 			_render()
 			get_viewport().set_input_as_handled()
 		return
-	if info and mode == "stable" and index < Campaign.all_mounts().size():
-		_start_rename(Campaign.all_mounts()[index].mount)
-		get_viewport().set_input_as_handled()
-		return
-	if not (up or down or left or right or accept or cancel):
+	if not (up or down or left or right or accept or cancel or info):
 		return
 	get_viewport().set_input_as_handled()
-	Sound.play("confirm" if accept else "cancel" if cancel else "cursor")
+	if _help.visible:
+		_help.visible = false
+		Sound.play("cancel")
+		_render()
+		return
+	if info and mode == "stable" and index < Campaign.all_mounts().size():
+		_start_rename(Campaign.all_mounts()[index].mount)
+		return
+	Sound.play("confirm" if accept or info else "cancel" if cancel else "cursor")
 	message = ""
 	if mode == "status":
-		if up or down:
+		# Detail mode: arrows move the highlight, D or X go back to browsing.
+		if _status.detail:
+			if up or down or left or right:
+				_status.move_detail(Vector2i(int(right) - int(left), int(down) - int(up)))
+			elif info or cancel:
+				_status.exit_detail()
+		elif info:
+			_status.enter_detail()
+		elif up or down:
 			var names := _army_names()
 			var i := wrapi(names.find(current_unit) + (1 if down else -1), 0, names.size())
 			_show_status(names[i])
@@ -121,7 +171,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif cancel:
 			_status.close()
 			_status_unit.free()
-			mode = "status_unit"
+			_status_unit = null
+			mode = _status_return
+			index = maxi(0, _list_units().find(current_unit))
+		_render()
+		return
+	if info:
+		_info()
 		_render()
 		return
 	if up or down:
@@ -207,6 +263,46 @@ func _accept() -> void:
 			_enter("promote_unit")
 		"status_unit":
 			_show_status(_army_names()[index])
+
+
+## D: the status screen for a highlighted unit, help for a highlighted item.
+func _info() -> void:
+	var units := _list_units()
+	if index < units.size():
+		_show_status(units[index])
+		return
+	var it := _highlighted_item()
+	if not it.is_empty():
+		_help_label.text = Glossary.item(it)
+		_help.reset_size()
+		_help.position = Vector2(4, 160 - 4 - _help.get_combined_minimum_size().y)
+		_help.visible = true
+
+
+## The units listed in this mode, in row order (empty where the rows aren't units).
+func _list_units() -> Array:
+	match mode:
+		"pick", "items_unit", "status_unit", "stable_rider":
+			return _army_names()
+		"promote_unit":
+			return _promotable()
+	return []
+
+
+## The item on the highlighted row, or {} where the rows aren't items.
+func _highlighted_item() -> Dictionary:
+	var list := []
+	match mode:
+		"items":
+			list = Campaign.army_unit(current_unit).items if column == 0 else Campaign.convoy
+		"shop":
+			if column == 0:
+				var stock := Shop.stock_for(Campaign.chapter_data())
+				return Items.make(stock[index]) if index < stock.size() else {}
+			list = Campaign.convoy
+		"repair":
+			list = _repairables().map(func(r): return r[1])
+	return list[index] if index < list.size() else {}
 
 
 func _back() -> void:
@@ -365,6 +461,8 @@ func _show_status(unit_name: String) -> void:
 	current_unit = unit_name
 	_status_unit = SaveGame.unit_from_dict(Campaign.army_unit(unit_name))
 	_status.show_unit(_status_unit)
+	if mode != "status":
+		_status_return = mode
 	mode = "status"
 
 
@@ -415,6 +513,9 @@ func _render() -> void:
 	_objective.text = tr("Victory: {text}").format({"text": Objectives.victory_text(Objectives.of(chapter))})
 	var lines: Array[String] = []
 	var side: Array[String] = []
+	# Lines at the top of a column that stay put while its rows scroll.
+	var left_head := 1 if mode in ["items", "shop", "repair", "stable_rider", "promote_class"] else 0
+	var side_head := 1 if mode in ["items", "shop"] else 0
 	match mode:
 		"menu":
 			for i in MENU.size():
@@ -460,13 +561,13 @@ func _render() -> void:
 				side.append("   " + tr("(empty)"))
 		"repair":
 			var list := _repairables()
+			lines.append(tr("Gold %d") % Campaign.gold)
 			if list.is_empty():
 				lines.append(tr("Every weapon is in good repair."))
 			for i in list.size():
 				var it: Dictionary = list[i][1]
 				lines.append(_row(i, "%s: %s  %s/%d  %dG" % [tr(list[i][0]), it.name,
 					tr("broken") if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it), Items.repair_cost(it)]))
-			side.append(tr("Gold %d") % Campaign.gold)
 		"stable":
 			var mounts := Campaign.all_mounts()
 			if mounts.is_empty():
@@ -502,19 +603,44 @@ func _render() -> void:
 				lines.append(_row(i, options[i]))
 			var bonus := Classes.promotion_bonus(options[index])
 			side.append(_gains_text(bonus))
-	_left.text = "\n".join(lines)
-	_right.text = "\n".join(side)
+	var side_active := mode in ["items", "shop"] and column == 1
+	_left.text = "\n".join(_fit(lines, left_head, -1 if side_active else index))
+	_right.text = "\n".join(_fit(side, side_head, index if side_active else -1))
+	_left.size.x = COLUMN_W if not side.is_empty() else FULL_W
 	var hints := {  # i18n
 		"menu": "Up/Down: choose  Z: select",
-		"pick": "Z: deploy / bench  X: back",
-		"items": "Z: move item  Left/Right: unit/convoy  X: back",
-		"shop": "Z: buy / sell  Left/Right: buy/sell  X: back",
-		"repair": "Z: repair  X: back",
+		"pick": "Z: deploy / bench  D: info  X: back",
+		"items_unit": "Z: select  D: info  X: back",
+		"status_unit": "Z: select  D: info  X: back",
+		"promote_unit": "Z: select  D: info  X: back",
+		"items": "Z: move item  Left/Right: unit/convoy  D: info  X: back",
+		"shop": "Z: buy / sell  Left/Right: buy/sell  D: info  X: back",
+		"repair": "Z: repair  D: info  X: back",
 		"stable": "Z: assign / unassign  D: rename  X: back",
-		"stable_rider": "Z: ride  X: back",
-		"status": "Left/Right: page  Up/Down: unit  X: back",
+		"stable_rider": "Z: ride  D: info  X: back",
 	}
 	_hint.text = message if message != "" else tr(hints.get(mode, "Z: select  X: back"))
+	# The status screen has its own hint; item help covers it.
+	_hint.visible = mode != "status" and not _help.visible
+
+
+## The rows of a column that fit above the hint, scrolled to keep row `selected`
+## (-1: none) in view; the first `head` lines (titles) always show. "..." stands
+## in for rows hidden above or below.
+func _fit(lines: Array[String], head: int, selected: int) -> Array[String]:
+	var rows := int((HINT_TOP - LIST_TOP) / _left.get_line_height()) - head
+	if lines.size() - head <= rows:
+		return lines
+	var body := lines.slice(head)
+	var first := clampi(selected - rows / 2, 0, body.size() - rows)
+	var shown := body.slice(first, first + rows)
+	if first > 0:
+		shown[0] = "   ..."
+	if first + rows < body.size():
+		shown[-1] = "   ..."
+	var result: Array[String] = []
+	result.assign(lines.slice(0, head) + shown)
+	return result
 
 
 func _row(i: int, text: String, active := true) -> String:

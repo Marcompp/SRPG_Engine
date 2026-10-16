@@ -296,12 +296,21 @@ func hide_menu() -> void:
 	_menu.visible = false
 
 
+## Options the menu shows at once (it scrolls past that).
+const MENU_ROWS := 9
+
+
 func _refresh_menu() -> void:
 	var lines: Array[String] = []
 	if _menu_title:
 		lines.append(_menu_title)
-	for i in menu_options.size():
-		lines.append(("> " if i == menu_index else "   ") + tr(menu_options[i]))
+	# A window of MENU_ROWS options that scrolls with the selection; "..." stands in
+	# for options hidden above or below.
+	var first := clampi(menu_index - MENU_ROWS / 2, 0, maxi(0, menu_options.size() - MENU_ROWS))
+	var last := mini(first + MENU_ROWS, menu_options.size())
+	for i in range(first, last):
+		var hidden := (i == first and first > 0) or (i == last - 1 and last < menu_options.size())
+		lines.append("   ..." if hidden else ("> " if i == menu_index else "   ") + tr(menu_options[i]))
 	_menu_label.text = "\n".join(lines)
 
 
