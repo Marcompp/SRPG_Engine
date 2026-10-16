@@ -27,7 +27,7 @@ const DIM := UiTheme.DIM
 const LEFT_PANEL := Rect2(28, 128, 440, 430)
 const RIGHT_PANEL := Rect2(492, 128, 440, 430)
 const FULL_PANEL := Rect2(28, 128, 904, 430)
-const TEXT_INSET := 48.0
+const TEXT_INSET := 62.0
 ## The lists sit between here and the panels' bottom; the hint goes under them.
 const LIST_TOP := 152.0
 const HINT_TOP := 540.0
@@ -551,7 +551,7 @@ func _render() -> void:
 		"pick":
 			var names := _army_names()
 			for i in names.size():
-				lines.append("[%s] %s" % ["x" if picked.has(names[i]) else " ", names[i]])
+				lines.append("%s  %s" % ["◆" if picked.has(names[i]) else "◇", names[i]])  # deployed / benched
 			var d := Campaign.army_unit(names[index])
 			side.append(tr("%s  Lv %d") % [Campaign.class_label(d), d.level])
 			side.append(tr("Deployed %d/%d") % [picked.size(), chapter.deploy.size()])
@@ -609,8 +609,9 @@ func _render() -> void:
 			lines.append(tr("Who rides {mount}?").format({"mount": _mount.name}))
 			for i in names.size():
 				var d := Campaign.army_unit(names[i])
-				var mark := " " if Campaign.ride_problem(names[i], _mount) == "" else "x"
-				lines.append("[%s] %s  %s" % [mark, names[i], Campaign.class_label(d)])
+				# × marks those the mount refuses (Z on one says why).
+				var mark := "◇" if Campaign.ride_problem(names[i], _mount) == "" else "×"
+				lines.append("%s  %s  %s" % [mark, names[i], Campaign.class_label(d)])
 		"promote_unit":
 			var eligible := _promotable()
 			if eligible.is_empty():

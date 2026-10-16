@@ -35,6 +35,10 @@ Open the folder in Godot 4.4 and press F5. The game starts on a level select scr
 
 `data/sounds.cfg` names every music track and sound effect the game plays, each a file under `audio/` (`audio/music/`, `audio/effects/`). A sound whose file is missing plays nothing, so dropping a file in at the listed path (and letting the editor import it) is all it takes. There's no music yet. The effects are placeholders made by `tools/generate_sounds.gd`, a small retro synth: each effect is a recipe of voices (wave, pitch sweep, length, envelope) at the top of the script; edit one and run `godot --headless --path . --script res://tools/generate_sounds.gd -- hit` to remake it. Tracks loop unless the entry says `"loop": false`, and an entry can set its own volume. `scripts/sound.gd` plays them: the battle switches tracks at each phase (`player_phase`, `enemy_phase`...; a map's `"music": {"enemy": "boss_theme"}` picks others), plays `victory` or `defeat` at the end, `title` on the level select and `prep` on the prep screen. Effects cover the cursor and menus, strikes (hit, crit, miss), deaths, spells, heals, statuses, breaking, items and gold, level-ups, phase starts and dialogue typing. Events can switch tracks with `@music <track>` (until the next phase; `@music stop` for silence) and play effects with `@sound <effect>`.
 
+## UI
+
+The look is "Gilded Night", aiming at an HD-2D feel (design and history: [docs/ui_theme.md](docs/ui_theme.md)): the map stays pixel art at 240x160, while every screen draws on a `UiLayer`, a layer scaled by 0.25 so it's laid out in 960x640 units and rendered at window resolution. Panels are navy with fine double gold lines and filigree corners (`GildedStyleBox`, drawn in code), names and headings are in Cinzel and text in EB Garamond (`fonts/`, OFL), menus mark the selected row with a gold band and a pulsing diamond, and windows ease in as they open. `scripts/ui_theme.gd` holds the palette, font sizes and the shared Theme (with label variations such as `NameLabel` and `CaptionLabel`). On the map, `Atmosphere` adds light and depth between the map and the UI: color grading, slow light shafts, a vignette, a very slight tilt-shift blur, a glow under the cursor and drifting motes. The Atmosphere option turns those effects and the window easing off.
+
 ## Portraits
 
 Prototype, not shown in game yet (design: [docs/portraits.md](docs/portraits.md)). Portraits (96x80) are put together from parts drawn in `art/portraits/*.ase` (layers named `slot/variant`, e.g. `eyes/a:left`, in the key colors of `data/portraits.cfg`) and painted from color ramps (`data/portrait_ramps.cfg`): skin, each eye's iris and sclera, hair, three cloth colors, two trims and an accent. Hair casts a shadow that darkens whatever is under it within its own ramp, and parts can be moved (eyes higher, farther apart...). `godot --headless --path . --script res://tools/export_portraits.gd` exports the parts to `portraits/parts/`. The dev tool, `godot --path . res://tools/portrait_editor.tscn`, picks parts, ramps and offsets, randomizes, re-exports the art, and saves named characters' recipes to `data/portrait_presets.cfg` (or bakes a PNG).
@@ -259,7 +263,8 @@ Presets: `charger` (default), `ambusher`, `boss`, `turret`, `sentry`, `sleeper`,
 - `scripts/combat.gd`, `experience.gd`: formulas
 - `scripts/classes.gd`, `races.gd`, `weapons.gd`, `items.gd`, `spells.gd`: data rules (their tables are in `data/`)
 - `scripts/enemy_ai.gd`, `ai_profiles.gd`: enemy behavior and its settings/presets
-- `scripts/battle_map.gd`, `unit.gd`, `cursor.gd`, `ui.gd`: map, units and HUD
+- `scripts/battle_map.gd`, `unit.gd`, `cursor.gd`, `ui.gd`, `atmosphere.gd`: map, units, HUD and the map's light and depth effects
+- `scripts/ui_theme.gd`, `ui_layer.gd`, `gilded_style_box.gd`, `gilded_bar.gd`, `gilded_banner.gd`, `diamond_cursor.gd`: the UI's look (see UI above)
 - `scripts/status_screen.gd`, `glossary.gd`: the GBA-style status screen and its detail-mode help text
 - `scripts/unit_list.gd`, `options_screen.gd`: the Units and Options screens
 - `scripts/save_game.gd`, `settings.gd`: suspend data (units saved generically; see `Unit.SAVE_SKIP`) and options

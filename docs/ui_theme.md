@@ -1,6 +1,7 @@
 # UI theme: Gilded Night (design notes)
 
-Plan for the game's UI identity. Nothing is built yet. The look was picked from
+The game's UI identity, built in the steps below (all done, 2026-10-16; summary in
+the README's UI section). The look was picked from
 mockups comparing six directions (three on the 240x160 pixel grid, three HD-2D):
 an **HD-2D presentation**, where the world stays pixel art and the interface,
 text and lighting run at screen resolution, in the **Gilded Night** style:
@@ -158,5 +159,18 @@ any order once step 2 exists.
    dialogue, status, unit list and options fade without growing. Closing stays
    instant. With the Atmosphere option off, windows just appear. The menu
    diamond's pulse (step 2) is the only other motion.
-10. **Wrap-up:** remove the old `StyleBoxFlat` styling, screenshot every screen at
-    both scales, run the suite, add a UI section to the README.
+10. **Wrap-up** (done, 2026-10-16). The old flat styling went with
+    `UiTheme.legacy()` (step 7). The prep screen's `[x]` marks became diamonds:
+    ◆ deployed, ◇ benched, and × for a unit a mount refuses; its list text moved
+    in a little so the selection diamond doesn't touch them. Every screen was
+    screenshotted at 960x640 and at the fullscreen 1440x960 (scratch saves): all
+    readable, nothing clipped. The README has a UI section and the new scripts in
+    its layout list.
+
+## Not done yet
+
+- **Portraits:** the unit card, dialogue and status screen show placeholders
+  (team color, class icon or initial) until units have portraits.
+- **The diorama camera** (out of scope, see Look).
+- **Map art:** the atmosphere's shafts and blur only really show on detailed
+  tiles; the current ones are flat placeholders.
