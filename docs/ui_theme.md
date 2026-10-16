@@ -145,7 +145,9 @@ any order once step 2 exists.
    reading the screen texture (warm-to-cool grading, a touch more contrast and
    saturation, two slow diagonal light shafts, a vignette, and tilt-shift: a
    two-ring, 17-tap blur that grows toward the top and bottom, since the
-   Compatibility renderer can't be relied on for screen mipmaps), a soft additive
+   Compatibility renderer can't be relied on for screen mipmaps; kept very
+   subtle, at most 0.6 screen pixels in the outer fifth of the screen, since the
+   view is top-down), a soft additive
    glow on the cursor's cell, and 22 drifting light motes (`CPUParticles2D`). The
    "Atmosphere" option (On by default) turns all of it off.
 9. **Motion:** windows fade and slide 6 px as they open, the cursor pulses;

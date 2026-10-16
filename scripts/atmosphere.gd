@@ -15,8 +15,8 @@ uniform float strength = 1.0;
 // Tilt-shift: no blur in a band around the middle of the screen, up to `max_blur`
 // pixels at the top and bottom edges.
 const float FOCUS = 0.56;
-const float SHARP = 0.2;
-const float max_blur = 2.2;
+const float SHARP = 0.3;
+const float max_blur = 0.6;
 
 vec3 blurred(vec2 uv, vec2 px, float radius) {
 	if (radius < 0.05) {
