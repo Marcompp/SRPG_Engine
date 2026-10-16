@@ -1,0 +1,150 @@
+Final Objective: A feature-rich engine to build Fire Emblem Style Strategy RPGs with
+with a focus in emerging ludonarratives
+
+Main inspirations:  
+FE4 and 5 FE in ludonarrative resonance, gameplay flow, pacing
+FE5 in game balance and jankyness 
+GBA FE in presentation, UI, game feel and approachability 
+FE9 and 10 in the base mechanics and stuff
+3DS FE (mostly awakening and fates) in UI, QoL and UX, as well as unit customization freedom
+FE2 / Echoes in experimental mechanics
+
+Claude things:
+(X) Maybe make a md file with the basic definitions and goals of every class and race to prevent confusion in the future? (docs/classes.md, docs/races.md)
+
+
+Priorities (2026-10-10)
+Ordered by value to the ludonarrative goal, what each item unlocks, and whether it gets
+more expensive the longer it waits.
+
+Tier 1 - do soon, the cost keeps growing
+ 1. (X) Other factions - units are PLAYER/ENEMY with ~20 hardcoded checks; every new feature
+    adds more. Core to FE4/5-style emergent story (allies, neutrals, three-way fights,
+    recruitment). Berserk can come along with it.
+ 2. (X) Language groundwork - no tr() yet. Just route player-facing strings through tr() and
+    give event text keys; full translation can wait. Gets worse with every line of dialogue.
+ 3. (X) Data out of .gd constants - into resources/JSON. Needed before the database editor,
+    multiple campaigns and per-campaign feature toggles.
+
+Tier 2 - turns it into a real campaign
+ 4. (X) Currency, shops and services - needed to pace a campaign; forging/enchanting/repair
+    costs depend on it.
+ 5. (X) Finish the race pass - the decided items in docs/races.md (stat caps, growths,
+    movement priority, Fae regen, Ent class limits).
+ 6. Permadeath mechanics - very ludonarrative, mostly self-contained.
+
+Tier 3 - content, once the systems settle
+ Mys, janky spell effects, weapon traits then forging/enchanting,
+ transforming, monster classes, mounted equivalents, biography gameplay effects.
+
+Tier 4 - the milestone
+ Start the 10 chapter proof of concept after Tier 1 + items 4-5, and let it reorder the rest.
+
+Later - presentation and tooling (cheap exception: class icons for placeholders,
+makes playtesting easier to read)
+
+
+(X) Code health. battle.gd is past 1,300 lines and handles input, menus, targeting, combat resolution, rescue, ships, trade and phases. Splitting it (input/menus, actions, phases) would make every future feature cheaper and reduce clashes between sessions editing it at the same time. The tests make this safe to do.
+
+(X) QoL - the cursor follows the info menus / scrolling to a unit in the info screen means you're hovering that unit when closing it
+(X) QoL - clicking on a grayed out unit has the same effect as clicking on the terrain
+(X) QoL - you can click on an enemy you want the currently selected unit to attack/heal (weighted by the last traversable tile you hovered)
+(X) QoL - Canto needs you to click wait to end the turn
+(X) QoL - Pressing the next unit button when hovering an unit from a faction, brings you to the next unit of that faction
+(X) QoL - Have danger zones update after moving a unit but before committing to their action, allowing the player to gauge how the movement the enemy's reach
+(X) QoL - When hovering a unit, just like the squares a unit can attack are red and a unit can heal are green, add a color for squares where a unit can use a non-damaging offensive skill (ie: a status spell), maybe purple?
+(X) Info buttom functionality in the prep screen
+(X) UI - prep screen and shop screen and other menus spill beyond the screen  
+
+(X) Auto save
+(X) Bigger maps
+(X) Skill system (Classes, Races and Units can all have skills)
+(X) Gender as a hidden value to units
+(X) Breakable terrain
+(X) Doors
+(X) Currency and shops and other services
+( ) Mechanics to do with permadeath (ie: Necromancers)
+(X) Preview Map in the prep screen
+(X) Broken weapon/repair functionality
+( ) New weapon stat - Mys (how much it boosts spells when equipped, most have zero)
+(/) Weapon skills / traits
+- Weapon forging 
+- Weapon enchanting
+(X) Weapon Kill functionality
+ - Weapons should store some info about how they are used
+ - When reaching certain kill thresholds, weapons gain new random traits weighted by the above info
+(X) Racial attacks ie: a dragon's Fire Breath and a Vampire's Bite
+(/) Gameplay biography moments (narrowly avoided death, killed a boss with a crit, etc)
+ - different moments should probably have different importance priorities, so that less important ones can be hidden away when the page gets too bloated
+( ) (low priority) consider gameplay implications of gameplay biography moments (ie, an unit that has a habit of narrowly avoiding death might develop the miracle skill?)
+(/) Randomly generated names for the generics
+(X) Turn rewind 
+(X) Other factions
+ - Green units (ally)
+ - Yellow units (neutral?)
+ - Purple units (other enemy faction?)
+ - More ideas
+(X) Mounts
+(X) Add special interaction for when Dancers dance to other Dancers (something powerful but not game breaking)
+( ) Transforming skills/commands
+
+(/) Status effects (see docs/status_effects.md)
+ (X) Poison
+ (X) Silence
+ (X) Sleep
+ (X) Berserk (needs any-side targeting: pairs well with Other factions)
+ (X) Paralyse
+ (X) Petrify
+ (X) Weapons and spells can inflict statuses
+ - More ideas
+
+Database stuff
+( ) Better define mounted equivalent classes for the foot units
+( ) Classes for pure monster units with no weapons
+
+( ) Rework how the swimming, climbing, and forresting skills work
+
+( ) Give Brigands and Corsairs (and their promotions) the skill Loot - allows breaking open chests and burning houses/villages
+( ) Complete the 
+( ) Mastery skills for every promoted and special class (acquired at lvl 20 for now)
+ - Assassin: Shift Lethality to mastery skill, swap innate skill with Killing Machine (name will change) - doubles crit chance
+ - Swordsmaster: Something that complements their speediness
+ - Corsair: 
+ - Berserker: 
+ - etc
+
+( ) Better hash out what racial traits are counted as skills - almost everything
+
+( ) More janky spell effects
+ - Utility stuff
+ - Map manip stuff
+  (ie: spell that freezes water, spell that creates burning tiles, breakable earth wall, etc)
+ - More ideas
+
+( ) Improve UI by a lot
+( ) Add sauce
+
+(/) Dialogue and cutscene events
+ (Try to get every important functionality of FE GBA eventing)
+
+( ) Graphics integration
+( ) Sound design
+(X) Future proof everything to make it easy to eventually implement language settings
+
+
+( ) Design interface to set database stuff
+( ) Organised to support multiple separate campaigns
+( ) Selectively enable features for campaign
+
+
+( ) Proof of concept 10 chapter storyline
+
+
+Presentation wishlist (long term goals)
+( ) Randomly generated portraits for generics (different combinations of eyes, face shape, nose, mouth, coloring, facial hair, etc, plus hat and clothes determined by start class to give the generic look)
+( ) Clearly differentiated map sprites by class that use faction pallete
+(X) Placeholders use some sort of class determined icon instead of letter
+( ) FE4/5 style map animations (magic and other special commands only get map animations)
+( ) FE4/5 style flow for battle animations (with a more gba fe inspired style to the graphics)
+( ) 2D-HD artstyle (if possible) 
+(ideally, the artstyle can be determined by campaign)
