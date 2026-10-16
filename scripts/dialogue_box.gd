@@ -85,7 +85,7 @@ func _ready() -> void:
 	_name_plate.theme_type_variation = &"PlatePanel"
 	_name_label = Label.new()
 	_name_label.theme_type_variation = &"TitleLabel"
-	_name_label.add_theme_font_size_override("font_size", 24)
+	_name_label.add_theme_font_size_override("font_size", 27)
 	_name_plate.add_child(_name_label)
 	add_child(_name_plate)
 

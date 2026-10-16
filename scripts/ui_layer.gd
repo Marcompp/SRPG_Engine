@@ -20,6 +20,9 @@ func _init(layer_index := 1) -> void:
 	root.size = SIZE
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UiTheme.hd()
+	# The project filters textures with nearest for the pixel art; text scaled by a
+	# window that isn't exactly 4x (smaller, fullscreen) needs smooth filtering.
+	root.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	add_child(root)
 
 

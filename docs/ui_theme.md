@@ -16,8 +16,10 @@ corners, names in engraved capitals (Cinzel), body text in a book serif
   overhanging the panel by about 9 px; soft drop shadow.
 - **Type:** names, labels and tabs in Cinzel (letter-spaced capitals, gold
   243, 220, 154); everything else in EB Garamond (warm white 239, 230, 207;
-  secondary text lavender 169, 160, 196). Sizes in 960x640 units: names 26,
-  body 22, dialogue 25, labels 14.
+  secondary text lavender 169, 160, 196). Sizes in 960x640 units: names 30,
+  titles 24, body 25, secondary 21, dialogue 28, small capitals 16. The HD layer
+  filters textures smoothly (with mipmaps) so text stays clean when the window
+  isn't exactly 4x; the world keeps the project's nearest filtering.
 - **Selection:** a gold gradient band behind the row, fading at both ends, and a
   rotated gold square with a glow at its left.
 - **Bars:** dark track with a thin gold outline; HP fill green to pale gold with

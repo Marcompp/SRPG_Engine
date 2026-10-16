@@ -72,7 +72,7 @@ var _objective_label: Label
 const MARGIN := 28
 ## Map rows and columns on screen (16 px cells on the 240x160 screen).
 const SCREEN_CELLS := Vector2i(15, 10)
-const MENU_ROW_HEIGHT := 40
+const MENU_ROW_HEIGHT := 44
 const MP_FROM := Color8(84, 132, 220)
 const MP_TO := Color8(170, 200, 255)
 
@@ -179,7 +179,7 @@ func _make_card() -> PanelContainer:
 	_card_details = _label(column)
 	_card_details.add_theme_font_size_override("font_size", UiTheme.SIZE_SMALL)
 	_card_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_card_details.custom_minimum_size.x = 380
+	_card_details.custom_minimum_size.x = 430
 	return _make_panel(column)
 
 
@@ -196,7 +196,7 @@ func _bar_row(parent: Control, caption: String) -> HBoxContainer:
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(bar)
 	var value := _label(row)
-	value.custom_minimum_size.x = 76
+	value.custom_minimum_size.x = 86
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	return row
 
@@ -212,10 +212,10 @@ func _make_terrain() -> PanelContainer:
 func _make_menu() -> PanelContainer:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 0)
-	column.custom_minimum_size.x = 230
+	column.custom_minimum_size.x = 250
 	_menu_prompt = _label(column, &"SubLabel")
 	_menu_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_menu_prompt.custom_minimum_size.x = 300
+	_menu_prompt.custom_minimum_size.x = 340
 	var selected: StyleBox = UiTheme.selected_row().duplicate()
 	selected.content_margin_left = 44
 	selected.content_margin_right = 24
@@ -263,7 +263,7 @@ func _make_forecast() -> PanelContainer:
 			elif row_index == 0:
 				label.theme_type_variation = &"TitleLabel"
 			else:
-				label.custom_minimum_size.x = 110
+				label.custom_minimum_size.x = 124
 			label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			grid.add_child(label)
 			row.append(label)
@@ -276,7 +276,7 @@ func _make_trade() -> PanelContainer:
 	row.add_theme_constant_override("separation", 40)
 	for i in 2:
 		var label := Label.new()
-		label.custom_minimum_size.x = 320
+		label.custom_minimum_size.x = 360
 		row.add_child(label)
 		_trade_labels.append(label)
 	return _make_panel(row)

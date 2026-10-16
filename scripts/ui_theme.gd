@@ -16,11 +16,12 @@ const HP_FROM := Color8(111, 191, 94)
 const HP_TO := Color8(214, 234, 138)
 
 ## Font sizes in HD units.
-const SIZE_NAME := 26
-const SIZE_BODY := 22
-const SIZE_DIALOGUE := 25
-const SIZE_SMALL := 19
-const SIZE_CAPTION := 14
+const SIZE_NAME := 30
+const SIZE_TITLE := 24
+const SIZE_BODY := 25
+const SIZE_DIALOGUE := 28
+const SIZE_SMALL := 21
+const SIZE_CAPTION := 16
 
 const DISPLAY_FONT := "res://fonts/Cinzel-Variable.ttf"
 const BODY_FONT := "res://fonts/EBGaramond-Variable.ttf"
@@ -36,8 +37,12 @@ static var _fonts := {}
 static func font(path: String, weight := 400, spacing := 0) -> Font:
 	var key := "%s/%d/%d" % [path, weight, spacing]
 	if not _fonts.has(key):
+		var base: FontFile = load(path)
+		# Mipmaps keep text smooth when the window's scale draws it smaller than its
+		# size (see UiLayer).
+		base.generate_mipmaps = true
 		var v := FontVariation.new()
-		v.base_font = load(path)
+		v.base_font = base
 		v.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("weight"): weight}
 		v.spacing_glyph = spacing
 		_fonts[key] = v
@@ -69,7 +74,7 @@ static func hd() -> Theme:
 	t.set_stylebox("panel", "Panel", GildedStyleBox.new())
 
 	_label_variation(t, "NameLabel", display(700, 2), SIZE_NAME, GOLD_BRIGHT)
-	_label_variation(t, "TitleLabel", display(500, 1), 21, GOLD_BRIGHT)
+	_label_variation(t, "TitleLabel", display(500, 1), SIZE_TITLE, GOLD_BRIGHT)
 	_label_variation(t, "SubLabel", body(), SIZE_SMALL, DIM)
 	_label_variation(t, "CaptionLabel", display(500, 2), SIZE_CAPTION, CAPTION)
 
