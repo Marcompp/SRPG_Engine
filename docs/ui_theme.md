@@ -150,7 +150,13 @@ any order once step 2 exists.
    view is top-down), a soft additive
    glow on the cursor's cell, and 22 drifting light motes (`CPUParticles2D`). The
    "Atmosphere" option (On by default) turns all of it off.
-9. **Motion:** windows fade and slide 6 px as they open, the cursor pulses;
-   timings follow the game speed, and turning atmosphere off skips them.
+9. **Motion** (done, 2026-10-16). `UiTheme.appear()`: a window opening from
+   hidden fades in and grows from 97% around its center over 0.14 s divided by
+   the game speed (scale rather than a slide, which would fight the anchored
+   layout `_place()` keeps updating as the cursor moves). HUD windows use it
+   through BattleUI's `_open()`, so moving an open window doesn't replay it; the
+   dialogue, status, unit list and options fade without growing. Closing stays
+   instant. With the Atmosphere option off, windows just appear. The menu
+   diamond's pulse (step 2) is the only other motion.
 10. **Wrap-up:** remove the old `StyleBoxFlat` styling, screenshot every screen at
     both scales, run the suite, add a UI section to the README.

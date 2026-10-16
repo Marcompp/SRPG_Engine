@@ -120,7 +120,9 @@ func show_unit(u: Unit) -> void:
 	page = mini(page, page_count() - 1)
 	detail = false
 	_render()
-	visible = true
+	if not visible:
+		visible = true
+		UiTheme.appear(self, false)
 
 
 func close() -> void:

@@ -82,6 +82,7 @@ func _ready() -> void:
 func open() -> void:
 	index = 0
 	visible = true
+	UiTheme.appear(self, false)
 	_render()
 
 

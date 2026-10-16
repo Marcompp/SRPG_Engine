@@ -122,3 +122,29 @@ static func tab_underline() -> StyleBoxFlat:
 	sb.border_width_bottom = 2
 	sb.content_margin_bottom = 6
 	return sb
+
+
+## Seconds a window takes to appear, at normal game speed.
+const APPEAR_SECONDS := 0.14
+
+
+## Fades `c` in as it opens (and, with `grow`, scales it up from 97% around its
+## center: scale doesn't move the layout). Faster at higher game speeds; instant when
+## the "atmosphere" option is off. Closing stays instant.
+static func appear(c: Control, grow := true) -> void:
+	var running: Tween = c.get_meta("appear_tween") if c.has_meta("appear_tween") else null
+	if running and running.is_valid():
+		running.kill()
+	c.modulate.a = 1.0
+	c.scale = Vector2.ONE
+	if not Settings.value("atmosphere"):
+		return
+	var seconds := APPEAR_SECONDS / float(Settings.value("game_speed"))
+	c.modulate.a = 0.0
+	var tw := c.create_tween().set_parallel().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(c, "modulate:a", 1.0, seconds)
+	if grow:
+		c.pivot_offset = c.size / 2.0
+		c.scale = Vector2.ONE * 0.97
+		tw.tween_property(c, "scale", Vector2.ONE, seconds)
+	c.set_meta("appear_tween", tw)

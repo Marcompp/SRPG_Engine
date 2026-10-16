@@ -320,7 +320,7 @@ func _place(panel: Control, right: bool, bottom: bool) -> void:
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN if bottom else Control.GROW_DIRECTION_END
 	panel.reset_size()
 	panel.set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, MARGIN)
-	panel.visible = true
+	_open(panel)
 
 
 ## A panel centered on the screen.
@@ -329,7 +329,15 @@ func _center(panel: Control) -> void:
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_open(panel)
+
+
+## Shows a panel, easing it in if it was hidden (moving an open one doesn't replay it).
+func _open(panel: Control) -> void:
+	if panel.visible:
+		return
 	panel.visible = true
+	UiTheme.appear(panel)
 
 
 ## Put panels on the side of the screen away from the cursor (map cells are turned
@@ -687,7 +695,7 @@ func show_trade(left: Unit, right: Unit, cursor: Vector2i, held: Vector2i) -> vo
 	_trade.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, MARGIN)
 	_trade.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_trade.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_trade.visible = true
+	_open(_trade)
 
 
 func hide_trade() -> void:

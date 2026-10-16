@@ -93,7 +93,9 @@ func _ready() -> void:
 ## Shows `text` said by `speaker` (a slot entry, or {} for narration) on `side`, and
 ## returns once the player advances past it.
 func say(speaker: Dictionary, side: int, text: String) -> void:
-	visible = true
+	if not visible:
+		visible = true
+		UiTheme.appear(self, false)
 	if not speaker.is_empty():
 		slots[side] = speaker
 	_refresh_portraits(side if not speaker.is_empty() else -1)

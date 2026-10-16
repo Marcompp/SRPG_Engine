@@ -80,6 +80,7 @@ func open(list: Array[Unit]) -> void:
 	_scroll = 0
 	_sort()
 	visible = true
+	UiTheme.appear(self, false)
 	_render()
 
 
