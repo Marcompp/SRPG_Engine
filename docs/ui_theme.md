@@ -10,8 +10,8 @@ corners, names in engraved capitals (Cinzel), body text in a book serif
 
 ## Look
 
-- **Panels:** vertical gradient from navy (18, 20, 50, 90%) to near-black
-  (8, 9, 28, 84%); an outer 1 px gold line (214, 178, 94), an inner line 6 px in
+- **Panels:** vertical gradient from navy (18, 20, 50, 95%) to near-black
+  (8, 9, 28, 92%); an outer 1 px gold line (214, 178, 94), an inner line 6 px in
   at 30% gold; a filigree corner (curl plus a small diamond) on each corner,
   overhanging the panel by about 9 px; soft drop shadow.
 - **Type:** names, labels and tabs in Cinzel (letter-spaced capitals, gold
@@ -70,14 +70,18 @@ any order once step 2 exists.
    both fonts cover Spanish (á ó ú ñ ¡ ¿) and ç. To fix in step 2: setting the
    weight axis through `name_to_tag("weight")` had no visible effect (Cinzel 700
    looked like 500), so the axis tag or the font setup needs checking.
-2. **Theme foundation.** `fonts/` (Cinzel, EB Garamond, their OFL licences).
-   `scripts/ui_theme.gd` (`UiTheme`) builds one shared `Theme`: palette
-   constants, font sizes per role, a `GildedStyleBox` (custom `StyleBox` drawing
-   the fill, both lines and the four corners from one small corner texture,
-   rotated) and its variants (name plate, selected row, tab underline). Reusable
-   `GildedBar` and `DiamondCursor` controls. The three `Theme.new()` sites
-   (`ui.gd`, `prep_screen.gd`, `level_select.gd`) use `UiTheme` instead. A test
-   that the theme builds and the fonts load.
+2. **Theme foundation** (done, 2026-10-16). `fonts/` holds Cinzel and EB
+   Garamond (variable fonts) with their OFL licences. `scripts/ui_theme.gd`
+   (`UiTheme`): palette and font-size constants, `font()` (weight and letter
+   spacing in one `FontVariation`: nesting two lost the weight, which was the
+   spike's bold bug), `hd()` (the theme for HD screens: body font, gilded panels,
+   Label variations NameLabel, TitleLabel, SubLabel, CaptionLabel, the PlatePanel
+   and SelectedRow variations) and `legacy()` / `legacy_box()`, the old flat look
+   in one place: `ui.gd`, `prep_screen.gd`, `level_select.gd` and the status
+   screen's help box use it until they move. `GildedStyleBox` (a script
+   `StyleBox`) draws the fill, both lines, a soft shadow and the corner
+   flourishes in code, so no corner texture. `GildedBar`, `DiamondCursor`, and
+   `UiLayer` (the 0.25-scaled layer, root sized 960x640). Test: `test_ui_theme`.
 3. **Battle HUD** (`ui.gd`, the biggest step). The unit window, today one label
    of formatted text, becomes a card (face, name, class and level, HP bar, then
    weapon, items and stats as rows) plus a separate terrain window. The action

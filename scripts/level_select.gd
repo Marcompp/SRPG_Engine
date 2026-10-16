@@ -25,9 +25,7 @@ var _confirm_new := false
 
 func _ready() -> void:
 	Text.manual(self)  # the code translates what it shows
-	var theme := Theme.new()
-	theme.default_font_size = 8
-	self.theme = theme
+	theme = UiTheme.legacy()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var bg := ColorRect.new()

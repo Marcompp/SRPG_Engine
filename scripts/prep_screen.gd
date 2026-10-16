@@ -62,7 +62,7 @@ var _rename: LineEdit
 func _ready() -> void:
 	Text.manual(self)  # the code translates what it shows
 	var theme := Theme.new()
-	theme.default_font_size = 8
+	theme.merge_with(UiTheme.legacy())
 	theme.set_constant("line_spacing", "Label", 1)
 	self.theme = theme
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -87,13 +87,7 @@ func _ready() -> void:
 	_help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_help_label.custom_minimum_size.x = FULL_W - 6
 	_help = PanelContainer.new()
-	var box_style := StyleBoxFlat.new()
-	box_style.bg_color = Color(0.08, 0.1, 0.3)
-	box_style.border_color = Color(0.85, 0.85, 1.0)
-	box_style.set_border_width_all(1)
-	box_style.set_corner_radius_all(2)
-	box_style.set_content_margin_all(3)
-	_help.add_theme_stylebox_override("panel", box_style)
+	_help.add_theme_stylebox_override("panel", UiTheme.legacy_box())
 	_help.visible = false
 	_help.add_child(_help_label)
 	add_child(_help)

@@ -468,3 +468,30 @@ func test_turn_rewind() -> void:
 	check(not b.ui.menu_options.has("Rewind"), "no uses left, no Rewind")
 	await press(KEY_X)
 	SaveGame.delete_suspend()
+
+
+# --- UI theme (docs/ui_theme.md) -----------------------------------------------
+
+
+func test_ui_theme() -> void:
+	var t := UiTheme.hd()
+	var body := t.default_font as FontVariation
+	var names := t.get_font("font", "NameLabel") as FontVariation
+	check(body.base_font != null and names.base_font != null, "both fonts load")
+	check_eq(names.variation_opentype.values(), [700], "names are bold")
+	check(names.spacing_glyph > 0, "and letter-spaced in the same variation")
+	for f in [body, names]:
+		var missing := Array("áéíóúüñÁÉÍÓÚÜÑ¡¿".split("")).filter(func(c): return not f.has_char(c.unicode_at(0)))
+		check(missing.is_empty(), "%s covers Spanish (missing: %s)" % [f.base_font.resource_path.get_file(), missing])
+	check(t.get_stylebox("panel", "PanelContainer") is GildedStyleBox, "panels are gilded")
+	var plate := t.get_stylebox("panel", "PlatePanel") as GildedStyleBox
+	check(not plate.corners and not plate.inner_line, "the name plate is a plain gold-edged box")
+	var layer := UiLayer.new()
+	check_eq(layer.root.size, Vector2(960, 640), "the HD layer is laid out in 960x640 units")
+	check_eq(layer.scale * UiLayer.SIZE, Vector2(240, 160), "scaled down onto the 240x160 game")
+	layer.free()
+	var bar := GildedBar.new()
+	bar.ratio = 1.5
+	check_eq(bar.ratio, 1.0, "a bar can't overfill")
+	bar.free()
+	check(UiTheme.legacy().get_stylebox("panel", "PanelContainer") is StyleBoxFlat, "the old look stays for unmoved screens")

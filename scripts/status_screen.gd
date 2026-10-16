@@ -83,13 +83,7 @@ func _ready() -> void:
 	_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_desc_label.custom_minimum_size.x = 140
 	_desc_panel = PanelContainer.new()
-	var box_style := StyleBoxFlat.new()
-	box_style.bg_color = Color(0.08, 0.1, 0.3)  # opaque: the page behind shouldn't show through
-	box_style.border_color = Color(0.85, 0.85, 1.0)
-	box_style.set_border_width_all(1)
-	box_style.set_corner_radius_all(2)
-	box_style.set_content_margin_all(3)
-	_desc_panel.add_theme_stylebox_override("panel", box_style)
+	_desc_panel.add_theme_stylebox_override("panel", UiTheme.legacy_box())  # opaque: the page behind shouldn't show through
 	_desc_panel.visible = false
 	_desc_panel.add_child(_desc_label)
 	add_child(_desc_panel)

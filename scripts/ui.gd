@@ -45,18 +45,8 @@ var _objective_label: Label
 
 
 func _ready() -> void:
-	var theme := Theme.new()
-	theme.default_font_size = 8
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.15, 0.4, 0.9)
-	sb.border_color = Color(0.85, 0.85, 1.0)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(2)
-	sb.set_content_margin_all(3)
-	theme.set_stylebox("panel", "PanelContainer", sb)
-
 	_root = Control.new()
-	_root.theme = theme
+	_root.theme = UiTheme.legacy()
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
