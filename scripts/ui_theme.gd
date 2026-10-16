@@ -1,7 +1,6 @@
 class_name UiTheme
 ## The UI's look, "Gilded Night" (design: docs/ui_theme.md): palette, fonts and the shared
-## Themes. hd() is for screens on a UiLayer, laid out in 960x640 units; legacy() is the
-## old flat look in 240x160 units, for screens not moved to the HD layer yet.
+## Theme, hd(), for screens on a UiLayer (laid out in 960x640 units).
 
 ## Palette.
 const GOLD := Color8(214, 178, 94)  # lines and outlines
@@ -28,7 +27,6 @@ const BODY_FONT := "res://fonts/EBGaramond-Variable.ttf"
 const BODY_ITALIC_FONT := "res://fonts/EBGaramond-Italic-Variable.ttf"
 
 static var _hd: Theme
-static var _legacy: Theme
 static var _fonts := {}
 
 
@@ -123,32 +121,4 @@ static func tab_underline() -> StyleBoxFlat:
 	sb.border_color = GOLD
 	sb.border_width_bottom = 2
 	sb.content_margin_bottom = 6
-	return sb
-
-
-## The old look (240x160 units): flat blue panels and the default font at size 8.
-static func legacy() -> Theme:
-	if _legacy:
-		return _legacy
-	var t := Theme.new()
-	t.default_font_size = 8
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.15, 0.4, 0.9)
-	sb.border_color = Color(0.85, 0.85, 1.0)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(2)
-	sb.set_content_margin_all(3)
-	t.set_stylebox("panel", "PanelContainer", sb)
-	_legacy = t
-	return t
-
-
-## The old look's opaque box, for help text over a busy screen.
-static func legacy_box() -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.08, 0.1, 0.3)
-	sb.border_color = Color(0.85, 0.85, 1.0)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(2)
-	sb.set_content_margin_all(3)
 	return sb

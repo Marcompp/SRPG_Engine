@@ -16,19 +16,21 @@ extends Control
 ## Up/Down: choose. Z: confirm. X: back. D: info (the status screen for a unit, help
 ## for an item; on the status screen, its detail mode). Long lists scroll. Changes
 ## are saved to the campaign at once.
+## Drawn on an HD layer in the Gilded Night look (docs/ui_theme.md), in 960x640 units:
+## each list column is a gilded panel, the highlighted row has the gold band and diamond.
 
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const LEVEL_SELECT_SCENE := "res://scenes/level_select.tscn"
-const DIM := Color(0.7, 0.75, 0.95)
-## The two list columns: x and width (the left one gets the full width when the
-## right one is empty).
-const LEFT_X := 8.0
-const RIGHT_X := 122.0
-const COLUMN_W := 110.0
-const FULL_W := 224.0
-## The lists sit between here and the hint, which takes up to two lines at the bottom.
-const LIST_TOP := 34.0
-const HINT_TOP := 138.0
+const DIM := UiTheme.DIM
+## The two list panels (the left one takes the full width when the right one is empty),
+## and where their text starts inside them.
+const LEFT_PANEL := Rect2(28, 128, 440, 430)
+const RIGHT_PANEL := Rect2(492, 128, 440, 430)
+const FULL_PANEL := Rect2(28, 128, 904, 430)
+const TEXT_INSET := 48.0
+## The lists sit between here and the panels' bottom; the hint goes under them.
+const LIST_TOP := 152.0
+const HINT_TOP := 540.0
 ## Entries are ids, translated where shown.
 const MENU: Array[String] = ["Pick Units", "Items", "Shop", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!",  # i18n
 	"Level Select"]
@@ -42,10 +44,17 @@ var current_unit := ""
 var picked: Array = []
 var message := ""
 
+var _hd: UiLayer
 var _title: Label
 var _objective: Label
+var _left_panel: Panel
+var _right_panel: Panel
 var _left: Label
 var _right: Label
+## The gold band (with the diamond) on each column's highlighted row.
+var _cursors: Array[Panel] = []
+## Each column's highlighted row among its shown lines (-1: none), as last rendered.
+var _selected_rows: Array[int] = [-1, -1]
 var _hint: Label
 var _status: StatusScreen
 var _status_unit: Unit
@@ -61,48 +70,65 @@ var _rename: LineEdit
 
 func _ready() -> void:
 	Text.manual(self)  # the code translates what it shows
-	var theme := Theme.new()
-	theme.merge_with(UiTheme.legacy())
-	theme.set_constant("line_spacing", "Label", 1)
-	self.theme = theme
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_hd = UiLayer.new(1)
+	add_child(_hd)
 	var bg := ColorRect.new()
-	bg.color = Color(0.08, 0.1, 0.25)
-	add_child(bg)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_title = _label(Vector2(8, 4))
-	_title.add_theme_font_size_override("font_size", 10)
-	_objective = _label(Vector2(8, 18), DIM)
-	_left = _label(Vector2(LEFT_X, LIST_TOP))
-	_right = _label(Vector2(RIGHT_X, LIST_TOP))
+	bg.color = Color(8 / 255.0, 9 / 255.0, 26 / 255.0)
+	bg.size = UiLayer.SIZE
+	_hd.root.add_child(bg)
+	_title = _label(Vector2(40, 26), &"NameLabel")
+	_title.add_theme_font_size_override("font_size", 34)
+	_objective = _label(Vector2(42, 76), &"SubLabel")
+	_left_panel = Panel.new()
+	_right_panel = Panel.new()
+	for panel in [_left_panel, _right_panel]:
+		_hd.root.add_child(panel)
+		var band := Panel.new()
+		band.theme_type_variation = &"SelectedRow"
+		band.visible = false
+		_hd.root.add_child(band)
+		var diamond := DiamondCursor.new()
+		band.add_child(diamond)
+		_cursors.append(band)
+	_left = _label(Vector2.ZERO)
+	_right = _label(Vector2.ZERO)
 	for column_label in [_left, _right]:
-		column_label.size = Vector2(COLUMN_W, HINT_TOP - LIST_TOP)
 		column_label.clip_text = true
 		column_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_hint = _label(Vector2(LEFT_X, HINT_TOP), DIM)
-	_hint.size = Vector2(FULL_W, 160 - HINT_TOP)
+	_hint = _label(Vector2(40, HINT_TOP + 28), &"SubLabel")
+	_hint.size = Vector2(UiLayer.SIZE.x - 80, 0)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_help_label = Label.new()
 	_help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_help_label.custom_minimum_size.x = FULL_W - 6
+	_help_label.add_theme_font_size_override("font_size", UiTheme.SIZE_SMALL)
+	_help_label.custom_minimum_size.x = FULL_PANEL.size.x - 40
 	_help = PanelContainer.new()
-	_help.add_theme_stylebox_override("panel", UiTheme.legacy_box())
+	var box: GildedStyleBox = UiTheme.hd().get_stylebox("panel", "PanelContainer").duplicate()
+	box.fill_top = Color(UiTheme.NAVY_TOP, 1.0)  # opaque: the list behind shouldn't show through
+	box.fill_bottom = Color(UiTheme.NAVY_BOTTOM, 1.0)
+	_help.add_theme_stylebox_override("panel", box)
 	_help.visible = false
 	_help.add_child(_help_label)
-	add_child(_help)
-	_status = StatusScreen.new()
-	_status.veil_alpha = 1.0
-	var hd := UiLayer.new(1)
-	add_child(hd)
-	hd.root.add_child(_status)
+	_hd.root.add_child(_help)
 	_rename = LineEdit.new()
 	_rename.visible = false
-	_rename.position = Vector2(96, 120)
-	_rename.size = Vector2(120, 14)
+	_rename.position = Vector2(300, 470)
+	_rename.size = Vector2(360, 48)
 	_rename.max_length = 16
+	var field := StyleBoxFlat.new()
+	field.bg_color = Color(UiTheme.NAVY_BOTTOM, 1.0)
+	field.border_color = UiTheme.GOLD
+	field.set_border_width_all(1)
+	field.set_content_margin_all(10)
+	_rename.add_theme_stylebox_override("normal", field)
+	_rename.add_theme_stylebox_override("focus", field)
+	_rename.add_theme_color_override("caret_color", UiTheme.GOLD_BRIGHT)
 	_rename.text_submitted.connect(_finish_rename)
-	add_child(_rename)
+	_hd.root.add_child(_rename)
+	_status = StatusScreen.new()
+	_status.veil_alpha = 1.0
+	_hd.root.add_child(_status)
 
 	if not Campaign.load_save():
 		Campaign.start_new()
@@ -112,12 +138,11 @@ func _ready() -> void:
 	Sound.music("prep")
 
 
-func _label(pos: Vector2, color := Color.WHITE) -> Label:
+func _label(pos: Vector2, variation := &"") -> Label:
 	var label := Label.new()
 	label.position = pos
-	if color != Color.WHITE:
-		label.add_theme_color_override("font_color", color)
-	add_child(label)
+	label.theme_type_variation = variation
+	_hd.root.add_child(label)
 	return label
 
 
@@ -272,7 +297,7 @@ func _info() -> void:
 	if not it.is_empty():
 		_help_label.text = Glossary.item(it)
 		_help.reset_size()
-		_help.position = Vector2(4, 160 - 4 - _help.get_combined_minimum_size().y)
+		_help.position = Vector2(FULL_PANEL.position.x, UiLayer.SIZE.y - 28 - _help.get_combined_minimum_size().y)
 		_help.visible = true
 
 
@@ -516,7 +541,7 @@ func _render() -> void:
 	match mode:
 		"menu":
 			for i in MENU.size():
-				lines.append(_row(i, tr(MENU[i])))
+				lines.append(tr(MENU[i]))
 			side.append(tr("Gold %d") % Campaign.gold)
 			side.append(tr("Deployed %d/%d") % [picked.size(), chapter.deploy.size()])
 			for unit_name in picked:
@@ -526,7 +551,7 @@ func _render() -> void:
 		"pick":
 			var names := _army_names()
 			for i in names.size():
-				lines.append(_row(i, "[%s] %s" % ["x" if picked.has(names[i]) else " ", names[i]]))
+				lines.append("[%s] %s" % ["x" if picked.has(names[i]) else " ", names[i]])
 			var d := Campaign.army_unit(names[index])
 			side.append(tr("%s  Lv %d") % [Campaign.class_label(d), d.level])
 			side.append(tr("Deployed %d/%d") % [picked.size(), chapter.deploy.size()])
@@ -534,28 +559,28 @@ func _render() -> void:
 			var names := _army_names()
 			for i in names.size():
 				var d := Campaign.army_unit(names[i])
-				lines.append(_row(i, tr("%s  Lv %d") % [names[i], d.level]))
+				lines.append(tr("%s  Lv %d") % [names[i], d.level])
 			side.append(tr("Convoy: %d items") % Campaign.convoy.size())
 		"items":
 			var d := Campaign.army_unit(current_unit)
 			lines.append(current_unit)
 			for i in d.items.size():
-				lines.append(_row(i, Items.label(d.items[i], " "), column == 0))
+				lines.append(Items.label(d.items[i], " "))
 			side.append(tr("Convoy"))
 			for i in Campaign.convoy.size():
-				side.append(_row(i, Items.label(Campaign.convoy[i], " "), column == 1))
+				side.append(Items.label(Campaign.convoy[i], " "))
 			if Campaign.convoy.is_empty():
-				side.append("   " + tr("(empty)"))
+				side.append(tr("(empty)"))
 		"shop":
 			var stock := Shop.stock_for(Campaign.chapter_data())
 			lines.append(tr("Buy  Gold %d") % Campaign.gold)
 			for i in stock.size():
-				lines.append(_row(i, Shop.buy_label(stock[i], Campaign.gold), column == 0))
+				lines.append(Shop.buy_label(stock[i], Campaign.gold))
 			side.append(tr("Sell (convoy)"))
 			for i in Campaign.convoy.size():
-				side.append(_row(i, Shop.sell_label(Campaign.convoy[i]), column == 1))
+				side.append(Shop.sell_label(Campaign.convoy[i]))
 			if Campaign.convoy.is_empty():
-				side.append("   " + tr("(empty)"))
+				side.append(tr("(empty)"))
 		"repair":
 			var list := _repairables()
 			lines.append(tr("Gold %d") % Campaign.gold)
@@ -563,15 +588,15 @@ func _render() -> void:
 				lines.append(tr("Every weapon is in good repair."))
 			for i in list.size():
 				var it: Dictionary = list[i][1]
-				lines.append(_row(i, "%s: %s  %s/%d  %dG" % [tr(list[i][0]), it.name,
-					tr("broken") if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it), Items.repair_cost(it)]))
+				lines.append("%s: %s  %s/%d  %dG" % [tr(list[i][0]), it.name,
+					tr("broken") if Weapons.is_broken(it) else str(it.uses), Weapons.max_uses(it), Items.repair_cost(it)])
 		"stable":
 			var mounts := Campaign.all_mounts()
 			if mounts.is_empty():
 				lines.append(tr("No mounts yet."))
 			for i in mounts.size():
 				var m: Dictionary = mounts[i].mount
-				lines.append(_row(i, tr("%s  %s Lv %d") % [m.name, m.species, m.level]))
+				lines.append(tr("%s  %s Lv %d") % [m.name, m.species, m.level])
 			if index < mounts.size():
 				var m: Dictionary = mounts[index].mount
 				side.append(tr("Rider: %s") % (mounts[index].rider if mounts[index].rider != "" else tr("none")))
@@ -585,25 +610,28 @@ func _render() -> void:
 			for i in names.size():
 				var d := Campaign.army_unit(names[i])
 				var mark := " " if Campaign.ride_problem(names[i], _mount) == "" else "x"
-				lines.append(_row(i, "[%s] %s  %s" % [mark, names[i], Campaign.class_label(d)]))
+				lines.append("[%s] %s  %s" % [mark, names[i], Campaign.class_label(d)])
 		"promote_unit":
 			var eligible := _promotable()
 			if eligible.is_empty():
 				lines.append(tr("No unit has reached Lv %d.") % Classes.PROMOTION_LEVEL)
 			for i in eligible.size():
 				var d := Campaign.army_unit(eligible[i])
-				lines.append(_row(i, tr("%s  %s Lv %d") % [eligible[i], Campaign.class_label(d), d.level]))
+				lines.append(tr("%s  %s Lv %d") % [eligible[i], Campaign.class_label(d), d.level])
 		"promote_class":
 			var options := Campaign.promotion_options(Campaign.army_unit(current_unit))
 			lines.append(tr("Promote {unit} to:").format({"unit": current_unit}))
 			for i in options.size():
-				lines.append(_row(i, options[i]))
+				lines.append(options[i])
 			var bonus := Classes.promotion_bonus(options[index])
 			side.append(_gains_text(bonus))
 	var side_active := mode in ["items", "shop"] and column == 1
-	_left.text = "\n".join(_fit(lines, left_head, -1 if side_active else index))
-	_right.text = "\n".join(_fit(side, side_head, index if side_active else -1))
-	_left.size.x = COLUMN_W if not side.is_empty() else FULL_W
+	var has_rows := _row_count() > 0
+	var full := side.is_empty()
+	_right_panel.visible = not full
+	_right.visible = not full
+	_layout_column(0, FULL_PANEL if full else LEFT_PANEL, lines, left_head, index if has_rows and not side_active else -1)
+	_layout_column(1, RIGHT_PANEL, side, side_head, index if has_rows and side_active else -1)
 	var hints := {  # i18n
 		"menu": "Up/Down: choose  Z: select",
 		"pick": "Z: deploy / bench  D: info  X: back",
@@ -621,24 +649,48 @@ func _render() -> void:
 	_hint.visible = mode != "status" and not _help.visible
 
 
+## Places column `c` (0 left, 1 right) in `rect` and shows the `lines` that fit, with
+## the gold band on row `selected` (-1: none; see _fit).
+func _layout_column(c: int, rect: Rect2, lines: Array[String], head: int, selected: int) -> void:
+	var panel: Panel = [_left_panel, _right_panel][c]
+	var label: Label = [_left, _right][c]
+	panel.position = rect.position
+	panel.size = rect.size
+	label.position = Vector2(rect.position.x + TEXT_INSET, LIST_TOP)
+	label.size = Vector2(rect.size.x - TEXT_INSET - 24, HINT_TOP - LIST_TOP)
+	label.text = "\n".join(_fit(lines, head, selected))
+	_selected_rows[c] = _fit_selected
+	var band := _cursors[c]
+	band.visible = _fit_selected >= 0 and label.visible
+	if band.visible:
+		var h := label.get_line_height()
+		band.position = Vector2(rect.position.x + 12, LIST_TOP + _fit_selected * h)
+		band.size = Vector2(rect.size.x - 24, h)
+		band.get_child(0).position = Vector2(26, h / 2.0)
+
+
+## Row `selected` among the lines _fit last returned (-1: none).
+var _fit_selected := -1
+
+
 ## The rows of a column that fit above the hint, scrolled to keep row `selected`
 ## (-1: none) in view; the first `head` lines (titles) always show. "..." stands
 ## in for rows hidden above or below.
 func _fit(lines: Array[String], head: int, selected: int) -> Array[String]:
 	var rows := int((HINT_TOP - LIST_TOP) / _left.get_line_height()) - head
+	_fit_selected = head + selected if selected >= 0 else -1
 	if lines.size() - head <= rows:
 		return lines
 	var body := lines.slice(head)
 	var first := clampi(selected - rows / 2, 0, body.size() - rows)
 	var shown := body.slice(first, first + rows)
+	if selected >= 0:
+		_fit_selected = head + selected - first
 	if first > 0:
-		shown[0] = "   ..."
+		shown[0] = "..."
 	if first + rows < body.size():
-		shown[-1] = "   ..."
+		shown[-1] = "..."
 	var result: Array[String] = []
 	result.assign(lines.slice(0, head) + shown)
 	return result
 
-
-func _row(i: int, text: String, active := true) -> String:
-	return ("> " if active and i == index else "   ") + text

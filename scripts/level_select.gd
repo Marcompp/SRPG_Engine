@@ -2,20 +2,25 @@ extends Control
 ## Level select (for testing): Up/Down to pick a level, Z to play it. When a
 ## battle was suspended, a "Resume" entry at the top picks it back up; then each
 ## campaign (Chapters.CAMPAIGNS) gets a Continue entry (if it has a save) and a New
-## one; "Options" at the bottom opens the options menu.
+## one; "Options" at the bottom opens the options menu. Drawn on an HD layer in the
+## Gilded Night look (docs/ui_theme.md), in 960x640 units.
 
 const BATTLE_SCENE := "res://scenes/main.tscn"
 const PREP_SCENE := "res://scenes/prep.tscn"
-const DIM := Color(0.7, 0.75, 0.95)
+const DIM := UiTheme.DIM
 
 var index := 0
 ## [{"label", "description", and "level"+"resume", "campaign"+"campaign_id" or
 ## "options"}], in display order.
 var choices: Array = []
 ## Rows of the choice list shown at once.
-const LIST_ROWS := 5
+const LIST_ROWS := 7
+const PANEL_RECT := Rect2(150, 112, 660, 360)
+const ROW_H := 44.0
 
-var _list: Label
+## One label per visible row; the band and diamond sit on the selected one.
+var _rows: Array[Label] = []
+var _cursor: Panel
 var _description: Label
 var _hint: Label
 var _options: OptionsScreen
@@ -25,37 +30,62 @@ var _confirm_new := false
 
 func _ready() -> void:
 	Text.manual(self)  # the code translates what it shows
-	theme = UiTheme.legacy()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var hd := UiLayer.new(1)
+	add_child(hd)
+	var screen := hd.root
 
 	var bg := ColorRect.new()
-	bg.color = Color(0.08, 0.1, 0.25)
-	add_child(bg)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
-	add_child(box)
-	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 12)
-
+	bg.color = Color(8 / 255.0, 9 / 255.0, 26 / 255.0)
+	bg.size = UiLayer.SIZE
+	screen.add_child(bg)
 	var title := Label.new()
 	title.text = tr("Level Select")
-	title.add_theme_font_size_override("font_size", 14)
-	box.add_child(title)
-	_list = Label.new()
-	box.add_child(_list)
+	title.add_theme_font_override("font", UiTheme.display(700, 6))
+	title.add_theme_font_size_override("font_size", 44)
+	title.add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT)
+	title.size = Vector2(UiLayer.SIZE.x, 0)
+	title.position = Vector2(0, 40)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	screen.add_child(title)
+
+	var panel := Panel.new()
+	panel.position = PANEL_RECT.position
+	panel.size = PANEL_RECT.size
+	screen.add_child(panel)
+	_cursor = Panel.new()
+	_cursor.theme_type_variation = &"SelectedRow"
+	_cursor.size = Vector2(PANEL_RECT.size.x - 24, ROW_H)
+	_cursor.position.x = 12
+	panel.add_child(_cursor)
+	var diamond := DiamondCursor.new()
+	diamond.position = Vector2(26, ROW_H / 2.0)
+	_cursor.add_child(diamond)
+	for i in LIST_ROWS:
+		var row := Label.new()
+		row.position = Vector2(52, 26 + i * ROW_H)
+		row.size = Vector2(PANEL_RECT.size.x - 80, ROW_H)
+		row.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.clip_text = true
+		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		panel.add_child(row)
+		_rows.append(row)
 	_description = Label.new()
-	_description.add_theme_color_override("font_color", DIM)
-	box.add_child(_description)
+	_description.theme_type_variation = &"SubLabel"
+	_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_description.position = Vector2(PANEL_RECT.position.x + 20, PANEL_RECT.end.y + 20)
+	_description.size = Vector2(PANEL_RECT.size.x - 40, 0)
+	screen.add_child(_description)
 	_hint = Label.new()
-	_hint.add_theme_color_override("font_color", DIM)
-	box.add_child(_hint)
+	_hint.theme_type_variation = &"SubLabel"
+	_hint.size = Vector2(UiLayer.SIZE.x, 0)
+	_hint.position = Vector2(0, UiLayer.SIZE.y - 46)
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	screen.add_child(_hint)
 
 	_options = OptionsScreen.new()
 	_options.veil_alpha = 1.0
-	var hd := UiLayer.new(1)
-	add_child(hd)
-	hd.root.add_child(_options)
+	screen.add_child(_options)
 
 	_build_choices()
 	_refresh()
@@ -159,9 +189,14 @@ func _refresh() -> void:
 	_confirm_new = false  # moving away cancels a pending "press Z again"
 	# A window of LIST_ROWS entries that scrolls to keep the selection in view.
 	var first := clampi(index - LIST_ROWS / 2, 0, maxi(0, choices.size() - LIST_ROWS))
-	var lines: Array[String] = []
-	for i in range(first, mini(first + LIST_ROWS, choices.size())):
-		lines.append(("> " if i == index else "   ") + choices[i].label)
-	_list.text = "\n".join(lines)
+	for r in LIST_ROWS:
+		var i := first + r
+		_rows[r].visible = i < choices.size()
+		if i >= choices.size():
+			continue
+		_rows[r].text = choices[i].label
+		_rows[r].add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT if i == index else UiTheme.TEXT)
+		if i == index:
+			_cursor.position.y = _rows[r].position.y
 	_description.text = choices[index].description
 	_hint.text = tr("Up/Down: choose   Z: play   (%d/%d)") % [index + 1, choices.size()]

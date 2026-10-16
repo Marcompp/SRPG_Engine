@@ -80,8 +80,7 @@ any order once step 2 exists.
    Label variations NameLabel, TitleLabel, SubLabel, CaptionLabel, the PlatePanel
    and SelectedRow variations) and `legacy()` / `legacy_box()`, the old flat look
    in one place: `ui.gd`, `prep_screen.gd`, `level_select.gd` and the status
-   screen's help box used it until they moved (now only the prep screen and the
-   level select do). `GildedStyleBox` (a script
+   screen's help box used it until they moved (removed in step 7). `GildedStyleBox` (a script
    `StyleBox`) draws the fill, both lines, a soft shadow and the corner
    flourishes in code, so no corner texture. `GildedBar`, `DiamondCursor`, and
    `UiLayer` (the 0.25-scaled layer, root sized 960x640). Test: `test_ui_theme`.
@@ -131,7 +130,16 @@ any order once step 2 exists.
    layer, stacked in the order it's added (HUD windows, dialogue, unit list,
    status, options, fast-forward tag, banner), and BattleUI no longer uses the
    old look. The glossary popups are the status screen's help box (step 5).
-7. **Out of battle:** level select and prep screen, on the same HD layer.
+7. **Out of battle** (done, 2026-10-16). The level select and the prep screen
+   draw on a `UiLayer` of their own (their scene roots only take input). Level
+   select: the title in large engraved capitals, a gilded list of 7 rows with the
+   band and diamond, the description and hint under it. Prep screen: the
+   chapter's name and objective at the top, each list column a gilded panel (one
+   panel across when the right column is empty), the gold band on the
+   highlighted row of the active column instead of a "> " marker
+   (`_selected_rows` records which shown row it is; "..." still marks hidden
+   rows), item help in an opaque gilded box, the mount name field gold-edged.
+   With these moved, `UiTheme.legacy()` is gone: every screen uses the theme.
 8. **World atmosphere:** one canvas shader on a layer between the world and the
    UI (grading, vignette, tilt-shift, reading the screen texture so the blur is
    smooth), the cursor glow and `CPUParticles2D` motes. An Options toggle turns

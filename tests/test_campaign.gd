@@ -267,9 +267,9 @@ func test_prep_screen_info_and_scrolling() -> void:
 	prep.index = 19
 	prep._render()
 	var shown: PackedStringArray = prep._right.text.split("\n")
-	check(shown[-1].begins_with("> "), "the last convoy row is shown, highlighted")
+	check_eq(prep._selected_rows[1], shown.size() - 1, "the last convoy row is shown, highlighted")
 	check(shown.size() * prep._right.get_line_height() <= prep.HINT_TOP - prep.LIST_TOP, "and the list fits above the hint")
-	check_eq(shown[1], "   ...", "rows above are marked hidden")
+	check_eq(shown[1], "...", "rows above are marked hidden")
 	prep.queue_free()
 
 

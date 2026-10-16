@@ -494,4 +494,3 @@ func test_ui_theme() -> void:
 	bar.ratio = 1.5
 	check_eq(bar.ratio, 1.0, "a bar can't overfill")
 	bar.free()
-	check(UiTheme.legacy().get_stylebox("panel", "PanelContainer") is StyleBoxFlat, "the old look stays for unmoved screens")
