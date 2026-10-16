@@ -28,8 +28,7 @@ func test_break_wall_through_menu() -> void:
 	check_eq(b.map.tile_hp.get(wall), 5, "the wall takes the damage")
 	b.cursor.cell = wall
 	b.input.refresh_info()
-	check(b.ui._info_label.text.contains("Cracked Wall  HP 5/20"), "hovering shows its remaining HP")
-	check(not b.ui._info_label.text.contains("AVO"), "instead of terrain bonuses")
+	check_eq([b.ui._terrain_name.text, b.ui._terrain_bonus.text], ["Cracked Wall", "HP 5/20"], "hovering shows its remaining HP instead of terrain bonuses")
 	check_eq(b.map.terrain_key(wall), "x", "and still stands")
 	check(fighter.has_acted, "breaking ends the unit's turn")
 	check_eq(fighter.items[0].uses, 44, "and uses the weapon")

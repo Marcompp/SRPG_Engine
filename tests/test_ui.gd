@@ -167,7 +167,7 @@ func test_end_turn_warning() -> void:
 	await pick("End Turn")
 	check_eq(b.input.menus.context, "end_turn", "End Turn with units waiting asks first")
 	check_eq(b.ui.menu_options, ["Cancel", "End Turn"], "Cancel is listed (and selected) first")
-	check(b.ui._menu_label.text.contains("%d units haven't acted" % waiting), "the prompt says how many")
+	check(b.ui._menu_prompt.text.contains("%d units haven't acted" % waiting), "the prompt says how many")
 	await press(KEY_Z)
 	check_eq(b.state, b.State.IDLE, "Z right away cancels")
 	check(not b.enemy_phase, "turn not ended")
@@ -187,15 +187,15 @@ func test_info_panel_terrain_bonus() -> void:
 	lord.set_cell(Vector2i(4, 0))  # forest: DEF +1, AVO +20
 	b.cursor.cell = lord.cell
 	b.input.refresh_info()
-	check(b.ui._info_label.text.contains("Forest  DEF+1 AVO+20"), "foot unit sees the forest bonus")
+	check_eq([b.ui._terrain_name.text, b.ui._terrain_bonus.text], ["Forest", "DEF +1 · AVO +20"], "foot unit sees the forest bonus")
 	lord.move_type = "flying"
 	b.input.refresh_info()
-	check(b.ui._info_label.text.contains("Forest  no bonus (Flying)"), "a flier gets no terrain bonus")
+	check_eq(b.ui._terrain_bonus.text, "No bonus (Flying)", "a flier gets no terrain bonus")
 	lord.move_type = "foot"
 	b.map.set_terrain(Vector2i(5, 2), "=")
 	b.cursor.cell = Vector2i(5, 2)
 	b.input.refresh_info()
-	check(b.ui._info_label.text.contains("Path  DEF+0 AVO-20"), "negative bonuses read AVO-20, not AVO+-20")
+	check_eq([b.ui._terrain_name.text, b.ui._terrain_bonus.text], ["Path", "DEF +0 · AVO -20"], "negative bonuses read AVO -20, not AVO +-20")
 
 
 func test_unit_list() -> void:

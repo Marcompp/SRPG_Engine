@@ -56,7 +56,7 @@ func test_menus_draw_translated_entries() -> void:
 	var t := _pretend({"Wait": "Esperar", "Items": "Objetos"})
 	await open_menu_in_place(lord)
 	check(b.ui.menu_options.has("Wait"), "entries stay English ids")
-	check(b.ui._menu_label.text.contains("Esperar"), "and are drawn translated")
+	check(b.ui.menu_text().contains("Esperar"), "and are drawn translated")
 	await pick("Wait")
 	check(lord.has_acted, "picking still works")
 	_end(t)

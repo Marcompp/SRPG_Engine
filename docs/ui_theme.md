@@ -82,16 +82,21 @@ any order once step 2 exists.
    `StyleBox`) draws the fill, both lines, a soft shadow and the corner
    flourishes in code, so no corner texture. `GildedBar`, `DiamondCursor`, and
    `UiLayer` (the 0.25-scaled layer, root sized 960x640). Test: `test_ui_theme`.
-3. **Battle HUD** (`ui.gd`, the biggest step). The unit window, today one label
-   of formatted text, becomes a card (face, name, class and level, HP bar, then
-   weapon, items and stats as rows) plus a separate terrain window. The action
-   menu becomes row labels with the highlight and the diamond cursor (same
-   `menu_options` / `menu_index` API). Combat and spell forecasts, trade, level-up,
-   objective and the fast-forward tag get the theme; the phase banner becomes a
-   gold-ruled band with Cinzel text. `_place()` keeps its logic with margins in
-   the new units. Tests that read label text (`_info_label`, `_menu_label`,
-   `_spell_label`, `_forecast_cells`) keep working where the labels survive and
-   are updated where the structure changes.
+3. **Battle HUD** (done, 2026-10-16). `BattleUI` holds a `UiLayer` (layer 1)
+   for the HUD windows and moved itself to layer 2, so the old-look full-screen
+   views (status, unit list, options, dialogue) still cover the HUD until they
+   move. The unit window is a card: a face placeholder (team color with the class
+   icon or initial, until portraits), side caption, name, class · level · EXP, HP
+   and MP bars, then weapon, items, spells, notes and stats in smaller text. The
+   terrain window is separate (name, then `DEF +1 · AVO +20`, `No bonus (Flying)`
+   or a breakable tile's `HP 5/20`) and sits at the other end of the card's side,
+   or alone at the bottom (top when the cursor is near the bottom). The action
+   menu is nine row labels with the gold band and `DiamondCursor` on the selected
+   one (`menu_text()` returns what's shown). Forecast, spell forecast, trade,
+   level-up and objective use the theme; `GildedBanner` is the phase banner and
+   end screen (a band fading at both ends between gold rules; a banner's second
+   line, e.g. the turn, goes under the title). Tests now read `_terrain_name`,
+   `_terrain_bonus`, `_menu_prompt` and `menu_text()`.
 4. **Dialogue** (`dialogue_box.gd`): the box, name plate, 3x portrait and advance
    arrow described above. Typing and translation unchanged.
 5. **Status screen** (`status_screen.gd`): framed portrait, name block with HP

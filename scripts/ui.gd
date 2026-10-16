@@ -1,6 +1,9 @@
 class_name BattleUI
 extends CanvasLayer
 ## HUD: unit/terrain info, action menu, combat forecast, phase banner, end screen.
+## The HUD windows are on an HD layer (UiLayer, Gilded Night: docs/ui_theme.md), laid out
+## in 960x640 units; the full-screen views (status, unit list, options, dialogue) still
+## use the old 240x160 look on this layer, which draws above it.
 
 var menu_options: Array[String] = []
 var menu_index := 0
@@ -15,11 +18,34 @@ var view_origin := Vector2i.ZERO
 signal level_up_confirmed
 var _fast_forward: Label
 
+## Old-look screens, in 240x160 units.
 var _root: Control
-var _info: PanelContainer
-var _info_label: Label
+## The HUD windows, in 960x640 units.
+var _hd: UiLayer
+## Unit card: face, side, name, class and level, HP (and MP) bars, then the details.
+var _card: PanelContainer
+var _face: Panel
+var _face_icon: ClassIcon
+var _face_letter: Label
+var _card_side: Label
+var _card_name: Label
+var _card_sub: Label
+var _hp_bar: GildedBar
+var _hp_text: Label
+var _mp_row: HBoxContainer
+var _mp_bar: GildedBar
+var _mp_text: Label
+## Weapon, items, spells, notes and stats.
+var _card_details: Label
+## Terrain window: the terrain's name and its bonus (or a breakable tile's HP).
+var _terrain: PanelContainer
+var _terrain_name: Label
+var _terrain_bonus: Label
 var _menu: PanelContainer
-var _menu_label: Label
+var _menu_prompt: Label
+## One label per visible menu row (MENU_ROWS); the selected one holds the cursor.
+var _menu_rows: Array[Label] = []
+var _menu_cursor: DiamondCursor
 var _forecast: PanelContainer
 ## Forecast grid cells, indexed [row][column]; column 0 is the row header.
 var _forecast_cells: Array = []
@@ -32,8 +58,7 @@ var _level_up: PanelContainer
 var _level_title: Label
 ## Rows of [name, value, gain] labels, one per stat in Experience.STATS.
 var _level_rows: Array = []
-var _banner: ColorRect
-var _banner_label: Label
+var _banner: GildedBanner
 ## GBA-style unit info screen.
 var status_screen: StatusScreen
 ## Sortable table of every unit (map menu > Units).
@@ -43,23 +68,36 @@ var options_screen: OptionsScreen
 var _objective: PanelContainer
 var _objective_label: Label
 
+## Gap between HUD windows and the screen edge, in HD units.
+const MARGIN := 28
+## Map rows and columns on screen (16 px cells on the 240x160 screen).
+const SCREEN_CELLS := Vector2i(15, 10)
+const MENU_ROW_HEIGHT := 40
+const MP_FROM := Color8(84, 132, 220)
+const MP_TO := Color8(170, 200, 255)
+
 
 func _ready() -> void:
+	# The HD layer goes under this one, so the old-look full-screen views cover the HUD.
+	layer = 2
+	_hd = UiLayer.new(1)
+	add_child(_hd)
 	_root = Control.new()
 	_root.theme = UiTheme.legacy()
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	_info_label = Label.new()
-	_info = _make_panel(_info_label)
-	_menu_label = Label.new()
-	_menu = _make_panel(_menu_label)
+	_card = _make_card()
+	_terrain = _make_terrain()
+	_menu = _make_menu()
 	_forecast = _make_forecast()
 	_spell_label = Label.new()
 	_spell_forecast = _make_panel(_spell_label)
 	_level_up = _make_level_up()
 	_trade = _make_trade()
+	_objective_label = Label.new()
+	_objective = _make_panel(_objective_label)
 	# The unit list goes under the status screen, which can be opened from it.
 	unit_list = UnitListScreen.new()
 	_root.add_child(unit_list)
@@ -69,118 +107,211 @@ func _ready() -> void:
 	_root.add_child(status_screen)
 	options_screen = OptionsScreen.new()
 	_root.add_child(options_screen)
-	_objective_label = Label.new()
-	_objective = _make_panel(_objective_label)
+
 	_fast_forward = Label.new()
 	_fast_forward.visible = false
-	_fast_forward.add_theme_color_override("font_outline_color", Color.BLACK)
-	_fast_forward.add_theme_constant_override("outline_size", 3)
-	_root.add_child(_fast_forward)
-	_fast_forward.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 3)
+	_fast_forward.theme_type_variation = "CaptionLabel"
+	_fast_forward.add_theme_font_size_override("font_size", 18)
+	_fast_forward.add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT)
+	_fast_forward.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	_fast_forward.add_theme_constant_override("outline_size", 6)
+	_hd.root.add_child(_fast_forward)
+	_fast_forward.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)
 	_fast_forward.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 
-	_banner = ColorRect.new()
-	_banner.position = Vector2(0, 56)
-	_banner.size = Vector2(240, 48)
+	_banner = GildedBanner.new()
 	_banner.visible = false
-	_root.add_child(_banner)
-	_banner_label = Label.new()
-	_banner_label.add_theme_font_size_override("font_size", 14)
-	_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_banner.add_child(_banner_label)
-	_banner_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hd.root.add_child(_banner)
 
 
-func _make_panel(label: Label) -> PanelContainer:
+## A HUD window holding `content`, hidden until placed.
+func _make_panel(content: Control) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.visible = false
-	panel.add_child(label)
-	_root.add_child(panel)
+	panel.add_child(content)
+	_hd.root.add_child(panel)
+	return panel
+
+
+func _label(parent: Control, variation := &"", text := "") -> Label:
+	var label := Label.new()
+	label.theme_type_variation = variation
+	label.text = text
+	parent.add_child(label)
+	return label
+
+
+func _make_card() -> PanelContainer:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 10)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 16)
+	column.add_child(head)
+	# Face: a placeholder until units have portraits (team color, class icon or initial).
+	_face = Panel.new()
+	_face.custom_minimum_size = Vector2(76, 76)
+	_face.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	head.add_child(_face)
+	_face_icon = ClassIcon.new()
+	_face.add_child(_face_icon)
+	_face_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)
+	_face_letter = _label(_face)
+	_face_letter.add_theme_font_override("font", UiTheme.display(700))
+	_face_letter.add_theme_font_size_override("font_size", 40)
+	_face_letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_face_letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_face_letter.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var info := VBoxContainer.new()
+	info.add_theme_constant_override("separation", 2)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(info)
+	_card_side = _label(info, &"CaptionLabel")
+	_card_name = _label(info, &"NameLabel")
+	_card_sub = _label(info, &"SubLabel")
+	var hp_row := _bar_row(info, "HP")
+	_hp_bar = hp_row.get_child(1)
+	_hp_text = hp_row.get_child(2)
+	_mp_row = _bar_row(info, "MP")
+	_mp_bar = _mp_row.get_child(1)
+	_mp_bar.fill_from = MP_FROM
+	_mp_bar.fill_to = MP_TO
+	_mp_text = _mp_row.get_child(2)
+	_card_details = _label(column)
+	_card_details.add_theme_font_size_override("font_size", UiTheme.SIZE_SMALL)
+	_card_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_card_details.custom_minimum_size.x = 380
+	return _make_panel(column)
+
+
+## A caption, a bar and a "cur / max" label in a row.
+func _bar_row(parent: Control, caption: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var label := _label(row, &"CaptionLabel", tr(caption))
+	label.custom_minimum_size.x = 30
+	var bar := GildedBar.new()
+	bar.custom_minimum_size.x = 150
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(bar)
+	var value := _label(row)
+	value.custom_minimum_size.x = 76
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	return row
+
+
+func _make_terrain() -> PanelContainer:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 0)
+	_terrain_name = _label(column, &"TitleLabel")
+	_terrain_bonus = _label(column, &"SubLabel")
+	return _make_panel(column)
+
+
+func _make_menu() -> PanelContainer:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 0)
+	column.custom_minimum_size.x = 230
+	_menu_prompt = _label(column, &"SubLabel")
+	_menu_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_menu_prompt.custom_minimum_size.x = 300
+	var selected: StyleBox = UiTheme.selected_row().duplicate()
+	selected.content_margin_left = 44
+	selected.content_margin_right = 24
+	for i in MENU_ROWS:
+		var row := _label(column)
+		row.custom_minimum_size.y = MENU_ROW_HEIGHT
+		row.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_theme_stylebox_override("normal", _plain_row())
+		row.set_meta("selected_style", selected)
+		_menu_rows.append(row)
+	# Always in the tree (on the selected row), so it's freed with the HUD.
+	_menu_cursor = DiamondCursor.new()
+	_menu_rows[0].add_child(_menu_cursor)
+	var panel := _make_panel(column)
+	# The panel's own margins are kept small so the selection band reaches its edges.
+	var sb: GildedStyleBox = panel.get_theme_stylebox("panel").duplicate()
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	panel.add_theme_stylebox_override("panel", sb)
 	return panel
 
 
 ## The MP row is only shown for spells, where current MP is the magic defense; the
 ## Status row only when a side's hits can inflict a status.
 const FORECAST_ROWS: Array[String] = ["", "", "HP", "MP", "Dmg", "Hit", "Crit", "Status"]  # i18n
-const DIM := Color(0.7, 0.75, 0.95)
-const ADVANTAGE := Color(0.5, 1.0, 0.5)
-const DISADVANTAGE := Color(1.0, 0.5, 0.5)
-const EFFECTIVE := Color(1.0, 0.82, 0.25)
+const DIM := UiTheme.DIM
+const ADVANTAGE := Color8(160, 230, 120)
+const DISADVANTAGE := Color8(240, 130, 110)
+const EFFECTIVE := UiTheme.GOLD_BRIGHT
 
 
 func _make_forecast() -> PanelContainer:
 	var grid := GridContainer.new()
 	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 0)
-	for row_name in FORECAST_ROWS:
+	grid.add_theme_constant_override("h_separation", 28)
+	grid.add_theme_constant_override("v_separation", 2)
+	for row_index in FORECAST_ROWS.size():
 		var row: Array[Label] = []
 		for col in 3:
 			var label := Label.new()
 			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if col == 0 else HORIZONTAL_ALIGNMENT_CENTER
 			if col == 0:
-				label.text = tr(row_name)
-				label.add_theme_color_override("font_color", DIM)
+				label.text = tr(FORECAST_ROWS[row_index])
+				label.theme_type_variation = &"CaptionLabel"
+			elif row_index == 0:
+				label.theme_type_variation = &"TitleLabel"
+			else:
+				label.custom_minimum_size.x = 110
+			label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			grid.add_child(label)
 			row.append(label)
 		_forecast_cells.append(row)
-	var panel := PanelContainer.new()
-	panel.visible = false
-	panel.add_child(grid)
-	_root.add_child(panel)
-	return panel
+	return _make_panel(grid)
 
 
 func _make_trade() -> PanelContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 40)
 	for i in 2:
 		var label := Label.new()
-		label.custom_minimum_size.x = 84
+		label.custom_minimum_size.x = 320
 		row.add_child(label)
 		_trade_labels.append(label)
-	var panel := PanelContainer.new()
-	panel.visible = false
-	panel.add_child(row)
-	_root.add_child(panel)
-	return panel
+	return _make_panel(row)
 
 
 func _make_level_up() -> PanelContainer:
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
-	_level_title = Label.new()
+	box.add_theme_constant_override("separation", 10)
+	_level_title = _label(box, &"TitleLabel")
 	_level_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(_level_title)
 	var grid := GridContainer.new()
 	grid.columns = 6
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 0)
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 2)
 	for key in Experience.STATS:
 		var row: Array[Label] = []
 		for col in 3:
 			var label := Label.new()
 			if col == 0:
 				label.text = tr(Experience.STAT_LABELS[key])
-				label.add_theme_color_override("font_color", DIM)
-			elif col == 2:
+				label.theme_type_variation = &"CaptionLabel"
+				label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			elif col == 1:
+				label.custom_minimum_size.x = 32
+				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			else:
 				label.add_theme_color_override("font_color", ADVANTAGE)
-				label.custom_minimum_size.x = 12
+				label.custom_minimum_size.x = 48
 			grid.add_child(label)
 			row.append(label)
 		_level_rows.append(row)
 	box.add_child(grid)
-	var hint := Label.new()
-	hint.text = tr("Z: continue")
+	var hint := _label(box, &"SubLabel", tr("Z: continue"))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_color_override("font_color", DIM)
-	box.add_child(hint)
-	var panel := PanelContainer.new()
-	panel.visible = false
-	panel.add_child(box)
-	_root.add_child(panel)
-	return panel
+	return _make_panel(box)
 
 
 ## Places a panel in a screen corner; right-side panels grow leftward.
@@ -195,7 +326,16 @@ func _place(panel: Control, right: bool, bottom: bool) -> void:
 	panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN if right else Control.GROW_DIRECTION_END
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN if bottom else Control.GROW_DIRECTION_END
 	panel.reset_size()
-	panel.set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, 3)
+	panel.set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, MARGIN)
+	panel.visible = true
+
+
+## A panel centered on the screen.
+func _center(panel: Control) -> void:
+	panel.reset_size()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	panel.visible = true
 
 
@@ -210,57 +350,87 @@ func _near_top(cursor_cell: Vector2i, rows: int) -> bool:
 	return (cursor_cell - view_origin).y < rows
 
 
-## `tile_hp` is the remaining HP of a breakable tile (-1 otherwise); it's shown
-## instead of the terrain bonuses.
+## Whether the cursor is in the bottom `rows` rows of the screen.
+func _near_bottom(cursor_cell: Vector2i, rows: int) -> bool:
+	return (cursor_cell - view_origin).y >= SCREEN_CELLS.y - rows
+
+
+## The unit card (when there's a unit) and the terrain window, on the side of the screen
+## away from the cursor: the card at the top unless the cursor is near it, the terrain at
+## the other end. `tile_hp` is the remaining HP of a breakable tile (-1 otherwise); it's
+## shown instead of the terrain bonuses.
 func update_info(unit: Unit, terrain: Dictionary, cursor_cell: Vector2i, tile_hp := -1) -> void:
-	var text := ""
-	if unit:
-		var weapon := tr("No weapon")
-		if not unit.weapon.is_empty():
-			var rng := str(unit.min_range) if unit.min_range == unit.max_range \
-				else "%d-%d" % [unit.min_range, unit.max_range]
-			weapon = tr("%s (%d)  Rng %s  [%d/%d]") % [unit.weapon.name, unit.weapon.uses, rng,
-				unit.items.size(), Unit.MAX_ITEMS]
-		var lv := tr("Lv %d") % unit.level
-		if unit.team == Unit.Team.PLAYER:
-			lv += "  " + tr("EXP %d") % unit.exp_points
-		var hp_line := tr("HP %d/%d  MP %d/%d") % [unit.hp, unit.max_hp, unit.mp, unit.max_mp]
-		var side := ""
-		if unit.team != Unit.Team.PLAYER and unit.team != Unit.Team.ENEMY:
-			side = "  (%s)" % tr(Factions.NAMES[unit.team])
-		text = "%s%s  %s  %s\n%s\n" % [unit.unit_name, side, unit.class_display_name(), lv, hp_line]
-		if not unit.weapon.is_empty() or not unit.is_caster():
-			text += weapon + "\n"
-		var others: Array[String] = []
-		for i in unit.items.size():
-			if not Items.is_weapon(unit.items[i]):
-				others.append(item_label(unit, i))
-		if not others.is_empty():
-			text += tr("Items: %s") % ", ".join(others) + "\n"
-		if not unit.spells.is_empty():
-			text += tr("Spells: %s") % ", ".join(unit.spells) + "\n"
-		for line in unit_notes(unit):
-			text += line + "\n"
-		text += tr("STR %d  DEX %d  AGI %d  LCK %d\nDEF %d  MOV %d") % [
-			unit.combat_str(), unit.combat_dex(), unit.combat_agi(), unit.combat_lck(), unit.combat_def(), unit.mov]
-		if unit.move_type != "foot":
-			text += " (%s)" % unit.move_type.capitalize()
-		if unit.is_caster():
-			text += "  " + tr("INT %d") % unit.combat_int()
-		text += "\n"
+	_terrain_name.text = terrain.name
 	# Show the bonus the unit on the tile actually gets (fliers and spirits get none).
 	if tile_hp >= 0:
-		text += tr("%s  HP %d/%d") % [terrain.name, tile_hp, terrain.breakable.hp]
+		_terrain_bonus.text = tr("HP %d/%d") % [tile_hp, terrain.breakable.hp]
 	elif unit and BattleMap.NO_TERRAIN_BONUS.has(unit.move_type):
-		text += tr("%s  no bonus (%s)") % [terrain.name, unit.move_type.capitalize()]
+		_terrain_bonus.text = tr("No bonus (%s)") % unit.move_type.capitalize()
 	else:
-		text += "%s  DEF%+d AVO%+d" % [terrain.name, terrain.def, terrain.avo]
-	_info_label.text = text
-	_place(_info, _away_right(cursor_cell), _near_top(cursor_cell, 4))
+		_terrain_bonus.text = tr("DEF %+d · AVO %+d") % [terrain.def, terrain.avo]
+	var right := _away_right(cursor_cell)
+	if not unit:
+		_card.visible = false
+		_place(_terrain, right, not _near_bottom(cursor_cell, 3))
+		return
+	_fill_card(unit)
+	var card_bottom := _near_top(cursor_cell, 4)
+	_place(_card, right, card_bottom)
+	_place(_terrain, right, not card_bottom)
+
+
+func _fill_card(unit: Unit) -> void:
+	var face_style := StyleBoxFlat.new()
+	face_style.bg_color = Factions.COLORS[unit.team].darkened(0.25)
+	face_style.border_color = UiTheme.GOLD
+	face_style.set_border_width_all(1)
+	_face.add_theme_stylebox_override("panel", face_style)
+	_face_icon.pixels = ClassIcon.for_class(unit.unit_class)
+	_face_icon.queue_redraw()
+	_face_letter.text = unit.token_letter() if _face_icon.pixels.is_empty() else ""
+	_card_side.text = tr(Factions.NAMES[unit.team])
+	_card_side.add_theme_color_override("font_color", Factions.COLORS[unit.team].lerp(Color.WHITE, 0.5))
+	_card_name.text = unit.unit_name
+	var sub: Array[String] = [unit.class_display_name(), tr("Lv %d") % unit.level]
+	if unit.team == Unit.Team.PLAYER:
+		sub.append(tr("EXP %d") % unit.exp_points)
+	_card_sub.text = " · ".join(sub)
+	_hp_bar.ratio = float(unit.hp) / maxi(1, unit.max_hp)
+	_hp_text.text = "%d / %d" % [unit.hp, unit.max_hp]
+	_mp_row.visible = unit.max_mp > 0
+	_mp_bar.ratio = float(unit.mp) / maxi(1, unit.max_mp)
+	_mp_text.text = "%d / %d" % [unit.mp, unit.max_mp]
+
+	var lines: Array[String] = []
+	if not unit.weapon.is_empty():
+		var rng := str(unit.min_range) if unit.min_range == unit.max_range \
+			else "%d-%d" % [unit.min_range, unit.max_range]
+		lines.append(tr("%s (%d)  Rng %s  [%d/%d]") % [unit.weapon.name, unit.weapon.uses, rng,
+			unit.items.size(), Unit.MAX_ITEMS])
+	elif not unit.is_caster():
+		lines.append(tr("No weapon"))
+	var others: Array[String] = []
+	for i in unit.items.size():
+		if not Items.is_weapon(unit.items[i]):
+			others.append(item_label(unit, i))
+	if not others.is_empty():
+		lines.append(tr("Items: %s") % ", ".join(others))
+	if not unit.spells.is_empty():
+		lines.append(tr("Spells: %s") % ", ".join(unit.spells))
+	lines.append_array(unit_notes(unit))
+	var stats := tr("STR %d  DEX %d  AGI %d  LCK %d\nDEF %d  MOV %d") % [
+		unit.combat_str(), unit.combat_dex(), unit.combat_agi(), unit.combat_lck(), unit.combat_def(), unit.mov]
+	if unit.move_type != "foot":
+		stats += " (%s)" % unit.move_type.capitalize()
+	if unit.is_caster():
+		stats += "  " + tr("INT %d") % unit.combat_int()
+	lines.append(stats)
+	_card_details.text = "\n".join(lines)
 
 
 func hide_info() -> void:
-	_info.visible = false
+	_card.visible = false
+	_terrain.visible = false
 
 
 func show_menu(options: Array[String], cursor_cell: Vector2i, title := "") -> void:
@@ -290,18 +460,49 @@ func hide_menu() -> void:
 const MENU_ROWS := 9
 
 
+## The menu's visible rows, as shown (for tests and debugging).
+func menu_text() -> String:
+	var shown: Array[String] = []
+	for row in _menu_rows:
+		if row.visible:
+			shown.append(row.text)
+	return "\n".join(shown)
+
+
 func _refresh_menu() -> void:
-	var lines: Array[String] = []
-	if _menu_title:
-		lines.append(_menu_title)
+	_menu_prompt.text = _menu_title
+	_menu_prompt.visible = _menu_title != ""
 	# A window of MENU_ROWS options that scrolls with the selection; "..." stands in
 	# for options hidden above or below.
 	var first := clampi(menu_index - MENU_ROWS / 2, 0, maxi(0, menu_options.size() - MENU_ROWS))
 	var last := mini(first + MENU_ROWS, menu_options.size())
-	for i in range(first, last):
+	for r in MENU_ROWS:
+		var row := _menu_rows[r]
+		var i := first + r
+		row.visible = i < last
+		if not row.visible:
+			continue
 		var hidden := (i == first and first > 0) or (i == last - 1 and last < menu_options.size())
-		lines.append("   ..." if hidden else ("> " if i == menu_index else "   ") + tr(menu_options[i]))
-	_menu_label.text = "\n".join(lines)
+		row.text = "..." if hidden else tr(menu_options[i])
+		var selected := i == menu_index and not hidden
+		row.add_theme_stylebox_override("normal", row.get_meta("selected_style") if selected else _plain_row())
+		row.add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT if selected else (UiTheme.DIM if hidden else UiTheme.TEXT))
+		if selected:
+			if _menu_cursor.get_parent() != row:
+				_menu_cursor.reparent(row, false)
+			_menu_cursor.position = Vector2(22, MENU_ROW_HEIGHT / 2.0)
+
+
+var _plain: StyleBoxEmpty
+
+
+## Unselected menu rows: no background, the same margins as the selected one.
+func _plain_row() -> StyleBoxEmpty:
+	if not _plain:
+		_plain = StyleBoxEmpty.new()
+		_plain.content_margin_left = 44
+		_plain.content_margin_right = 24
+	return _plain
 
 
 ## `atk_label` replaces the attacker's weapon name (e.g. with the spell being cast).
@@ -490,7 +691,7 @@ func show_trade(left: Unit, right: Unit, cursor: Vector2i, held: Vector2i) -> vo
 			lines.append(mark + (item_label(u, slot) if slot < u.items.size() else "---"))
 		_trade_labels[side].text = "\n".join(lines)
 	_trade.reset_size()
-	_trade.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 3)
+	_trade.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, MARGIN)
 	_trade.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_trade.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_trade.visible = true
@@ -518,11 +719,7 @@ func show_level_up(unit: Unit, before: Dictionary, gains: Dictionary) -> void:
 		row[1].text = str(before[key] + gains.get(key, 0))
 		row[2].text = "+%d" % gains[key] if gains.has(key) else ""
 		i += 1
-	_level_up.reset_size()
-	_level_up.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	_level_up.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_level_up.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_level_up.visible = true
+	_center(_level_up)
 	if level_up_waits and Settings.value("level_up_wait"):
 		await level_up_confirmed
 	else:
@@ -545,9 +742,11 @@ func show_fast_forward(speed: float) -> void:
 	_fast_forward.text = ">> x%d" % int(speed)
 
 
+## `text`'s first line is the title, the rest (e.g. the turn) goes under it.
 func show_banner(text: String, color: Color) -> void:
-	_banner_label.text = text
-	_banner.color = Color(color, 0.75)
+	var lines := text.split("
+", true, 1)
+	_banner.show_text(lines[0], lines[1] if lines.size() > 1 else "", color)
 	_banner.modulate.a = 0.0
 	_banner.visible = true
 	var tw := create_tween()
@@ -565,8 +764,7 @@ func show_end(text: String, color: Color, hint := "") -> void:
 	hide_info()
 	hide_menu()
 	hide_forecast()
-	_banner_label.text = text + "\n" + hint
-	_banner.color = Color(color, 0.85)
+	_banner.show_text(text, hint, color)
 	_banner.modulate.a = 1.0
 	_banner.visible = true
 
@@ -586,11 +784,7 @@ func hide_status() -> void:
 func show_objective(lines: Array[String]) -> void:
 	hide_info()
 	_objective_label.text = "\n".join(lines)
-	_objective.reset_size()
-	_objective.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	_objective.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_objective.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_objective.visible = true
+	_center(_objective)
 
 
 func hide_objective() -> void:
