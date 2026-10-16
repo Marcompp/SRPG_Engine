@@ -106,9 +106,19 @@ any order once step 2 exists.
    tucked behind the box, the listener dimmed; real portraits (96x80, shown at
    2x or 3x) can replace them once units have them. Typing, sounds and
    translation unchanged.
-5. **Status screen** (`status_screen.gd`): framed portrait, name block with HP
-   and MP bars, Cinzel tabs, two-column stats with gold bars, equipment row, bio;
-   glossary help popups in the theme. `_entries` stays (tests read it).
+5. **Status screen** (done, 2026-10-16). Laid out in HD units and hosted on its
+   own `UiLayer`: layer 3 in battle (it opens from the unit list, which is still
+   on the old-look layer 2) and layer 1 in the prep screen. Left column: a gilded
+   frame around the portrait placeholder (team color, class icon or initial,
+   movement badge), the name, class, race, level and EXP, HP and MP meters
+   ("18 / 18"). Right: a gilded panel with Cinzel tabs (the current one gold and
+   underlined) and the pages: one stat per row with a gold bar (capped stats
+   green and pulsing, skill-boosted values gold), items with uses, combat
+   numbers and spells between faint gold rules, skills with their source, the
+   biography in italics. Detail mode frames the entry in gold and explains it in
+   an opaque gilded box. The veil behind is see-through over the battle map and
+   opaque in the prep screen (`veil_alpha`). Entry order and texts are kept, so
+   the tests only changed for the HP/MP numbers and the bio's dash.
 6. **Other battle screens:** unit list, options, glossary popups.
 7. **Out of battle:** level select and prep screen, on the same HD layer.
 8. **World atmosphere:** one canvas shader on a layer between the world and the

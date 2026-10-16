@@ -92,7 +92,10 @@ func _ready() -> void:
 	_help.add_child(_help_label)
 	add_child(_help)
 	_status = StatusScreen.new()
-	add_child(_status)
+	_status.veil_alpha = 1.0
+	var hd := UiLayer.new(1)
+	add_child(hd)
+	hd.root.add_child(_status)
 	_rename = LineEdit.new()
 	_rename.visible = false
 	_rename.position = Vector2(96, 120)

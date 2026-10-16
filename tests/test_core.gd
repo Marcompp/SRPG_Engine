@@ -501,7 +501,7 @@ func test_status_screen() -> void:
 	check(screen.visible and screen.unit == lord, "shows the unit under the cursor")
 	check_eq(screen.page, 0, "starts on the Stats page")
 	var texts := _texts(screen)
-	for expected in ["Lord", "Swordsman", "Human", "Lv 1", "Exp 0", "HP 18/18", "MP 8/8"]:
+	for expected in ["Lord", "Swordsman", "Human", "Lv 1", "Exp 0", "18 / 18", "8 / 8"]:
 		check(texts.has(expected), "left column shows '%s'" % expected)
 	# Pages: Right flips, Left flips back; the Items page lists weapons, numbers, spells.
 	await press(KEY_RIGHT)
