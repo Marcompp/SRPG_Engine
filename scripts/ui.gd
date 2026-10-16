@@ -1,9 +1,9 @@
 class_name BattleUI
 extends CanvasLayer
 ## HUD: unit/terrain info, action menu, combat forecast, phase banner, end screen.
-## The HUD windows are on an HD layer (UiLayer, Gilded Night: docs/ui_theme.md), laid out
-## in 960x640 units; the full-screen views (status, unit list, options, dialogue) still
-## use the old 240x160 look on this layer, which draws above it.
+## The HUD windows and the dialogue are on an HD layer (UiLayer, Gilded Night:
+## docs/ui_theme.md), laid out in 960x640 units; the full-screen views (status, unit
+## list, options) still use the old 240x160 look on this layer, which draws above it.
 
 var menu_options: Array[String] = []
 var menu_index := 0
@@ -102,7 +102,7 @@ func _ready() -> void:
 	unit_list = UnitListScreen.new()
 	_root.add_child(unit_list)
 	dialogue = DialogueBox.new()
-	_root.add_child(dialogue)
+	_hd.root.add_child(dialogue)
 	status_screen = StatusScreen.new()
 	_root.add_child(status_screen)
 	options_screen = OptionsScreen.new()

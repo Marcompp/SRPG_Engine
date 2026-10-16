@@ -97,8 +97,13 @@ any order once step 2 exists.
    end screen (a band fading at both ends between gold rules; a banner's second
    line, e.g. the turn, goes under the title). Tests now read `_terrain_name`,
    `_terrain_bonus`, `_menu_prompt` and `menu_text()`.
-4. **Dialogue** (`dialogue_box.gd`): the box, name plate, 3x portrait and advance
-   arrow described above. Typing and translation unchanged.
+4. **Dialogue** (done, 2026-10-16). `DialogueBox` is on BattleUI's HD layer: a
+   full-width gilded box, the name on a PlatePanel over its top edge, a gold
+   arrow that bobs once the line is done, narration in italics. Portrait slots
+   are 192x160 placeholders (side color, gold edge, the speaker's initial),
+   tucked behind the box, the listener dimmed; real portraits (96x80, shown at
+   2x or 3x) can replace them once units have them. Typing, sounds and
+   translation unchanged.
 5. **Status screen** (`status_screen.gd`): framed portrait, name block with HP
    and MP bars, Cinzel tabs, two-column stats with gold bars, equipment row, bio;
    glossary help popups in the theme. `_entries` stays (tests read it).
