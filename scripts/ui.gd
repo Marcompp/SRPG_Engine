@@ -1,10 +1,9 @@
 class_name BattleUI
 extends CanvasLayer
-## HUD: unit/terrain info, action menu, combat forecast, phase banner, end screen.
-## The HUD windows and the dialogue are on an HD layer (UiLayer, Gilded Night:
-## docs/ui_theme.md), laid out in 960x640 units, and the status screen on another one on
-## top; the unit list and options still use the old 240x160 look on this layer, between
-## the two.
+## HUD: unit/terrain info, action menu, combat forecast, phase banner, end screen, and
+## the full-screen views (dialogue, unit list, status, options). All of it is on one HD
+## layer (UiLayer, Gilded Night: docs/ui_theme.md), laid out in 960x640 units and
+## stacked in the order it's added.
 
 var menu_options: Array[String] = []
 var menu_index := 0
@@ -19,9 +18,7 @@ var view_origin := Vector2i.ZERO
 signal level_up_confirmed
 var _fast_forward: Label
 
-## Old-look screens, in 240x160 units.
-var _root: Control
-## The HUD windows, in 960x640 units.
+## Everything this shows, in 960x640 units.
 var _hd: UiLayer
 ## Unit card: face, side, name, class and level, HP (and MP) bars, then the details.
 var _card: PanelContainer
@@ -79,15 +76,8 @@ const MP_TO := Color8(170, 200, 255)
 
 
 func _ready() -> void:
-	# The HD layer goes under this one, so the old-look full-screen views cover the HUD.
-	layer = 2
-	_hd = UiLayer.new(1)
+	_hd = UiLayer.new(layer)
 	add_child(_hd)
-	_root = Control.new()
-	_root.theme = UiTheme.legacy()
-	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_root)
-	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	_card = _make_card()
 	_terrain = _make_terrain()
@@ -99,18 +89,15 @@ func _ready() -> void:
 	_trade = _make_trade()
 	_objective_label = Label.new()
 	_objective = _make_panel(_objective_label)
-	# The unit list goes under the status screen, which can be opened from it.
-	unit_list = UnitListScreen.new()
-	_root.add_child(unit_list)
+	# Full-screen views over the HUD; the status screen over the unit list, which opens it.
 	dialogue = DialogueBox.new()
 	_hd.root.add_child(dialogue)
-	# The status screen opens from the unit list, so its HD layer goes above this one.
-	var top := UiLayer.new(3)
-	add_child(top)
+	unit_list = UnitListScreen.new()
+	_hd.root.add_child(unit_list)
 	status_screen = StatusScreen.new()
-	top.root.add_child(status_screen)
+	_hd.root.add_child(status_screen)
 	options_screen = OptionsScreen.new()
-	_root.add_child(options_screen)
+	_hd.root.add_child(options_screen)
 
 	_fast_forward = Label.new()
 	_fast_forward.visible = false

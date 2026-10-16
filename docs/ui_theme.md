@@ -80,7 +80,8 @@ any order once step 2 exists.
    Label variations NameLabel, TitleLabel, SubLabel, CaptionLabel, the PlatePanel
    and SelectedRow variations) and `legacy()` / `legacy_box()`, the old flat look
    in one place: `ui.gd`, `prep_screen.gd`, `level_select.gd` and the status
-   screen's help box use it until they move. `GildedStyleBox` (a script
+   screen's help box used it until they moved (now only the prep screen and the
+   level select do). `GildedStyleBox` (a script
    `StyleBox`) draws the fill, both lines, a soft shadow and the corner
    flourishes in code, so no corner texture. `GildedBar`, `DiamondCursor`, and
    `UiLayer` (the 0.25-scaled layer, root sized 960x640). Test: `test_ui_theme`.
@@ -119,7 +120,17 @@ any order once step 2 exists.
    an opaque gilded box. The veil behind is see-through over the battle map and
    opaque in the prep screen (`veil_alpha`). Entry order and texts are kept, so
    the tests only changed for the HP/MP numbers and the bio's dash.
-6. **Other battle screens:** unit list, options, glossary popups.
+6. **Other battle screens** (done, 2026-10-16). The unit list is a table in a
+   gilded panel: small-capital headers (the sort column gold and underlined),
+   names in their side's color, units that acted dimmed, the gold band and
+   diamond on the selected row. Options is a centered gilded panel: the title in
+   engraved capitals, one row per setting with its value at the right, the
+   selected row gold with `‹ value ›`. Options has the same `veil_alpha` as the
+   status screen (opaque on the level select, which hosts it on its own
+   `UiLayer`). With these moved, everything in battle shares BattleUI's one HD
+   layer, stacked in the order it's added (HUD windows, dialogue, unit list,
+   status, options, fast-forward tag, banner), and BattleUI no longer uses the
+   old look. The glossary popups are the status screen's help box (step 5).
 7. **Out of battle:** level select and prep screen, on the same HD layer.
 8. **World atmosphere:** one canvas shader on a layer between the world and the
    UI (grading, vignette, tilt-shift, reading the screen texture so the blur is

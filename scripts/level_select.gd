@@ -52,7 +52,10 @@ func _ready() -> void:
 	box.add_child(_hint)
 
 	_options = OptionsScreen.new()
-	add_child(_options)
+	_options.veil_alpha = 1.0
+	var hd := UiLayer.new(1)
+	add_child(hd)
+	hd.root.add_child(_options)
 
 	_build_choices()
 	_refresh()

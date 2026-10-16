@@ -1,58 +1,76 @@
 class_name UnitListScreen
 extends Control
 ## Every unit on the map in one sortable table (player units in blue, enemies in
-## red, player units that already acted dimmed).
+## red, player units that already acted dimmed), in the Gilded Night look
+## (docs/ui_theme.md). Laid out in HD units (960x640): put it on a UiLayer.
 ## Up/Down: row (scrolls). Left/Right: sort column. Z: put the cursor on the unit.
 ## D: its status screen. X: close. (Input is routed here by Battle.)
 
-const DIM := Color(0.7, 0.75, 0.95)
-const PLAYER_TEXT := Color(0.65, 0.8, 1.0)
-const ENEMY_TEXT := Color(1.0, 0.6, 0.55)
-const ACTED_TEXT := Color(0.55, 0.55, 0.6)
-const SORTED_HEADER := Color(1.0, 0.85, 0.25)
+const DIM := UiTheme.DIM
+const PLAYER_TEXT := Color8(165, 195, 255)
+const ENEMY_TEXT := Color8(240, 150, 135)
+const ACTED_TEXT := Color8(120, 118, 140)
+const SORTED_HEADER := UiTheme.GOLD_BRIGHT
 ## key: what the column sorts by (see _value()). Name and Class sort A-Z, numbers high to low.
+## x is inside the panel.
 const COLUMNS := [
-	{"title": "Name", "x": 4.0, "key": "name"},  # i18n
-	{"title": "Class", "x": 50.0, "key": "class"},  # i18n
-	{"title": "Lv", "x": 106.0, "key": "lv"},  # i18n
-	{"title": "HP", "x": 122.0, "key": "hp"},  # i18n
-	{"title": "Str", "x": 150.0, "key": "str"},  # i18n
-	{"title": "Dex", "x": 168.0, "key": "dex"},  # i18n
-	{"title": "Agi", "x": 186.0, "key": "agi"},  # i18n
-	{"title": "Def", "x": 204.0, "key": "def"},  # i18n
-	{"title": "Mov", "x": 222.0, "key": "mov"},  # i18n
+	{"title": "Name", "x": 48.0, "key": "name"},  # i18n
+	{"title": "Class", "x": 226.0, "key": "class"},  # i18n
+	{"title": "Lv", "x": 430.0, "key": "lv"},  # i18n
+	{"title": "HP", "x": 490.0, "key": "hp"},  # i18n
+	{"title": "Str", "x": 600.0, "key": "str"},  # i18n
+	{"title": "Dex", "x": 662.0, "key": "dex"},  # i18n
+	{"title": "Agi", "x": 724.0, "key": "agi"},  # i18n
+	{"title": "Def", "x": 786.0, "key": "def"},  # i18n
+	{"title": "Mov", "x": 848.0, "key": "mov"},  # i18n
 ]
-const TOP := 15.0
-const ROW_H := 10.0
+const PANEL_RECT := Rect2(20, 20, 920, 568)
+## The first row's top, inside the panel.
+const TOP := 74.0
+const ROW_H := 36.0
 const VISIBLE_ROWS := 13
 
 var units: Array[Unit] = []
 var index := 0
 var sort_col := 0
 var _scroll := 0
+var _panel: Panel
 var _rows: Control
-var _cursor: ColorRect
+var _cursor: Panel
+var _diamond: DiamondCursor
 var _footer: Label
 
 
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	size = UiLayer.SIZE
 	var bg := ColorRect.new()
-	bg.color = Color(0.1, 0.14, 0.38)
+	bg.color = Color(6 / 255.0, 7 / 255.0, 20 / 255.0, 0.9)
+	bg.size = UiLayer.SIZE
 	add_child(bg)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_cursor = ColorRect.new()
-	_cursor.color = Color(1, 1, 1, 0.15)
-	_cursor.size = Vector2(236, ROW_H)
-	_cursor.position.x = 2
-	add_child(_cursor)
+	_panel = Panel.new()
+	_panel.position = PANEL_RECT.position
+	_panel.size = PANEL_RECT.size
+	add_child(_panel)
+	_cursor = Panel.new()
+	_cursor.theme_type_variation = &"SelectedRow"
+	_cursor.size = Vector2(PANEL_RECT.size.x - 24, ROW_H)
+	_cursor.position.x = 12
+	_panel.add_child(_cursor)
+	_diamond = DiamondCursor.new()
+	_diamond.position = Vector2(22, ROW_H / 2.0)
+	_cursor.add_child(_diamond)
 	_rows = Control.new()
-	add_child(_rows)
+	_panel.add_child(_rows)
+	var rule := ColorRect.new()
+	rule.color = Color(UiTheme.GOLD, 0.3)
+	rule.position = Vector2(28, TOP - 8)
+	rule.size = Vector2(PANEL_RECT.size.x - 56, 1)
+	_panel.add_child(rule)
 	_footer = Label.new()
-	_footer.position = Vector2(4, 148)
-	_footer.add_theme_color_override("font_color", DIM)
+	_footer.theme_type_variation = &"SubLabel"
+	_footer.position = Vector2(PANEL_RECT.position.x + 8, PANEL_RECT.end.y + 10)
 	add_child(_footer)
 
 
@@ -129,10 +147,11 @@ func _render() -> void:
 		_rows.remove_child(child)
 		child.queue_free()
 	for c in COLUMNS.size():
-		var header := _label(tr(COLUMNS[c].title), Vector2(COLUMNS[c].x, 3),
-			SORTED_HEADER if c == sort_col else DIM)
+		var header := _label(tr(COLUMNS[c].title), Vector2(COLUMNS[c].x, 22), SORTED_HEADER if c == sort_col else UiTheme.CAPTION)
+		header.theme_type_variation = &"CaptionLabel"
+		header.add_theme_font_size_override("font_size", 17)
 		if c == sort_col:
-			header.text += "*"
+			header.add_theme_stylebox_override("normal", UiTheme.tab_underline())
 	# Keep the selected row on screen.
 	if index < _scroll:
 		_scroll = index
@@ -146,17 +165,18 @@ func _render() -> void:
 			else (ACTED_TEXT if u.has_acted else PLAYER_TEXT))
 		var values := [u.unit_name, u.class_display_name(), u.level, "%d/%d" % [u.hp, u.max_hp],
 			u.strength, u.dexterity, u.agility, u.defense, u.mov]
+		var text_color := ACTED_TEXT if u.team == Unit.Team.PLAYER and u.has_acted else UiTheme.TEXT
 		for c in COLUMNS.size():
-			var label := _label(str(values[c]), Vector2(COLUMNS[c].x, y), color if c == 0 else Color.WHITE)
+			var label := _label(str(values[c]), Vector2(COLUMNS[c].x, y + 2), color if c == 0 else text_color)
 			if c < 2:  # Name and Class: shorten to fit before the next column
-				_fit(label, COLUMNS[c + 1].x - COLUMNS[c].x - 3)
+				_fit(label, COLUMNS[c + 1].x - COLUMNS[c].x - 12)
 	_cursor.visible = not units.is_empty()
 	_cursor.position.y = TOP + (index - _scroll) * ROW_H
 	_footer.text = tr("%d/%d   Z: go to  D: info  L/R: sort  X: close") % [index + 1, units.size()] \
 		if not units.is_empty() else tr("No units")
 
 
-## Shortens a label's text (ending in ".") until it fits in `width` pixels.
+## Shortens a label's text (ending in ".") until it fits in `width` units.
 func _fit(label: Label, width: float) -> void:
 	var font := label.get_theme_font("font")
 	var size := label.get_theme_font_size("font_size")
