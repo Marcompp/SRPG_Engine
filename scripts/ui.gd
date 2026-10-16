@@ -76,6 +76,8 @@ const MP_TO := Color8(170, 200, 255)
 
 
 func _ready() -> void:
+	# Above the map's Atmosphere layer (1).
+	layer = 2
 	_hd = UiLayer.new(layer)
 	add_child(_hd)
 

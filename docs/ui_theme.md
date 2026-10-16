@@ -140,10 +140,14 @@ any order once step 2 exists.
    (`_selected_rows` records which shown row it is; "..." still marks hidden
    rows), item help in an opaque gilded box, the mount name field gold-edged.
    With these moved, `UiTheme.legacy()` is gone: every screen uses the theme.
-8. **World atmosphere:** one canvas shader on a layer between the world and the
-   UI (grading, vignette, tilt-shift, reading the screen texture so the blur is
-   smooth), the cursor glow and `CPUParticles2D` motes. An Options toggle turns
-   it off.
+8. **World atmosphere** (done, 2026-10-16). `Atmosphere`, a `CanvasLayer` at
+   layer 1 (BattleUI moved to 2), added by the battle: one full-screen shader
+   reading the screen texture (warm-to-cool grading, a touch more contrast and
+   saturation, two slow diagonal light shafts, a vignette, and tilt-shift: a
+   two-ring, 17-tap blur that grows toward the top and bottom, since the
+   Compatibility renderer can't be relied on for screen mipmaps), a soft additive
+   glow on the cursor's cell, and 22 drifting light motes (`CPUParticles2D`). The
+   "Atmosphere" option (On by default) turns all of it off.
 9. **Motion:** windows fade and slide 6 px as they open, the cursor pulses;
    timings follow the game speed, and turning atmosphere off skips them.
 10. **Wrap-up:** remove the old `StyleBoxFlat` styling, screenshot every screen at

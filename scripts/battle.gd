@@ -60,6 +60,8 @@ func _ready() -> void:
 	camera = BattleCamera.new()
 	camera.name = "Camera"
 	add_child(camera)
+	# Light and depth on the map, between it and the UI (docs/ui_theme.md).
+	add_child(Atmosphere.new(cursor))
 	if Levels.resume:
 		Levels.resume = false
 		phases.resume_suspended()

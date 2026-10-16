@@ -26,6 +26,8 @@ const OPTIONS := [  # i18n
 		"choices": [[true, "Each turn"], [false, "Off"]]},
 	{"key": "rewinds", "label": "Turn rewinds",
 		"choices": [[3, "3 per map"], [5, "5 per map"], [1, "1 per map"], [-1, "Unlimited"], [0, "Off"]]},
+	{"key": "atmosphere", "label": "Atmosphere",
+		"choices": [[true, "On"], [false, "Off"]]},
 	{"key": "music_volume", "label": "Music", "default": 4,
 		"choices": [[0.0, "Off"], [0.25, "25%"], [0.5, "50%"], [0.75, "75%"], [1.0, "100%"]]},
 	{"key": "effects_volume", "label": "Sound effects", "default": 4,
