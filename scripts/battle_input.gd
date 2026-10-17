@@ -225,17 +225,46 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## Menu sounds for a key press. On the map, the cursor sounds only when it moves
-## (move_cursor); dialogue and the options screen make their own.
+## (move_cursor); dialogue and the options screen make their own. Confirm is
+## "select" on the map, "confirm" in menus and "invalid" where it does nothing.
 func _input_sound(dir: Vector2i, accept: bool, cancel: bool) -> void:
 	var state := battle.state
 	if state in [Battle.State.DIALOGUE, Battle.State.OPTIONS]:
 		return
 	if accept:
-		Sound.play("confirm")
+		if not _accept_valid():
+			Sound.play("invalid")
+		elif state in [Battle.State.IDLE, Battle.State.FORMATION, Battle.State.SELECTED, Battle.State.TARGETING,
+				Battle.State.AREA_TARGET]:
+			Sound.play("select")
+		else:
+			Sound.play("confirm")
 	elif cancel and state != Battle.State.IDLE:
 		Sound.play("cancel")
 	elif dir != Vector2i.ZERO and not state in [Battle.State.IDLE, Battle.State.SELECTED, Battle.State.FORMATION]:
 		Sound.play("cursor")
+
+
+## Whether confirm does something here (the same checks _unhandled_input makes).
+func _accept_valid() -> bool:
+	var cell := battle.cursor.cell
+	match battle.state:
+		Battle.State.SELECTED:
+			if reach.cells.has(cell):
+				return true
+			var u := battle.unit_at(cell)
+			return u != null and not canto_move and not quick_cells(selected, u).is_empty()
+		Battle.State.FORMATION:
+			var held := formation.held
+			if held == null:
+				return true
+			var u := battle.unit_at(cell)
+			return u == held or (formation.can_place(held, cell) and (u == null or formation.can_place(u, held.cell)))
+		Battle.State.AREA_TARGET:
+			return Spells.can_cast_at(selected, targeting.active_spell, cell, battle.units(), battle.map)
+		Battle.State.UNIT_LIST:
+			return battle.ui.unit_list.selected_unit() != null
+	return true
 
 
 func _dir_from(event: InputEvent) -> Vector2i:

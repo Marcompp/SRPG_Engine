@@ -4,6 +4,7 @@ extends SceneTree
 ##   godot --headless --path . --script res://tools/generate_sounds.gd
 ## then let the editor import them (or add --import to a headless run). Pass effect
 ## names after "--" to remake only those. Made from scratch, so free to use.
+## Effects with no recipe are recorded sounds (see audio/CREDITS.md) and left alone.
 ##
 ## Each effect (RECIPES) is a list of voices, mixed together. A voice:
 ##   wave:  "square", "triangle", "sine", "saw" or "noise" (noise's pitch is how often
@@ -49,9 +50,6 @@ static func arp(notes: Array, step: float, base: Dictionary, last_dur := 0.0) ->
 static func recipes() -> Dictionary:
 	return {
 		# Menus: short and quiet, heard hundreds of times.
-		"cursor": [{"wave": "square", "f0": 1400.0, "dur": 0.03, "vol": 0.18, "duty": 0.25, "curve": 2.0}],
-		"confirm": arp(["A5", "E6"], 0.045, {"wave": "square", "vol": 0.25, "duty": 0.25, "curve": 1.5, "dur": 0.05},
-			0.08),
 		"cancel": arp(["E5", "A4"], 0.045, {"wave": "square", "vol": 0.22, "duty": 0.25, "curve": 1.5, "dur": 0.05},
 			0.08),
 		"text": [{"wave": "square", "f0": 880.0, "dur": 0.018, "vol": 0.08, "duty": 0.5, "curve": 1.0}],
@@ -60,48 +58,13 @@ static func recipes() -> Dictionary:
 			{"wave": "noise", "f0": 6000.0, "f1": 800.0, "dur": 0.12, "vol": 0.55, "curve": 3.0, "lp": 0.6},
 			{"wave": "square", "f0": 320.0, "f1": 60.0, "dur": 0.1, "vol": 0.45, "duty": 0.5, "curve": 2.0},
 		],
-		"crit": [
-			{"wave": "square", "f0": 1800.0, "f1": 300.0, "dur": 0.06, "vol": 0.35, "duty": 0.25, "curve": 1.5},
-			{"wave": "noise", "f0": 9000.0, "f1": 500.0, "at": 0.04, "dur": 0.28, "vol": 0.5, "curve": 2.5, "lp": 0.7},
-			{"wave": "square", "f0": 220.0, "f1": 40.0, "at": 0.04, "dur": 0.22, "vol": 0.4, "duty": 0.5, "curve": 1.5},
-		],
-		"miss": [
-			{"wave": "noise", "f0": 1500.0, "f1": 7000.0, "dur": 0.16, "vol": 0.3, "attack": 0.05, "curve": 1.5,
-				"lp": 0.25},
-			{"wave": "sine", "f0": 500.0, "f1": 1100.0, "dur": 0.12, "vol": 0.12, "attack": 0.03, "curve": 1.0},
-		],
-		"death": [
-			{"wave": "square", "f0": 700.0, "f1": 55.0, "dur": 0.6, "vol": 0.35, "duty": 0.5, "vib": 0.06,
-				"vib_rate": 18.0, "curve": 1.2},
-			{"wave": "noise", "f0": 900.0, "f1": 120.0, "at": 0.1, "dur": 0.5, "vol": 0.25, "curve": 1.5, "lp": 0.4},
-		],
 		"spell": arp(["C5", "G5", "D6", "A6", "E7"], 0.035, {"wave": "triangle", "vol": 0.3, "curve": 1.2,
 			"dur": 0.12, "vib": 0.02, "vib_rate": 30.0}, 0.3)
 			+ [{"wave": "noise", "f0": 12000.0, "dur": 0.35, "vol": 0.08, "attack": 0.1, "curve": 1.0, "lp": 0.5}],
-		"heal": arp(["C5", "E5", "G5", "C6", "E6"], 0.06, {"wave": "triangle", "vol": 0.32, "curve": 1.0,
-			"dur": 0.2, "vib": 0.01, "vib_rate": 8.0}, 0.45),
-		"status": [
-			{"wave": "saw", "f0": 520.0, "f1": 260.0, "dur": 0.32, "vol": 0.22, "vib": 0.08, "vib_rate": 14.0,
-				"curve": 1.2, "lp": 0.35},
-			{"wave": "square", "f0": 780.0, "f1": 390.0, "dur": 0.32, "vol": 0.1, "duty": 0.125, "vib": 0.08,
-				"vib_rate": 14.0, "curve": 1.2},
-		],
 		"break": [
 			{"wave": "noise", "f0": 2500.0, "f1": 300.0, "dur": 0.4, "vol": 0.45, "curve": 1.8, "lp": 0.5},
 			{"wave": "square", "f0": 150.0, "f1": 35.0, "dur": 0.25, "vol": 0.4, "duty": 0.5, "curve": 1.5},
 			{"wave": "noise", "f0": 700.0, "at": 0.12, "dur": 0.2, "vol": 0.3, "curve": 2.0, "lp": 0.3},
-		],
-		# Rewards and flow
-		"item": arp(["G5", "B5", "D6", "G6"], 0.06, {"wave": "square", "vol": 0.25, "duty": 0.25, "curve": 1.0,
-			"dur": 0.07}, 0.3),
-		"level_up": arp(["C5", "E5", "G5", "C6"], 0.08, {"wave": "square", "vol": 0.25, "duty": 0.5, "curve": 1.0,
-			"dur": 0.09}, 0.55)
-			+ arp(["E4", "G4", "C5"], 0.08, {"at": 0.24, "wave": "triangle", "vol": 0.25, "curve": 1.0, "dur": 0.08},
-			0.55),
-		"phase": [
-			{"wave": "triangle", "f0": n("C5"), "dur": 0.4, "vol": 0.3, "curve": 1.5},
-			{"wave": "triangle", "f0": n("G5"), "at": 0.12, "dur": 0.6, "vol": 0.3, "curve": 1.5},
-			{"wave": "square", "f0": n("G6"), "at": 0.12, "dur": 0.4, "vol": 0.06, "duty": 0.125, "curve": 2.0},
 		],
 	}
 
@@ -115,7 +78,9 @@ func _init() -> void:
 		if not wanted.is_empty() and not wanted.has(effect):
 			continue
 		if not all.has(effect):
-			push_warning("no recipe for \"%s\"" % effect)
+			# A recorded sound, not a placeholder.
+			if wanted.has(effect):
+				push_warning("no recipe for \"%s\"" % effect)
 			continue
 		var entry: Variant = GameData.section("sounds", "effects")[effect]
 		var path: String = "res://audio/" + (entry.file if entry is Dictionary else entry)

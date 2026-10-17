@@ -131,14 +131,17 @@ func _play_effect(effect: String) -> void:
 	var frame := Engine.get_process_frames()
 	if _started.get(effect, -1) == frame:
 		return
-	var stream := _stream(EFFECTS[effect], false)
+	var entry: Variant = EFFECTS[effect]
+	if entry is Array:
+		entry = entry.pick_random()  # variations
+	var stream := _stream(entry, false)
 	if stream == null:
 		return
 	_started[effect] = frame
 	var voice := _voices[_next_voice]
 	_next_voice = (_next_voice + 1) % VOICES
 	voice.stream = stream
-	voice.volume_db = _volume(EFFECTS[effect])
+	voice.volume_db = _volume(entry)
 	voice.play()
 
 
@@ -163,7 +166,7 @@ func _start(stream: AudioStream, volume_db: float) -> void:
 		_music.play()
 
 
-## The stream for a sounds.cfg entry (a path, or {"file", "volume", "loop"}), or
+## The stream for one sounds.cfg entry (a path, or {"file", "volume", "loop"}), or
 ## null while its file isn't in the project.
 func _stream(entry: Variant, is_music: bool) -> AudioStream:
 	var path: String = DIR + (entry.file if entry is Dictionary else entry)

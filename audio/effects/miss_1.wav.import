@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://bvmupykgs3v45"
-path="res://.godot/imported/miss.wav-4450ffb473c6854dfce5cb7c1ec87f07.sample"
+uid="uid://casopk3ovg1dy"
+path="res://.godot/imported/miss_1.wav-dcf055ed566ad8c72c8d788d73007023.sample"
 
 [deps]
 
-source_file="res://audio/effects/miss.wav"
-dest_files=["res://.godot/imported/miss.wav-4450ffb473c6854dfce5cb7c1ec87f07.sample"]
+source_file="res://audio/effects/miss_1.wav"
+dest_files=["res://.godot/imported/miss_1.wav-dcf055ed566ad8c72c8d788d73007023.sample"]
 
 [params]
 

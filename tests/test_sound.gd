@@ -1,6 +1,6 @@
 extends "res://tests/test_base.gd"
-## Music and sound effects (Sound, data/sounds.cfg). There are no audio files yet, so
-## these check what the game asks for: the names, the tracks and the volumes.
+## Music and sound effects (Sound, data/sounds.cfg). Tests can't hear, so these check
+## what the game asks for: the names, the tracks and the volumes.
 
 
 func test_sound_names_exist() -> void:
@@ -69,3 +69,43 @@ func test_volume_options() -> void:
 		"50% sets the bus volume")
 	Settings.reload()
 	Sound.apply_volumes()
+
+
+func test_confirm_sounds() -> void:
+	# Confirm picks on the map ("select"), chooses in menus ("confirm"), and sounds
+	# "invalid" where it does nothing.
+	var lord := unit_named("Lord")
+	clear_board([lord])
+	lord.set_cell(Vector2i(2, 2))
+	b.cursor.cell = lord.cell
+	Sound.played.clear()
+	await press(KEY_Z)
+	check_eq(b.state, Battle.State.SELECTED, "the Lord is selected")
+	check_eq(Sound.played, ["select"] as Array[String], "picking a unit")
+	# An empty tile out of the Lord's reach.
+	var far := Vector2i(-1, -1)
+	for y in b.map.rows:
+		for x in b.map.cols:
+			var c := Vector2i(x, y)
+			if not b.input.reach.cells.has(c) and b.unit_at(c) == null:
+				far = c
+	b.cursor.cell = far
+	Sound.played.clear()
+	await press(KEY_Z)
+	check_eq(b.state, Battle.State.SELECTED, "nothing happens out of reach")
+	check_eq(Sound.played, ["invalid"] as Array[String], "out of reach")
+	await press(KEY_X)
+	b.cursor.cell = far
+	await press(KEY_Z)
+	check_eq(b.state, Battle.State.MENU, "an empty tile opens the map menu")
+	Sound.played.clear()
+	await pick("Objective")
+	check(Sound.played.has("confirm"), "a menu choice: %s" % [Sound.played])
+
+
+func test_effect_variations() -> void:
+	# An effect listed as an array plays one of its files; each is in the project.
+	var miss: Variant = Sound.EFFECTS["miss"]
+	check(miss is Array and miss.size() > 1, "miss has variations")
+	for entry in miss:
+		check(ResourceLoader.exists(Sound.DIR + entry), "%s is there" % entry)
