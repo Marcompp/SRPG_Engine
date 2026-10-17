@@ -42,6 +42,22 @@ static func victory_text(obj: Dictionary) -> String:
 	return TranslationServer.translate("Defeat every enemy.")
 
 
+## Translated: the goal in a few words, for the objective window on the map.
+static func short_text(obj: Dictionary) -> String:
+	match obj.type:
+		"boss":
+			return TranslationServer.translate("Defeat %s") % obj.boss
+		"seize":
+			return TranslationServer.translate("Seize the tile")
+		"survive":
+			return TranslationServer.translate("Survive")
+		"defend":
+			return TranslationServer.translate("Defend the tile")
+		"escape":
+			return TranslationServer.translate("Escape")
+	return TranslationServer.translate("Rout the enemy")
+
+
 ## Translated: the ways to lose, joined with ", or ".
 static func defeat_text(obj: Dictionary) -> String:
 	var ways: Array[String] = [TranslationServer.translate("Your Lord falls")]

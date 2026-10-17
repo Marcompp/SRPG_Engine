@@ -38,6 +38,8 @@ var rewinds_left := 0
 
 ## Scrolls the view over maps bigger than the screen (see BattleCamera).
 var camera: BattleCamera
+## Warnings, talk bubbles, boss crowns and loot over the units (see MapMarkers).
+var markers: MapMarkers
 ## The battle's parts, created in _ready (child nodes, so input gets events).
 var input: BattleInput
 var actions: BattleActions
@@ -62,6 +64,11 @@ func _ready() -> void:
 	add_child(camera)
 	# Light and depth on the map, between it and the UI (docs/ui_theme.md).
 	add_child(Atmosphere.new(cursor))
+	markers = MapMarkers.new()
+	markers.name = "Markers"
+	markers.battle = self
+	add_child(markers)
+	move_child(markers, units_root.get_index() + 1)  # over the units, under the cursor
 	if Levels.resume:
 		Levels.resume = false
 		phases.resume_suspended()
@@ -267,6 +274,15 @@ func turn_text() -> String:
 	if objective.type in ["survive", "defend"]:
 		return tr("Turn %d / %d") % [turn, objective.turns]
 	return tr("Turn %d") % turn
+
+
+## The objective window's lines: the goal, then the turn (and on a rout, the foes left).
+func goal_lines() -> Array[String]:
+	var objective := Objectives.of(Levels.get_level(Levels.selected))
+	var status := turn_text()
+	if objective.type == "rout":
+		status += "  ·  " + tr("%d left") % threats_to(Unit.Team.PLAYER).size()
+	return [Objectives.short_text(objective), status]
 
 
 # --- Enemy threat (danger zone and marked enemies) ----------------------------

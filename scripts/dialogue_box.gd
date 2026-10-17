@@ -9,6 +9,7 @@ extends Control
 
 signal advanced
 
+## At Normal text speed (Options: Text speed multiplies it; 0 shows lines at once).
 const CHARS_PER_SECOND := 45.0
 ## Multiplier while cancel (X) is held.
 const FAST := 4.0
@@ -112,6 +113,11 @@ func say(speaker: Dictionary, side: int, text: String) -> void:
 	if auto_advance:
 		_text.visible_characters = -1
 		return
+	if Settings.value("text_speed") == 0.0:
+		# Instant: the whole line at once.
+		_finish_line()
+		await advanced
+		return
 	_shown = 0.0
 	_blipped = -BLIP_EVERY
 	_text.visible_characters = 0
@@ -154,7 +160,7 @@ func _process(delta: float) -> void:
 		_arrow.position = Vector2(_box.size.x - 34, _box.size.y - 26 + roundf(sin(_time * TAU) * 3))
 	if not _typing:
 		return
-	var speed := CHARS_PER_SECOND * (FAST if Input.is_action_pressed("cancel") else 1.0)
+	var speed: float = CHARS_PER_SECOND * Settings.value("text_speed") * (FAST if Input.is_action_pressed("cancel") else 1.0)
 	_shown += delta * speed
 	_text.visible_characters = int(_shown)
 	if _text.visible_characters >= _blipped + BLIP_EVERY:

@@ -65,6 +65,10 @@ var unit_list: UnitListScreen
 var options_screen: OptionsScreen
 var _objective: PanelContainer
 var _objective_label: Label
+## Objective window on the map (Options: Objective window): the goal and the turn.
+var _goal: PanelContainer
+var _goal_text: Label
+var _goal_turn: Label
 
 ## Gap between HUD windows and the screen edge, in HD units.
 const MARGIN := 28
@@ -83,6 +87,7 @@ func _ready() -> void:
 
 	_card = _make_card()
 	_terrain = _make_terrain()
+	_goal = _make_goal()
 	_menu = _make_menu()
 	_forecast = _make_forecast()
 	_spell_label = Label.new()
@@ -199,6 +204,14 @@ func _make_terrain() -> PanelContainer:
 	column.add_theme_constant_override("separation", 0)
 	_terrain_name = _label(column, &"TitleLabel")
 	_terrain_bonus = _label(column, &"SubLabel")
+	return _make_panel(column)
+
+
+func _make_goal() -> PanelContainer:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 0)
+	_goal_text = _label(column, &"TitleLabel")
+	_goal_turn = _label(column, &"SubLabel")
 	return _make_panel(column)
 
 
@@ -432,6 +445,23 @@ func _fill_card(unit: Unit) -> void:
 func hide_info() -> void:
 	_card.visible = false
 	_terrain.visible = false
+	_goal.visible = false
+
+
+## The objective window, on the cursor's side of the screen (the unit card and terrain
+## window take the other): at the top, or the bottom when the cursor is near the top.
+func show_goal(lines: Array[String], cursor_cell: Vector2i) -> void:
+	_goal_text.text = lines[0]
+	_goal_turn.text = lines[1]
+	_place(_goal, not _away_right(cursor_cell), _near_top(cursor_cell, 3))
+
+
+func hide_goal() -> void:
+	_goal.visible = false
+
+
+func goal_visible() -> bool:
+	return _goal.visible
 
 
 func show_menu(options: Array[String], cursor_cell: Vector2i, title := "") -> void:
@@ -440,6 +470,12 @@ func show_menu(options: Array[String], cursor_cell: Vector2i, title := "") -> vo
 	_menu_title = title
 	_refresh_menu()
 	_place(_menu, _away_right(cursor_cell), false)
+
+
+## Puts the selection on entry `index` (show_menu starts at the first).
+func menu_select(index: int) -> void:
+	menu_index = clampi(index, 0, maxi(0, menu_options.size() - 1))
+	_refresh_menu()
 
 
 func menu_move(step: int) -> void:

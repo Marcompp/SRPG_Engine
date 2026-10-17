@@ -1,7 +1,9 @@
 extends Control
 ## Battle preparations for the next campaign chapter (see Campaign):
 ##   Pick Units: who deploys (the Lord always does; up to the chapter's slots).
-##   Items:      move items between a unit and the convoy (also how units swap items).
+##   Items:      move items between a unit and the convoy.
+##   Trade:      pick two units, then swap items between them as in a battle's Trade:
+##               Z picks an item up, Z on the other side swaps it or hands it over.
 ##   Shop:       buy into the convoy (left: the chapter's stock, see Shop) and sell
 ##               from it (right) for gold (docs/economy.md).
 ##   Repair:     restore any worn weapon in the army or convoy to full uses, for the
@@ -32,15 +34,19 @@ const TEXT_INSET := 62.0
 const LIST_TOP := 152.0
 const HINT_TOP := 540.0
 ## Entries are ids, translated where shown.
-const MENU: Array[String] = ["Pick Units", "Items", "Shop", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!",  # i18n
+const MENU: Array[String] = ["Pick Units", "Items", "Trade", "Shop", "Repair", "Stable", "Promote", "Status", "Check Map", "Fight!",  # i18n
 	"Level Select"]
 
-## "menu", "pick", "items_unit", "items", "shop", "repair", "promote_unit", "promote_class", "status_unit", "status"
+## "menu", "pick", "items_unit", "items", "trade_unit", "trade_partner", "trade", "shop", "repair",
+## "promote_unit", "promote_class", "status_unit", "status"
 var mode := "menu"
 var index := 0
-## Items mode: 0 = the unit's inventory, 1 = the convoy.
+## Items mode: 0 = the unit's inventory, 1 = the convoy. Trade: 0 = current_unit, 1 = the partner.
 var column := 0
 var current_unit := ""
+## Trade: the second unit, and the picked-up item's (column, row), or (-1, -1) when none.
+var trade_partner := ""
+var held := Vector2i(-1, -1)
 var picked: Array = []
 var message := ""
 
@@ -207,6 +213,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif (left or right) and mode in ["items", "shop"]:
 		column = 1 - column
 		index = 0
+	elif (left or right) and mode == "trade":
+		if held.x < 0 and not _trade_items(1 - column).is_empty():
+			column = 1 - column
+			index = mini(index, _row_count() - 1)
 	elif accept:
 		_accept()
 	elif cancel:
@@ -222,6 +232,8 @@ func _accept() -> void:
 					_enter("pick")
 				"Items":
 					_enter("items_unit")
+				"Trade":
+					_enter("trade_unit")
 				"Shop":
 					column = 0
 					_enter("shop")
@@ -248,6 +260,16 @@ func _accept() -> void:
 			_enter("items")
 		"items":
 			_move_item()
+		"trade_unit":
+			current_unit = _army_names()[index]
+			_enter("trade_partner")
+		"trade_partner":
+			trade_partner = _trade_partners()[index]
+			held = Vector2i(-1, -1)
+			_enter("trade")
+			column = 0 if not _trade_items(0).is_empty() else 1
+		"trade":
+			_trade()
 		"shop":
 			_shop()
 		"repair":
@@ -304,8 +326,10 @@ func _info() -> void:
 ## The units listed in this mode, in row order (empty where the rows aren't units).
 func _list_units() -> Array:
 	match mode:
-		"pick", "items_unit", "status_unit", "stable_rider":
+		"pick", "items_unit", "status_unit", "stable_rider", "trade_unit":
 			return _army_names()
+		"trade_partner":
+			return _trade_partners()
 		"promote_unit":
 			return _promotable()
 	return []
@@ -317,6 +341,8 @@ func _highlighted_item() -> Dictionary:
 	match mode:
 		"items":
 			list = Campaign.army_unit(current_unit).items if column == 0 else Campaign.convoy
+		"trade":
+			list = _trade_items(column)
 		"shop":
 			if column == 0:
 				var stock := Shop.stock_for(Campaign.chapter_data())
@@ -331,6 +357,18 @@ func _back() -> void:
 	match mode:
 		"items":
 			_enter("items_unit")
+		"trade_partner":
+			_enter("trade_unit")
+			index = maxi(0, _army_names().find(current_unit))
+		"trade":
+			if held.x >= 0:
+				# Put the held item back down first.
+				column = held.x
+				index = held.y
+				held = Vector2i(-1, -1)
+				return
+			_enter("trade_partner")
+			index = maxi(0, _trade_partners().find(trade_partner))
 		"promote_class":
 			_enter("promote_unit")
 		"stable_rider":
@@ -368,6 +406,44 @@ func _move_item() -> void:
 		if not Campaign.take_item(current_unit, index):
 			message = tr("{unit} can't carry more.").format({"unit": current_unit})
 	Campaign.save()
+	index = clampi(index, 0, maxi(0, _row_count() - 1))
+
+
+## Trade: everyone in the army but the unit already picked.
+func _trade_partners() -> Array:
+	return _army_names().filter(func(n): return n != current_unit)
+
+
+## Trade: the items of column `c`'s unit (0: current_unit, 1: the partner).
+func _trade_items(c: int) -> Array:
+	return Campaign.army_unit(current_unit if c == 0 else trade_partner).items
+
+
+## Z in Trade: picks up the highlighted item and jumps to the other column, or puts the
+## held one down: on an item, the two swap; on the empty slot after the last item, it's
+## handed over.
+func _trade() -> void:
+	if held.x < 0:
+		if index >= _trade_items(column).size():
+			return
+		held = Vector2i(column, index)
+		column = 1 - column
+		index = mini(index, _row_count() - 1)
+		return
+	var from := _trade_items(held.x)
+	var to := _trade_items(column)
+	var item: Dictionary = from[held.y]
+	if index < to.size():
+		from[held.y] = to[index]
+		to[index] = item
+	else:
+		from.remove_at(held.y)
+		to.append(item)
+	held = Vector2i(-1, -1)
+	Campaign.save()
+	# Stay on this side if it still has items, otherwise hop back.
+	if _trade_items(column).is_empty():
+		column = 1 - column
 	index = clampi(index, 0, maxi(0, _row_count() - 1))
 
 
@@ -502,8 +578,14 @@ func _row_count() -> int:
 	match mode:
 		"menu":
 			return MENU.size()
-		"pick", "items_unit", "status_unit":
+		"pick", "items_unit", "status_unit", "trade_unit":
 			return Campaign.army.size()
+		"trade_partner":
+			return _trade_partners().size()
+		"trade":
+			# Plus the empty slot an item held from the other side can go to.
+			var count := _trade_items(column).size()
+			return count + 1 if held.x >= 0 and held.x != column and count < Unit.MAX_ITEMS else count
 		"items":
 			return Campaign.army_unit(current_unit).items.size() if column == 0 else Campaign.convoy.size()
 		"shop":
@@ -536,8 +618,8 @@ func _render() -> void:
 	var lines: Array[String] = []
 	var side: Array[String] = []
 	# Lines at the top of a column that stay put while its rows scroll.
-	var left_head := 1 if mode in ["items", "shop", "repair", "stable_rider", "promote_class"] else 0
-	var side_head := 1 if mode in ["items", "shop"] else 0
+	var left_head := 1 if mode in ["items", "trade_partner", "trade", "shop", "repair", "stable_rider", "promote_class"] else 0
+	var side_head := 1 if mode in ["items", "trade_unit", "trade_partner", "trade", "shop"] else 0
 	match mode:
 		"menu":
 			for i in MENU.size():
@@ -571,6 +653,32 @@ func _render() -> void:
 				side.append(Items.label(Campaign.convoy[i], " "))
 			if Campaign.convoy.is_empty():
 				side.append(tr("(empty)"))
+		"trade_unit", "trade_partner":
+			var names := _army_names() if mode == "trade_unit" else _trade_partners()
+			if mode == "trade_partner":
+				lines.append(tr("Trade with whom? ({unit})").format({"unit": current_unit}))
+			for i in names.size():
+				lines.append(tr("%s  Lv %d") % [names[i], Campaign.army_unit(names[i]).level])
+			# The highlighted unit's items.
+			if index < names.size():
+				var items: Array = Campaign.army_unit(names[index]).items
+				side.append(names[index])
+				for it in items:
+					side.append(Items.label(it, " "))
+				if items.is_empty():
+					side.append(tr("(empty)"))
+		"trade":
+			for c in 2:
+				var column_lines := lines if c == 0 else side
+				column_lines.append(current_unit if c == 0 else trade_partner)
+				var items := _trade_items(c)
+				for i in items.size():
+					# ◆ marks the item picked up.
+					column_lines.append(("◆ " if held == Vector2i(c, i) else "") + Items.label(items[i], " "))
+				if held.x >= 0 and held.x != c and items.size() < Unit.MAX_ITEMS:
+					column_lines.append("—")  # the empty slot it can be handed to
+				elif items.is_empty():
+					column_lines.append(tr("(empty)"))
 		"shop":
 			var stock := Shop.stock_for(Campaign.chapter_data())
 			lines.append(tr("Buy  Gold %d") % Campaign.gold)
@@ -626,7 +734,7 @@ func _render() -> void:
 				lines.append(options[i])
 			var bonus := Classes.promotion_bonus(options[index])
 			side.append(_gains_text(bonus))
-	var side_active := mode in ["items", "shop"] and column == 1
+	var side_active := mode in ["items", "trade", "shop"] and column == 1
 	var has_rows := _row_count() > 0
 	var full := side.is_empty()
 	_right_panel.visible = not full
@@ -640,6 +748,9 @@ func _render() -> void:
 		"status_unit": "Z: select  D: info  X: back",
 		"promote_unit": "Z: select  D: info  X: back",
 		"items": "Z: move item  Left/Right: unit/convoy  D: info  X: back",
+		"trade_unit": "Z: select  D: info  X: back",
+		"trade_partner": "Z: trade with  D: info  X: back",
+		"trade": "Z: pick up / swap  Left/Right: other unit  D: info  X: back",
 		"shop": "Z: buy / sell  Left/Right: buy/sell  D: info  X: back",
 		"repair": "Z: repair  D: info  X: back",
 		"stable": "Z: assign / unassign  D: rename  X: back",

@@ -7,6 +7,9 @@ var battle: Battle
 
 const PREP_SCENE := "res://scenes/prep.tscn"
 
+## Where the cursor was when the player phase ended (Autocursor off brings it back there).
+var _end_turn_cell := Vector2i(-1, -1)
+
 
 # --- Phases -------------------------------------------------------------------
 
@@ -36,9 +39,14 @@ func start_player_phase() -> void:
 	await run_berserk(Unit.Team.PLAYER)
 	if check_game_over():
 		return
+	# Autocursor: start on the Lord (or the first unit). Off, back where the cursor was
+	# when the last player phase ended (the first turn still starts on the Lord).
 	var players := battle.units_of(Unit.Team.PLAYER)
-	if not players.is_empty():
-		battle.cursor.cell = players[0].cell
+	if not Settings.value("autocursor") and _end_turn_cell.x >= 0:
+		battle.cursor.cell = _end_turn_cell
+	elif not players.is_empty():
+		var lords := players.filter(func(u: Unit) -> bool: return u.is_lord)
+		battle.cursor.cell = (lords[0] if not lords.is_empty() else players[0]).cell
 	battle.refresh_threat()
 	# Turn rewind can come back here.
 	battle.turn_history.append(SaveGame.capture(battle, false))
@@ -125,6 +133,7 @@ func count_down_statuses(team: Unit.Team) -> void:
 ## then the next turn's player phase.
 func end_player_phase() -> void:
 	battle.state = Battle.State.BUSY
+	_end_turn_cell = battle.cursor.cell
 	battle.ui.hide_info()
 	await count_down_statuses(Unit.Team.PLAYER)
 	battle.enemy_phase = true

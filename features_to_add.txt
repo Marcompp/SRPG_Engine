@@ -54,7 +54,10 @@ makes playtesting easier to read)
 (X) QoL - Have danger zones update after moving a unit but before committing to their action, allowing the player to gauge how the movement the enemy's reach
 (X) QoL - When hovering a unit, just like the squares a unit can attack are red and a unit can heal are green, add a color for squares where a unit can use a non-damaging offensive skill (ie: a status spell), maybe purple?
 (X) Info buttom functionality in the prep screen
-(X) UI - prep screen and shop screen and other menus spill beyond the screen  
+(X) UI - prep screen and shop screen and other menus spill beyond the screen
+
+( ) Sauce - EXP Bar + FE-style Level up screen
+( ) Sauce - improve the sound effects - add walking sounds, etc
 
 (X) Auto save
 (X) Bigger maps

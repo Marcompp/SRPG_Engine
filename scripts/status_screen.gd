@@ -5,7 +5,8 @@ extends Control
 ##
 ## Left column (always shown): portrait, name, class, race, level/EXP, HP and MP.
 ## Right panel: pages flipped with Left/Right. Stats (capped stats glow green), Items
-## (inventory, combat numbers, spells), Skills, and Biography (player units only).
+## (inventory, combat numbers, spells), Skills, Mount (mounted units only) and Biography
+## (player units only).
 ## Detail mode (D): a highlight moves over the entries of the left column and the
 ## current page, and a box explains the highlighted one (text from Glossary).
 
@@ -18,8 +19,8 @@ const MP_FROM := Color8(84, 132, 220)
 const MP_TO := Color8(170, 200, 255)
 ## Stats raised by skills.
 const BOOSTED := UiTheme.GOLD_BRIGHT
-## Page ids, translated where shown.
-const PAGES: Array[String] = ["Stats", "Items", "Skills", "Bio"]  # i18n
+## Page ids, translated where shown; pages() picks the ones a unit has.
+const PAGES: Array[String] = ["Stats", "Items", "Skills", "Mount", "Bio"]  # i18n
 const STAT_ROWS := [["str", "STR"], ["int", "INT"], ["dex", "DEX"], ["agi", "AGI"],  # i18n
 	["lck", "LCK"], ["def", "DEF"]]
 const MARGIN := 40.0
@@ -74,8 +75,8 @@ func _ready() -> void:
 	_page = Control.new()
 	_page.position = PAGE_ORIGIN
 	_panel.add_child(_page)
-	for i in PAGES.size():
-		var tab := _label(_panel, tr(PAGES[i]), Vector2(PAGE_ORIGIN.x + i * 118, 26), &"CaptionLabel")
+	for id in PAGES:
+		var tab := _label(_panel, tr(id), Vector2(0, 26), &"CaptionLabel")
 		tab.add_theme_font_size_override("font_size", 18)
 		_tabs.append(tab)
 	_hint = _label(self, "", Vector2(PANEL_RECT.position.x, PANEL_RECT.end.y + 10), &"SubLabel")
@@ -114,10 +115,11 @@ func _process(delta: float) -> void:
 
 # --- Public API -----------------------------------------------------------------
 
-## Shows `u`, keeping the current page when possible (Up/Down cycling keeps it).
+## Shows `u`, keeping the current page when it has it (Up/Down cycling keeps it).
 func show_unit(u: Unit) -> void:
+	var current := pages()[page] if unit else ""
 	unit = u
-	page = mini(page, page_count() - 1)
+	page = pages().find(current) if pages().has(current) else mini(page, page_count() - 1)
 	detail = false
 	_render()
 	if not visible:
@@ -131,9 +133,14 @@ func close() -> void:
 	page = 0
 
 
-## Biography is a player-only page.
+## The unit's pages: Mount only while mounted, Biography only for player units.
+func pages() -> Array[String]:
+	return PAGES.filter(func(id: String) -> bool:
+		return (id != "Mount" or not unit.mount.is_empty()) and (id != "Bio" or unit.team == Unit.Team.PLAYER))
+
+
 func page_count() -> int:
-	return PAGES.size() if unit.team == Unit.Team.PLAYER else PAGES.size() - 1
+	return pages().size()
 
 
 func change_page(step: int) -> void:
@@ -179,22 +186,38 @@ func _render() -> void:
 			child.queue_free()
 	_render_left()
 	_left_count = _entries.size()
-	match PAGES[page]:
+	var shown := pages()
+	match shown[page]:
 		"Stats":
 			_render_stats()
 		"Items":
 			_render_items()
 		"Skills":
 			_render_skills()
+		"Mount":
+			_render_mount()
 		"Bio":
 			_render_bio()
+	# The unit's tabs in a row, evenly spaced by their widths (tighter when there are more).
+	var row: Array[Label] = []
+	var widths := 0.0
 	for i in _tabs.size():
-		_tabs[i].visible = i < page_count()
-		_tabs[i].add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT if i == page else DIM)
-		if i == page:
-			_tabs[i].add_theme_stylebox_override("normal", UiTheme.tab_underline())
+		var at := shown.find(PAGES[i])
+		var tab := _tabs[i]
+		tab.visible = at >= 0
+		tab.add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT if at == page else DIM)
+		if at == page:
+			tab.add_theme_stylebox_override("normal", UiTheme.tab_underline())
 		else:
-			_tabs[i].remove_theme_stylebox_override("normal")
+			tab.remove_theme_stylebox_override("normal")
+		if tab.visible:
+			row.append(tab)
+			widths += tab.get_combined_minimum_size().x
+	var gap := minf(56.0, (PAGE_WIDTH - widths) / maxi(row.size() - 1, 1))
+	var x := PAGE_ORIGIN.x
+	for tab in row:
+		tab.position.x = x
+		x += tab.get_combined_minimum_size().x + gap
 	_update_detail()
 
 
@@ -288,11 +311,6 @@ func _render_stats() -> void:
 		mov.add_theme_color_override("font_color", BOOSTED)
 	_entry(mov, tr(Glossary.STATS.mov) + " " + (tr(Glossary.MOVE_TYPES[unit.move_type]) if Glossary.MOVE_TYPES.has(unit.move_type) else ""))
 	y += ROW
-	if not unit.mount.is_empty():
-		var m := unit.mount
-		_entry(_label(_page, tr("%s: %s Lv %d (%s)") % [m.species, m.name, m.level, m.gender.capitalize()],
-			Vector2(0, y), &"SubLabel"), Mounts.species_data(m.species).description)
-		y += 34
 	if unit.carrying:
 		_label(_page, tr("Carrying %s (DEX/AGI halved)") % unit.carrying.unit_name, Vector2(0, y), &"SubLabel")
 		y += 34
@@ -390,6 +408,57 @@ func _render_skills() -> void:
 		_entry(_label(_page, skill, Vector2(0, y)), "%s: %s" % [skill, Skills.get_data(skill).description])
 		_label(_page, tr(shown[i][1]), Vector2(250, y + 3), &"SubLabel")
 	_label(_page, tr("Learned %d/%d") % [unit.learned.size(), Skills.LEARNED_CAP], Vector2(0, 400), &"SubLabel")
+
+
+## The mount's own record: name, species, level, its stats against the species' caps
+## (what it adds to the rider's halved stats), MOV and its skills.
+func _render_mount() -> void:
+	const ROW := 38.0
+	var m := unit.mount
+	var data := Mounts.species_data(m.species)
+	var name_label := _label(_page, m.name, Vector2(0, -6), &"NameLabel")
+	name_label.add_theme_font_size_override("font_size", 28)
+	_entry(_label(_page, "%s, %s" % [tr(m.species), tr(m.gender.capitalize())], Vector2(0, 36), &"SubLabel"),
+		"%s: %s" % [m.species, tr(data.description)])
+	_entry(_label(_page, tr("Lv %d") % m.level, Vector2(260, 6)),
+		tr("Mount level (cap %d). Mounts level up on their own from their rider's fights.") % Mounts.LEVEL_CAP)
+	var exp_text := "--" if m.level >= Mounts.LEVEL_CAP else str(m.exp)
+	_entry(_label(_page, tr("Exp %s") % exp_text, Vector2(340, 6)),
+		tr("%d EXP per level; this species earns x%s.") % [Mounts.EXP_PER_LEVEL, str(data.exp_rate)])
+	var top := 80.0
+	_divider(top - 10)
+	for i in STAT_ROWS.size():
+		var key: String = STAT_ROWS[i][0]
+		var row_y := top + i * ROW
+		var value: int = m.stats.get(key, 0)
+		var most := Mounts.cap(m.species, key)
+		var capped := value >= most
+		_label(_page, tr(STAT_ROWS[i][1]), Vector2(0, row_y + 7), &"CaptionLabel")
+		var value_label := _label(_page, str(value), Vector2(60, row_y))
+		value_label.custom_minimum_size.x = 40
+		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		if capped:
+			value_label.add_theme_color_override("font_color", CAPPED)
+		_entry(value_label, tr("Added to the rider's %s / 2 while riding. Cap: %d.") % [tr(STAT_ROWS[i][1]), most])
+		var fill := _bar(_page, Vector2(124, row_y + 13), 300, float(value) / most,
+			CAPPED if capped else BAR_FROM, CAPPED_TO if capped else BAR_TO)
+		fill.glow = capped
+		if capped:
+			_glow.append(value_label)
+			_glow.append(fill)
+	var y := top + STAT_ROWS.size() * ROW + 8
+	_label(_page, tr("MOV"), Vector2(0, y + 7), &"CaptionLabel")
+	_entry(_label(_page, "%d  %s" % [data.mov, str(data.move).capitalize()], Vector2(84, y)),
+		tr(Glossary.STATS.mov) + " " + (tr(Glossary.MOVE_TYPES[data.move]) if Glossary.MOVE_TYPES.has(data.move) else ""))
+	y += ROW
+	var skills: Array = m.get("skills", [])
+	if not skills.is_empty():
+		_label(_page, tr("Skills"), Vector2(0, y + 7), &"CaptionLabel")
+		var x := 84.0
+		for skill: String in skills:
+			var label := _label(_page, skill, Vector2(x, y))
+			_entry(label, "%s: %s" % [skill, Skills.get_data(skill).description])
+			x += label.get_combined_minimum_size().x + 24
 
 
 func _render_bio() -> void:

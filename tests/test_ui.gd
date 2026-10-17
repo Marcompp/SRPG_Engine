@@ -343,6 +343,7 @@ func test_options_screen_saves() -> void:
 	check_eq(Settings.value("game_speed"), 1.5, "Right changes the highlighted option")
 	await press(KEY_DOWN)
 	await press(KEY_DOWN)
+	await press(KEY_DOWN)
 	await press(KEY_RIGHT)  # Danger zone at start: Off -> On
 	check_eq(Settings.value("danger_zone_default"), true, "Down + Right changes another option")
 	await press(KEY_X)
@@ -393,6 +394,76 @@ func test_option_level_up_auto() -> void:
 	lord.exp_points = 95
 	await b.actions.gain_exp(lord, 33)  # ...but the option says Auto, so this returns on its own
 	check(not b.ui._level_up.visible, "Auto: the level-up window closes by itself")
+	reset_settings()
+
+
+func test_objective_window() -> void:
+	b.cursor.cell = Vector2i(2, 5)
+	b.input.refresh_info()
+	check(b.ui.goal_visible(), "shown while browsing the map")
+	check_eq(b.ui._goal_text.text, Objectives.short_text(Objectives.of(Levels.get_level(Levels.selected))), "the goal")
+	check(b.ui._goal_turn.text.begins_with(b.turn_text()), "and the turn")
+	check(b.ui._goal.position.x < 480, "on the cursor's side (left)")
+	b.cursor.cell = Vector2i(12, 5)
+	b.input.refresh_info()
+	check(b.ui._goal.position.x > 480, "it follows the cursor to the right")
+	var lord := unit_named("Lord")
+	b.cursor.cell = lord.cell
+	await press(KEY_Z)
+	check(not b.ui.goal_visible(), "hidden while a unit is moving")
+	await press(KEY_X)
+	check(b.ui.goal_visible(), "back when it's deselected")
+	Settings.set_value("objective_window", false)
+	b.input.refresh_info()
+	check(not b.ui.goal_visible(), "Options: Objective window off hides it")
+	reset_settings()
+
+
+func test_rout_goal_counts_foes() -> void:
+	var foes: int = b.threats_to(Unit.Team.PLAYER).size()
+	check(b.goal_lines()[1].ends_with(tr("%d left") % foes), "a rout shows how many foes are left")
+
+
+func test_option_autocursor() -> void:
+	var lord := unit_named("Lord")
+	b.cursor.cell = Vector2i(5, 5)
+	b.phases.end_player_phase()
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+	check_eq(b.cursor.cell, lord.cell, "Autocursor: each player phase starts on the Lord")
+	Settings.set_value("autocursor", false)
+	b.cursor.cell = Vector2i(5, 5)
+	b.phases.end_player_phase()
+	while b.state != b.State.IDLE and b.state != b.State.GAME_OVER:
+		await process_frame
+	check_eq(b.cursor.cell, Vector2i(5, 5), "off: back where the cursor was at End Turn")
+	reset_settings()
+
+
+func test_option_text_speed() -> void:
+	var box: DialogueBox = b.ui.dialogue
+	DialogueBox.auto_advance = false
+	Settings.set_value("text_speed", 0.0)
+	box.visible = true
+	box.say({}, 0, "An instant line.")
+	await process_frame
+	check_eq(box._text.visible_characters, -1, "Instant: the whole line shows at once")
+	box.advance()
+	# Same time, typed by hand: Fast shows twice the letters.
+	Settings.set_value("text_speed", 2.0)
+	box.say({}, 0, "A line typed out letter by letter.")
+	box._process(0.2)
+	var fast: int = box._text.visible_characters
+	box.advance()
+	box.advance()
+	Settings.set_value("text_speed", 1.0)
+	box.say({}, 0, "A line typed out letter by letter.")
+	box._process(0.2)
+	check_eq(fast, 2 * box._text.visible_characters, "Fast types twice as many letters as Normal")
+	box.advance()
+	box.advance()
+	box.close()
+	DialogueBox.auto_advance = true
 	reset_settings()
 
 
@@ -494,3 +565,57 @@ func test_ui_theme() -> void:
 	bar.ratio = 1.5
 	check_eq(bar.ratio, 1.0, "a bar can't overfill")
 	bar.free()
+
+
+# --- Map markers (see MapMarkers) ------------------------------------------------
+
+func test_markers_effective_and_crit_warnings() -> void:
+	var stats := {"hp": 20, "str": 5, "dex": 5, "agi": 5, "lck": 0, "def": 3, "mov": 5}
+	var flier := Unit.create("Flier", Unit.Team.PLAYER, Vector2i(2, 2), stats.merged({"class": "Swordsman",
+		"race": "Harpy", "items": ["Iron Sword"]}))
+	var archer := Unit.create("Archer", Unit.Team.ENEMY, Vector2i(6, 2), stats.merged({"class": "Archer",
+		"items": ["Iron Bow"]}))
+	var killer := Unit.create("Killer", Unit.Team.ENEMY, Vector2i(6, 4), stats.merged({"class": "Swordsman",
+		"items": ["Iron Sword", "Killing Edge"]}))
+	var plain := Unit.create("Plain", Unit.Team.ENEMY, Vector2i(6, 6), stats.merged({"class": "Axeman",
+		"items": ["Iron Axe"]}))
+	isolate([])
+	for u in [flier, archer, killer, plain]:
+		b.units_root.add_child(u)
+	check_eq(MapMarkers.warning(archer, flier), "effective", "a bow is effective against a flier")
+	check_eq(MapMarkers.warning(killer, flier), "crit", "a carried (not equipped) Killing Edge: crit warning")
+	check_eq(killer.weapon.name, "Iron Sword", "trying its weapons leaves the inventory as it was")
+	check_eq(MapMarkers.warning(plain, flier), "", "nothing special: no warning")
+	check_eq(MapMarkers.warning(flier, archer), "", "a player unit isn't warned about")
+	# The subject: the hovered player unit while browsing.
+	b.cursor.cell = flier.cell
+	b.input.refresh_info()
+	check_eq(b.markers.subject(), flier, "hovering a player unit makes it the subject")
+	b.markers._update_warnings(flier)
+	check_eq(b.markers._warnings, {archer: "effective", killer: "crit"}, "the foes it's warned about")
+	b.cursor.cell = archer.cell
+	b.input.refresh_info()
+	check_eq(b.markers.subject(), null, "hovering a foe: no subject")
+
+
+func test_markers_talk_boss_and_loot() -> void:
+	var errors: Array = b.events.load_text("""
+== talk Lord, Brigand ==
+Lord: Hello.
+""")
+	check_eq(errors, [], "test events parse")
+	var lord := unit_named("Lord")
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	lord.set_cell(Vector2i(1, 1))
+	brig.set_cell(Vector2i(10, 8))
+	check(b.events.talk_partners(lord).has(brig), "a talk partner anywhere on the map")
+	check(b.events.talk_targets(lord).is_empty(), "though Talk itself still needs it adjacent")
+	brig.gold = 0
+	brig.items.assign([Items.make("Iron Axe")])
+	check(not MapMarkers.has_loot(brig), "only weapons and no gold: no loot")
+	brig.items.append(Items.make("Potion"))
+	check(MapMarkers.has_loot(brig), "something stealable: loot")
+	brig.items.pop_back()
+	brig.gold = 100
+	check(MapMarkers.has_loot(brig), "gold: loot")
+	check(not MapMarkers.has_loot(lord), "never on player units")

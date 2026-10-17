@@ -44,7 +44,7 @@ func test_biography_is_kept_untranslated() -> void:
 	copy.free()
 	var t := _pretend({"Seized {map}.": "Tomo {map}."})
 	b.ui.show_status(lord)
-	b.ui.status_screen.page = StatusScreen.PAGES.find("Bio")
+	b.ui.status_screen.page = b.ui.status_screen.pages().find("Bio")
 	b.ui.status_screen.change_page(0)
 	check(_texts(b.ui.status_screen).any(func(s): return s.begins_with("– Tomo ")), "shown translated")
 	b.ui.hide_status()

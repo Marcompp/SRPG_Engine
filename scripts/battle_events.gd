@@ -52,13 +52,18 @@ func on_turn(turn: int, phase: String) -> void:
 
 ## Units `u` can Talk to: adjacent, with a talk event naming `u` first.
 func talk_targets(u: Unit) -> Array[Unit]:
+	return talk_partners(u).filter(func(other: Unit) -> bool: return BattleMap.distance(u.cell, other.cell) == 1)
+
+
+## Units on the map `u` has a Talk event with, wherever they are (MapMarkers shows them).
+func talk_partners(u: Unit) -> Array[Unit]:
 	var result: Array[Unit] = []
 	for i in events.size():
 		var e: Dictionary = events[i]
 		if e.trigger != "talk" or e.args[0] != u.unit_name or not _ready_to_run(i):
 			continue
 		for other in battle.units():
-			if other.unit_name == e.args[1] and BattleMap.distance(u.cell, other.cell) == 1 and not result.has(other):
+			if other.unit_name == e.args[1] and not result.has(other):
 				result.append(other)
 	return result
 

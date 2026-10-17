@@ -1,8 +1,8 @@
 class_name BattleMenus
 extends RefCounted
 ## The command menus (part of BattleInput, as `input.menus`): the map menu, the
-## unit menu and the menus it opens (weapons, magic, items, repair, steal, unload,
-## rewind), and the confirmation prompts. Picking an entry opens the next menu,
+## unit menu and the menus it opens (weapons, magic, items and each item's submenu,
+## repair, steal, unload, rewind), and the confirmation prompts. Picking an entry opens the next menu,
 ## starts targeting (input.targeting) or runs the action (BattleActions).
 
 var input: BattleInput
@@ -23,6 +23,8 @@ var repair_choices: Array[int] = []
 ## Steal: the foe picked, and the item indices behind the Steal menu's entries.
 var steal_target: Unit
 var steal_choices: Array[int] = []
+## Items menu: the inventory index of the item whose submenu is open.
+var item_index := -1
 ## Passengers behind the Unload menu's entries.
 var passenger_choices: Array[Unit] = []
 ## Shop on the map: the item names behind the Buy menu's entries, and whether the
@@ -129,10 +131,9 @@ func open_magic_menu() -> void:
 	open("magic", options)
 
 
-## Inventory view. Picking a weapon equips it (does not end the unit's turn);
-## picking a usable consumable uses it (ends the turn). Weapons the unit's class
-## can't wield are marked (x).
-func open_items_menu() -> void:
+## Inventory view: picking an item opens its submenu (open_item_menu). Weapons the
+## unit's class can't wield are marked (x). `index` is the entry to start on.
+func open_items_menu(index := 0) -> void:
 	var options: Array[String] = []
 	var equipped := selected.equipped_index()
 	for i in selected.items.size():
@@ -144,6 +145,26 @@ func open_items_menu() -> void:
 			mark = "  " + tr("(x)")
 		options.append(Items.label(item) + mark)
 	open("items", options)
+	battle.ui.menu_select(clampi(index, 0, options.size() - 1))
+
+
+## What can be done with the item at `index`, GBA-style: only what applies is listed.
+## Equipping doesn't end the turn; using does; discarding commits the move.
+func open_item_menu(index: int) -> void:
+	item_index = index
+	var item := selected.items[index]
+	var options: Array[String] = []
+	if selected.can_wield(item) and index != selected.equipped_index():
+		options.append("Equip")  # i18n
+	if not Items.is_weapon(item) and Items.can_use(selected, item):
+		options.append("Use")  # i18n
+	options.append("Discard")  # i18n
+	open("item", options, Items.label(item))
+
+
+func _confirm_discard() -> void:
+	var options: Array[String] = ["Cancel", "Discard"]  # i18n
+	open("discard", options, tr("Discard {item}?").format({"item": Items.label(selected.items[item_index])}))
 
 
 ## Map menu > Rewind: pick an earlier turn start (this turn's included), newest first.
@@ -326,19 +347,35 @@ func accept() -> void:
 			# Newest turn first.
 			battle.phases.rewind_to(battle.turn_history.size() - 1 - battle.ui.menu_index)
 		"items":
-			var item := selected.items[battle.ui.menu_index]
-			if selected.can_wield(item):
-				selected.equip(battle.ui.menu_index)
-				open_items_menu()
-			elif item.get("kind", "") == "scroll" and Items.can_use(selected, item):
-				_read_scroll(battle.ui.menu_index)
-			elif item.get("kind", "") == "repair" and Items.can_use(selected, item):
-				open_repair_menu(battle.ui.menu_index)
-			elif Items.can_use(selected, item):
-				_act(_use_item.bind(battle.ui.menu_index))
+			open_item_menu(battle.ui.menu_index)
+		"item":
+			var item := selected.items[item_index]
+			match battle.ui.menu_choice():
+				"Equip":
+					selected.equip(item_index)
+					open_items_menu(selected.items.find(item))
+				"Use":
+					if item.get("kind", "") == "scroll":
+						_read_scroll(item_index)
+					elif item.get("kind", "") == "repair":
+						open_repair_menu(item_index)
+					else:
+						_act(_use_item.bind(item_index))
+				"Discard":
+					_confirm_discard()
+		"discard":
+			if battle.ui.menu_choice() == "Discard":
+				var item := selected.items[item_index]
+				selected.items.remove_at(item_index)
+				selected.popup(tr("Discarded {item}").format({"item": item.name}), Color.LIGHT_GRAY)
+				# Like trading, discarding can't be taken back, so the move can't either.
+				input.move_committed = true
+				if selected.items.is_empty():
+					open_unit_menu()
+				else:
+					open_items_menu(item_index)
 			else:
-				selected.popup(tr("Can't use"), Color.LIGHT_GRAY)
-				open_items_menu()
+				open_item_menu(item_index)
 
 
 func cancel() -> void:
@@ -358,6 +395,10 @@ func cancel() -> void:
 			input.undo_move()
 		"attack", "magic", "items", "unload", "break":
 			open_unit_menu()
+		"item":
+			open_items_menu(item_index)
+		"discard":
+			open_item_menu(item_index)
 		"shop":
 			# Buying or selling ends the turn; just looking doesn't.
 			if shop_used:
@@ -369,7 +410,7 @@ func cancel() -> void:
 		"steal":
 			input.targeting.start_units("steal", battle.actions.steal_targets(selected))
 		"repair":
-			open_items_menu()
+			open_item_menu(repair_kit)
 
 
 # --- Shop on the map (see Shop) -------------------------------------------------
@@ -437,7 +478,7 @@ func _read_scroll(index: int) -> void:
 		await input.get_tree().create_timer(0.3).timeout
 		input.finish_action()
 	else:
-		open_items_menu()
+		open_items_menu(index)
 
 
 ## Runs an action that ends the selected unit's turn.

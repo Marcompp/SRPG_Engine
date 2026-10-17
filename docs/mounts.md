@@ -51,7 +51,7 @@ Effective stat while mounted = rider's stat / 2 + mount's stat.
   those are the unit's real stats.
 - The mount gets its own level-up popup. Mount gains count in full, so this is
   where a mounted unit's growth shows.
-- The status screen shows rider, mount and effective stats.
+- The status screen shows effective stats (detail mode breaks them into rider / 2 + mount), and a Mount page for riders: name, species, gender, level and EXP, its stats against the species caps, MOV and skills.
 
 ### Experience
 

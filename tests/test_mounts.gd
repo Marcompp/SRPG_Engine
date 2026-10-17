@@ -41,6 +41,36 @@ func test_mounted_classes_and_stats() -> void:
 	check(Skills.has(rogue, "Loyal"), "the mount's skills count")
 
 
+func test_status_screen_mount_page() -> void:
+	var lord := unit_named("Lord")
+	var screen: StatusScreen = b.ui.status_screen
+	b.ui.show_status(lord)
+	check(not screen.pages().has("Mount"), "no Mount page on foot")
+	b.ui.hide_status()
+	lord.mount_up(Mounts.generate("Horse", 3, {"name": "Bayard", "skills": ["Loyal"]}))
+	b.ui.show_status(lord)
+	check_eq(screen.pages(), ["Stats", "Items", "Skills", "Mount", "Bio"] as Array[String], "riders get a Mount page")
+	screen.page = screen.pages().find("Mount")
+	screen.change_page(0)
+	var texts := _texts(screen)
+	for expected in ["Bayard", "Lv 3", str(lord.mount.stats.agi), "Loyal"]:
+		check(texts.has(expected), "Mount page shows '%s'" % expected)
+	# Up/Down to a unit on foot falls back to a page it has; back to a rider keeps Mount.
+	var archer := unit_named("Archer")
+	screen.show_unit(archer)
+	check(screen.page < screen.page_count(), "a unit on foot lands on a page it has")
+	screen.page = 3
+	screen.show_unit(lord)
+	check_eq(screen.pages()[screen.page], "Bio", "the page is kept by name, not index")
+	b.ui.hide_status()
+	# Enemies: no Bio, but Mount when riding.
+	var brig := unit_named("Brigand", Unit.Team.ENEMY)
+	ride(brig, "Horse", "Axeman")
+	b.ui.show_status(brig)
+	check_eq(screen.pages(), ["Stats", "Items", "Skills", "Mount"] as Array[String], "mounted enemy pages")
+	b.ui.hide_status()
+
+
 func test_who_can_ride() -> void:
 	check(Mounts.ride_problem("Guard", "Human", "male", "Horse") != "", "heavy armor can't ride")
 	check(Mounts.ride_problem("Footman", "Centaur", "male", "Horse") != "", "Centaurs don't ride")

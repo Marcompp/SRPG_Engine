@@ -43,6 +43,7 @@ func test_scroll_learning_and_cap() -> void:
 	await open_menu_in_place(lord)
 	await pick("Items")
 	await pick("Vigor Scroll  1")
+	await pick("Use")
 	check_eq(b.state, b.State.CHOICE, "learning a sixth skill asks first")
 	check_eq(b.ui.menu_options[-1], "Don't learn", "with an option not to")
 	await press(KEY_X)
@@ -52,6 +53,7 @@ func test_scroll_learning_and_cap() -> void:
 	check_eq(b.input.menus.context, "items", "back in the items menu")
 	# Forget the first one instead.
 	await pick("Vigor Scroll  1")
+	await pick("Use")
 	await press(KEY_Z)
 	check(not lord.learned.has("Luck +4"), "the picked skill is forgotten")
 	check_eq(lord.learned[-1], "Strength +2", "the new one learned")
@@ -271,6 +273,7 @@ func test_canto() -> void:
 	await press(KEY_Z)  # move 1 tile
 	await pick("Items")
 	await pick("Potion  3")
+	await pick("Use")
 	check_eq(b.state, b.State.SELECTED, "Canto: after acting, it can move again")
 	check(b.input.canto_move, "a Canto move")
 	check(not lord.has_acted, "not done yet")

@@ -227,6 +227,49 @@ func test_prep_screen() -> void:
 	prep.queue_free()
 
 
+func test_prep_trade() -> void:
+	Campaign.start_new()
+	Campaign.save()
+	var prep: Control = load("res://scenes/prep.tscn").instantiate()
+	root.add_child(prep)
+	await process_frame
+	var lord: Dictionary = Campaign.army_unit("Lord")
+	var archer: Dictionary = Campaign.army_unit("Archer")
+	var lord_items: Array = lord.items.map(func(it): return it.name)
+	var archer_items: Array = archer.items.map(func(it): return it.name)
+	prep.index = prep.MENU.find("Trade")
+	_prep_press(prep, KEY_Z)
+	check_eq(prep.mode, "trade_unit", "Trade: pick a unit")
+	prep.index = prep._army_names().find("Lord")
+	_prep_press(prep, KEY_Z)
+	check(not prep._trade_partners().has("Lord"), "then a partner, not the same unit")
+	prep.index = prep._trade_partners().find("Archer")
+	_prep_press(prep, KEY_Z)
+	check_eq(prep.mode, "trade", "then trade")
+	# Swap the Lord's first item with the Archer's first.
+	_prep_press(prep, KEY_Z)
+	check_eq(prep.held, Vector2i(0, 0), "Z picks the item up")
+	check_eq(prep.column, 1, "and jumps to the other unit")
+	_prep_press(prep, KEY_Z)
+	check_eq(lord.items[0].name, archer_items[0], "swapped: the Lord has the Archer's")
+	check_eq(archer.items[0].name, lord_items[0], "and the Archer the Lord's")
+	# Hand the Archer's first item over: the empty slot after the Lord's items.
+	prep.index = 0
+	_prep_press(prep, KEY_Z)
+	check_eq(prep.column, 0, "on the Lord's side")
+	prep.index = lord.items.size()
+	_prep_press(prep, KEY_Z)
+	check_eq(lord.items.size(), lord_items.size() + 1, "handed over to the Lord")
+	check_eq(archer.items.size(), archer_items.size() - 1, "from the Archer")
+	# X with an item held puts it back; X again goes back to picking a partner.
+	_prep_press(prep, KEY_Z)
+	_prep_press(prep, KEY_X)
+	check_eq(prep.held, Vector2i(-1, -1), "X drops the held item")
+	_prep_press(prep, KEY_X)
+	check_eq(prep.mode, "trade_partner", "X: back to the partners")
+	prep.queue_free()
+
+
 func _prep_press(prep: Control, code: Key) -> void:
 	var e := InputEventKey.new()
 	e.physical_keycode = code

@@ -85,6 +85,7 @@ func test_cures() -> void:
 	await open_menu_in_place(lord)
 	await pick("Items")
 	await pick("Antitoxin  3")
+	await pick("Use")
 	check(lord.statuses.is_empty(), "Antitoxin cures Poison")
 	check(lord.has_acted, "using it ends the turn")
 	# Restore: an ally-target spell that cures every status and heals nothing.

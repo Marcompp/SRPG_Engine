@@ -343,6 +343,11 @@ func choose(options: Array[String], title: String) -> int:
 func refresh_info() -> void:
 	battle.ui.update_info(battle.unit_at(battle.cursor.cell), battle.map.terrain_at(battle.cursor.cell), battle.cursor.cell,
 		battle.map.tile_hp.get(battle.cursor.cell, -1))
+	# The objective window shows while browsing the map, not while a unit is moving.
+	if Settings.value("objective_window") and battle.state in [Battle.State.IDLE, Battle.State.FORMATION]:
+		battle.ui.show_goal(battle.goal_lines(), battle.cursor.cell)
+	else:
+		battle.ui.hide_goal()
 	update_hover()
 
 
@@ -357,6 +362,7 @@ func select(u: Unit) -> void:
 	moved_cost = 0.0
 	reach = battle.map.get_reachable(u, battle.units())
 	show_unit_ranges(u, reach)
+	battle.ui.hide_goal()
 	_start_path()
 
 
